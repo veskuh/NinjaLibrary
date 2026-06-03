@@ -1,0 +1,277 @@
+import QtQuick
+import QtTest
+import NinjaLibrary
+import Kaakao 1.0
+
+TestCase {
+    name: "MainWindowTests"
+    width: 1024
+    height: 768
+    visible: true
+
+    Component {
+        id: mainWindowComponent
+        MainWindow {}
+    }
+
+    // Helper to find a child by type name (e.g. "Sidebar" or "Inspector")
+    function findChildByType(parent, typeName) {
+        if (!parent) return null;
+        if (parent.toString().indexOf(typeName) >= 0) return parent;
+        if (parent.children) {
+            for (let i = 0; i < parent.children.length; ++i) {
+                let found = findChildByType(parent.children[i], typeName);
+                if (found) return found;
+            }
+        }
+        if (parent.contentItem) {
+            let found = findChildByType(parent.contentItem, typeName);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    // Helper to recursively find a KaakaoToolButton by its text label
+    function findToolButtonByText(parent, text) {
+        if (!parent) return null;
+        if (parent.toString().indexOf("KaakaoToolButton") >= 0 && parent.text === text) {
+            return parent;
+        }
+        if (parent.children) {
+            for (let i = 0; i < parent.children.length; ++i) {
+                let found = findToolButtonByText(parent.children[i], text);
+                if (found) return found;
+            }
+        }
+        if (parent.header) {
+            let found = findToolButtonByText(parent.header, text);
+            if (found) return found;
+        }
+        if (parent.contentItem) {
+            let found = findToolButtonByText(parent.contentItem, text);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    function test_toolbar_button_properties() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        
+        // Wait for rendering and completed callbacks
+        wait(200);
+
+        // Verify Add Folder button
+        let folderBtn = findToolButtonByText(win, "Add Folder");
+        verify(folderBtn !== null, "Add Folder button should be found by text");
+        compare(folderBtn.iconEmoji, "➕", "Add Folder button icon emoji should be ➕");
+
+        // Verify Inspector toggle button
+        let inspectorBtn = findToolButtonByText(win, "Inspector");
+        verify(inspectorBtn !== null, "Inspector button should be found by text");
+        compare(inspectorBtn.iconEmoji, "ⓘ", "Inspector button icon emoji should be ⓘ");
+
+        win.destroy();
+    }
+
+    function test_menu_bar_structure_and_actions() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let menuBar = win.mainMenuBar;
+        verify(menuBar !== null, "MenuBar should exist on MainWindow");
+
+        // Verify menus exist
+        let menus = menuBar.menus;
+        verify(menus.length >= 5, "MenuBar should have at least 5 menus");
+
+        // Check menus titles
+        compare(menus[0].title, "File", "First menu should be File");
+        compare(menus[1].title, "Edit", "Second menu should be Edit");
+        compare(menus[2].title, "View", "Third menu should be View");
+        compare(menus[3].title, "Window", "Fourth menu should be Window");
+        compare(menus[4].title, "Help", "Fifth menu should be Help");
+
+        // Verify File menu items and triggering
+        let fileMenu = menus[0];
+        verify(fileMenu.count >= 2, "File menu should have menu items");
+        compare(fileMenu.itemAt(0).text, "Add Watched Folder...", "First File item should be Add Watched Folder");
+        compare(fileMenu.itemAt(2).text, "Quit", "Second File item should be Quit"); // index 2 because separator is at index 1
+
+        // Verify Help menu About and Preferences
+        let helpMenu = menus[4];
+        verify(helpMenu.count >= 2, "Help menu should have items");
+        compare(helpMenu.itemAt(0).text, "About NinjaLibrary", "First Help item should be About");
+        compare(helpMenu.itemAt(1).text, "Preferences...", "Second Help item should be Preferences");
+
+        // Test Sidebar Toggle via Menu Trigger
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+        compare(sidebar.collapsed, false, "Sidebar should be expanded initially");
+
+        let viewMenu = menus[2];
+        let toggleSidebarItem = viewMenu.itemAt(0);
+        compare(toggleSidebarItem.text, "Toggle Sidebar", "Should have Toggle Sidebar item");
+
+        toggleSidebarItem.action.trigger();
+        compare(sidebar.collapsed, true, "Sidebar should collapse after menu trigger");
+
+        toggleSidebarItem.action.trigger();
+        compare(sidebar.collapsed, false, "Sidebar should expand after second menu trigger");
+
+        win.destroy();
+    }
+
+
+    function test_inspector_toggling() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let inspector = findChildByType(win, "Inspector");
+        verify(inspector !== null, "Inspector component should exist");
+
+        // Default state: not collapsed, visible
+        compare(inspector.collapsed, false, "Inspector should not be collapsed by default");
+        compare(inspector.visible, true, "Inspector should be visible by default");
+
+        let inspectorBtn = findToolButtonByText(win, "Inspector");
+        verify(inspectorBtn !== null, "Inspector button should exist");
+
+        // Click to collapse
+        mouseClick(inspectorBtn);
+        compare(inspector.collapsed, true, "Inspector should be collapsed after click");
+        compare(inspector.visible, false, "Inspector should be invisible after click");
+
+        // Click again to expand
+        mouseClick(inspectorBtn);
+        compare(inspector.collapsed, false, "Inspector should not be collapsed after second click");
+        compare(inspector.visible, true, "Inspector should be visible after second click");
+
+        win.destroy();
+    }
+
+    function test_inspector_tag_reactivity() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let inspector = findChildByType(win, "Inspector");
+        verify(inspector !== null, "Inspector component should exist");
+
+        // Clear existing model rows
+        documentModel.clear();
+
+        // Append a mock document mapping roles both as integers and as strings
+        let mockDoc = {
+            "257": 42,
+            "259": "test_doc.pdf",
+            "260": "/path/test.pdf",
+            "273": "100 KB",
+            "266": 12,
+            "267": 3,
+            "268": false,
+            "269": ["initial_tag"],
+            "270": "",
+            "271": "Some notes",
+            "272": "",
+            "id": 42,
+            "fileName": "test_doc.pdf",
+            "absolutePath": "/path/test.pdf",
+            "fileSizeStr": "100 KB",
+            "pageCount": 12,
+            "starRating": 3,
+            "isOffline": false,
+            "tags": ["initial_tag"],
+            "notes": "Some notes",
+            "thumbnailPath": ""
+        };
+        documentModel.append(mockDoc);
+
+        // Select the mock document
+        inspector.selectedIds = [42];
+        compare(inspector.selectedId, 42, "Selected ID should match the appended document");
+        verify(inspector.docData !== null, "Inspector docData should be populated");
+        compare(inspector.docData.tags.length, 1, "Initial tag list length should be 1");
+        compare(inspector.docData.tags[0], "initial_tag", "Initial tag should match");
+
+        // Dynamically update the tags role using updateRow
+        documentModel.updateRow(0, {
+            "269": ["initial_tag", "new_tag"],
+            "tags": ["initial_tag", "new_tag"]
+        });
+
+        // Verify the inspector's docData updated immediately
+        verify(inspector.docData !== null, "Inspector docData should still be populated");
+        compare(inspector.docData.tags.length, 2, "Tags list length should immediately update to 2");
+        compare(inspector.docData.tags[1], "new_tag", "The new tag should be present immediately");
+
+        win.destroy();
+    }
+
+    function test_inspector_notes_auto_save() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let inspector = findChildByType(win, "Inspector");
+        verify(inspector !== null, "Inspector component should exist");
+
+        // Clear existing model rows
+        documentModel.clear();
+
+        // Append two mock documents
+        documentModel.append({
+            "257": 42,
+            "271": "Notes 42",
+            "id": 42,
+            "notes": "Notes 42"
+        });
+        documentModel.append({
+            "257": 43,
+            "271": "Notes 43",
+            "id": 43,
+            "notes": "Notes 43"
+        });
+
+        // Set up SignalSpy for notesUpdated signal on libraryController
+        let notesSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        notesSpy.target = libraryController;
+        notesSpy.signalName = "notesUpdated";
+
+        // 1. Select document 42
+        inspector.selectedIds = [42];
+        compare(inspector.selectedId, 42, "Document 42 should be selected");
+        
+        // Find notesArea
+        let notesArea = findChildByType(inspector, "KaakaoTextArea");
+        verify(notesArea !== null, "notesArea should exist inside Inspector");
+        compare(notesArea.text, "Notes 42", "notesArea text should show initial notes");
+
+        // Modify the text area content (simulates user typing)
+        notesArea.text = "Edited Notes 42";
+
+        // 2. Change selection to document 43. This should automatically save the notes of 42.
+        inspector.selectedIds = [43];
+        compare(notesSpy.count, 1, "Changing selection should trigger auto-save of previous notes");
+        compare(notesSpy.signalArguments[0][0], 42, "Saved document ID should be 42");
+        compare(notesSpy.signalArguments[0][1], "Edited Notes 42", "Saved notes text should match the edited text");
+        notesSpy.clear();
+
+        // Confirm text area has been updated to the B's notes
+        compare(notesArea.text, "Notes 43", "notesArea text should update to selection B notes");
+
+        // Edit notes of document 43
+        notesArea.text = "Edited Notes 43";
+
+        // 3. Collapse/close the inspector. This should trigger auto-save of 43.
+        inspector.collapsed = true;
+        compare(notesSpy.count, 1, "Collapsing inspector should trigger auto-save of notes");
+        compare(notesSpy.signalArguments[0][0], 43, "Saved document ID should be 43");
+        compare(notesSpy.signalArguments[0][1], "Edited Notes 43", "Saved notes text should match edited text");
+
+        notesSpy.destroy();
+        win.destroy();
+    }
+}

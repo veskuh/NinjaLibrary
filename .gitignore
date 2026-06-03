@@ -1,0 +1,19 @@
+# Build directories
+build/
+build-cov/
+build*/
+
+# Code coverage reports
+*.info
+
+# macOS system files
+.DS_Store
+
+# User-specific configuration
+.idea/
+.vscode/
+*.user
+
+# Working files
+task.md
+walkthrough.md

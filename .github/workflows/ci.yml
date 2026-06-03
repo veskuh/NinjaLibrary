@@ -1,0 +1,62 @@
+name: NinjaLibrary Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-runs-on: ubuntu-latest # Wait, let's look at the matrix. Matrix os is matrix.os, runs-on should be ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-12]
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup Compiler Environment (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build libgl1-mesa-dev libpoppler-qt6-dev tesseract-ocr libtesseract-dev
+
+    - name: Install Qt 6.8 Core Frameworks
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.8.*'
+        host: ${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
+        target: 'desktop'
+        arch: ${{ matrix.os == 'ubuntu-latest' && 'gcc_64' || 'clang_64' }}
+        modules: 'qtquickcontrols2 qt5compat'
+
+    - name: Configure CMake & Activate Profiling Code Coverage
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DENABLE_TESTING=ON \
+          -DENABLE_COVERAGE=${{ matrix.os == 'ubuntu-latest' && 'ON' || 'OFF' }}
+
+    - name: Compile Application & Test Binaries
+      run: cmake --build build
+
+    - name: Execute Automated Unit & Integration Tests (CTest)
+      run: |
+        cd build
+        ctest --output-on-failure --parallel 4
+
+    - name: Generate Code Coverage Diagnostics Dashboard (Linux Only)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get install -y lcov
+        lcov --directory . --capture --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/moc_*' '*/qrc_*' --output-file coverage.info
+        lcov --list coverage.info

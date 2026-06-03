@@ -1,0 +1,191 @@
+/*
+ * Copyright (c) 2026, NinjaLibrary
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+import QtQuick
+import QtQuick.Controls.Basic
+import Kaakao 1.0
+
+ItemDelegate {
+    id: control
+
+    // Desktop rows are compact
+    implicitHeight: 24
+    implicitWidth: ListView.view ? ListView.view.width : 200
+
+    property list<KaakaoTableColumn> columns
+    readonly property int rowIndex: index
+
+    readonly property bool isEvenRow: index % 2 === 0
+    readonly property bool isSelected: ListView.isCurrentItem
+    readonly property var rowData: modelData
+
+    onClicked: {
+        if (ListView.view) {
+            ListView.view.currentIndex = index
+            ListView.view.forceActiveFocus()
+        }
+    }
+
+    background: Rectangle {
+        anchors.fill: parent
+        color: {
+            if (control.isSelected) {
+                if (control.ListView.view && control.ListView.view.activeFocus)
+                    return Theme.selectionBackgroundActive;
+                return Theme.selectionBackgroundInactive;
+            }
+            return control.isEvenRow ? Theme.alternatingRowBackgroundEven : Theme.alternatingRowBackgroundOdd;
+        }
+    }
+
+    contentItem: Row {
+        id: cellRow
+        anchors.fill: parent
+        spacing: 0
+
+        Repeater {
+            model: control.columns
+            delegate: Item {
+                id: cellItem
+                width: modelData.width
+                height: control.height
+                clip: true
+
+                readonly property string cellValue: {
+                    let roleName = modelData.role
+                    if (control.rowData !== undefined && control.rowData[roleName] !== undefined)
+                        return control.rowData[roleName]
+                    
+                    if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+                        let val = control.ListView.view.model.get(control.rowIndex, roleName)
+                        return val !== undefined ? val.toString() : ""
+                    }
+                    
+                    if (model[roleName] !== undefined)
+                        return model[roleName]
+                    return ""
+                }
+
+                ToolTip.visible: cellMouse.containsMouse && ToolTip.text !== ""
+                ToolTip.text: {
+                    if (modelData.showAsIndicator) {
+                        return cellItem.cellValue
+                    }
+                    let roleName = modelData.role
+                    let tooltipRole = roleName + "Tooltip"
+                    
+                    let valTooltip = undefined
+                    if (control.rowData !== undefined && control.rowData[tooltipRole] !== undefined) {
+                        valTooltip = control.rowData[tooltipRole]
+                    } else if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+                        valTooltip = control.ListView.view.model.get(control.rowIndex, tooltipRole)
+                    } else if (model[tooltipRole] !== undefined) {
+                        valTooltip = model[tooltipRole]
+                    }
+                    
+                    if (valTooltip !== undefined && valTooltip !== "") {
+                        return valTooltip
+                    }
+                    
+                    if (cellLabel.truncated)
+                        return cellLabel.text
+                    return ""
+                }
+
+                MouseArea {
+                    id: cellMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                }
+
+                // Custom Status Indicator
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 10
+                    height: 10
+                    radius: 5
+                    visible: modelData.showAsIndicator
+                    color: {
+                        let colorRole = modelData.indicatorColorRole
+                        let valColor = undefined
+                        if (control.rowData !== undefined && control.rowData[colorRole] !== undefined) {
+                            valColor = control.rowData[colorRole]
+                        } else if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+                            valColor = control.ListView.view.model.get(control.rowIndex, colorRole)
+                        } else if (model[colorRole] !== undefined) {
+                            valColor = model[colorRole]
+                        }
+                        
+                        if (valColor !== undefined && valColor !== "") {
+                            if (valColor === "green") return Theme.colorSuccess || "#28a745"
+                            if (valColor === "red") return Theme.colorError || "#ff3b30"
+                            if (valColor === "orange") return "#ff9500"
+                            if (valColor === "purple") return "#af52de"
+                            return valColor
+                        }
+                        // Fallback to value if it's already a color string/HEX
+                        let val = cellItem.cellValue
+                        if (val.startsWith("#") || val === "red" || val === "green" || val === "blue" || val === "orange" || val === "yellow" || val === "gray" || val === "purple")
+                            return val
+                        return "gray"
+                    }
+                    border.width: 1
+                    border.color: Theme.isDarkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"
+                }
+
+                Label {
+                    id: cellLabel
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    verticalAlignment: Text.AlignVCenter
+                    visible: !modelData.showAsIndicator
+                    text: cellItem.cellValue
+                    font: Theme.defaultFont
+                    elide: modelData.elide !== undefined ? modelData.elide : Text.ElideRight
+                    renderType: Text.NativeRendering
+                    color: (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) 
+                           ? Theme.selectionTextActive 
+                           : Theme.selectionTextInactive
+                }
+
+                // Vertical divider line
+                Rectangle {
+                    anchors.right: parent.right
+                    height: parent.height
+                    width: 1
+                    color: Theme.headerDivider
+                    visible: index < control.columns.length - 1
+                }
+            }
+        }
+    }
+}
