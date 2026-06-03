@@ -56,54 +56,65 @@ Item {
         id: gridView
         anchors.fill: parent
         
+        gridView.topMargin: Theme.paddingMedium
+        gridView.leftMargin: Theme.paddingMedium
+        gridView.rightMargin: Theme.paddingMedium
+        gridView.bottomMargin: Theme.paddingMedium
+        
         model: proxyFilter
-        cellWidth: scaleFactor + 20
-        cellHeight: scaleFactor * 1.25 + 30
+        cellWidth: scaleFactor + Theme.paddingMedium
+        cellHeight: scaleFactor * 1.25 + Theme.paddingMedium
 
-        delegate: DocumentCard {
-            fileName: model.fileName
-            absolutePath: model.absolutePath
-            fileSize: model.fileSize
-            thumbnailPath: model.thumbnailPath
-            starRating: model.starRating
-            isOffline: model.isOffline
-            
-            width: scaleFactor
-            height: scaleFactor * 1.25
+        delegate: Item {
+            width: gridView.cellWidth
+            height: gridView.cellHeight
 
-            isSelected: gridCanvas.selectedIds.indexOf(model.docId) >= 0
-
-            // Request thumbnail if not loaded yet
-            Component.onCompleted: {
-                if (model.thumbnailPath === "" && !model.isOffline) {
-                    libraryController.requestThumbnail(model.docId, model.absolutePath, false)
-                }
-            }
-
-            onClicked: (event) => {
-                var docId = model.docId
-                var isCtrl = (event.modifiers & Qt.ControlModifier) || (event.modifiers & Qt.MetaModifier)
+            DocumentCard {
+                anchors.centerIn: parent
+                fileName: model.fileName
+                absolutePath: model.absolutePath
+                fileSize: model.fileSize
+                thumbnailPath: model.thumbnailPath
+                starRating: model.starRating
+                isOffline: model.isOffline
                 
-                if (isCtrl) {
-                    var idx = gridCanvas.selectedIds.indexOf(docId)
-                    var currentList = gridCanvas.selectedIds.slice() // copy array
-                    if (idx >= 0) {
-                        currentList.splice(idx, 1)
-                    } else {
-                        currentList.push(docId)
+                width: scaleFactor
+                height: scaleFactor * 1.25
+
+                isSelected: gridCanvas.selectedIds.indexOf(model.docId) >= 0
+
+                // Request thumbnail if not loaded yet
+                Component.onCompleted: {
+                    if (model.thumbnailPath === "" && !model.isOffline) {
+                        libraryController.requestThumbnail(model.docId, model.absolutePath, false)
                     }
-                    gridCanvas.selectedIds = currentList
-                } else {
-                    gridCanvas.selectedIds = [docId]
                 }
-                
-                gridView.currentIndex = index
-                gridView.forceActiveFocus()
-                gridCanvas.selectionChanged(gridCanvas.selectedIds)
-            }
 
-            onDoubleClicked: {
-                gridCanvas.doubleClicked(model.absolutePath)
+                onClicked: (event) => {
+                    var docId = model.docId
+                    var isCtrl = (event.modifiers & Qt.ControlModifier) || (event.modifiers & Qt.MetaModifier)
+                    
+                    if (isCtrl) {
+                        var idx = gridCanvas.selectedIds.indexOf(docId)
+                        var currentList = gridCanvas.selectedIds.slice() // copy array
+                        if (idx >= 0) {
+                            currentList.splice(idx, 1)
+                        } else {
+                            currentList.push(docId)
+                        }
+                        gridCanvas.selectedIds = currentList
+                    } else {
+                        gridCanvas.selectedIds = [docId]
+                    }
+                    
+                    gridView.currentIndex = index
+                    gridView.forceActiveFocus()
+                    gridCanvas.selectionChanged(gridCanvas.selectedIds)
+                }
+
+                onDoubleClicked: {
+                    gridCanvas.doubleClicked(model.absolutePath)
+                }
             }
         }
     }

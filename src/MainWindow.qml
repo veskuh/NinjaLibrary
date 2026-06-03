@@ -32,6 +32,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import Qt.labs.platform 1.1 as Labs
+import QtCore
 import Kaakao 1.0
 import "views"
 import "panels"
@@ -40,12 +41,44 @@ KaakaoWindow {
     id: window
     title: "NinjaLibrary - Local-First Document Gallery"
     
-    width: 1024
-    height: 700
+    x: winSettings.x
+    y: winSettings.y
+    width: winSettings.width
+    height: winSettings.height
     minimumWidth: 800
     minimumHeight: 500
     
     visible: true
+
+    Settings {
+        id: winSettings
+        category: "MainWindow"
+        property int x: 100
+        property int y: 100
+        property int width: 1024
+        property int height: 700
+    }
+
+    onXChanged: {
+        if (window.visibility === Window.Windowed) {
+            winSettings.x = window.x
+        }
+    }
+    onYChanged: {
+        if (window.visibility === Window.Windowed) {
+            winSettings.y = window.y
+        }
+    }
+    onWidthChanged: {
+        if (window.visibility === Window.Windowed) {
+            winSettings.width = window.width
+        }
+    }
+    onHeightChanged: {
+        if (window.visibility === Window.Windowed) {
+            winSettings.height = window.height
+        }
+    }
 
     property alias mainMenuBar: mainMenuBar
 
