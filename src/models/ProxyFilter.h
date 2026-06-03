@@ -60,6 +60,7 @@ public:
     QString folderFilter() const { return m_folderFilter; }
 
     Q_INVOKABLE QVariant get(int row, const QString &roleName) const;
+    void setSourceModel(QAbstractItemModel *sourceModel) override;
 
 public slots:
     void setFilterString(const QString &filter);

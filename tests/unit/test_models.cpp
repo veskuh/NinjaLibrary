@@ -43,6 +43,7 @@ private slots:
     void testModelFiltering();
     void testProxyFilterGet();
     void testProxyFilterGetBounds();
+    void testMultiTermSearch();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -250,6 +251,56 @@ void TestModels::testProxyFilterGetBounds()
 
     // Empty role name
     QVERIFY(!proxyFilter.get(0, "").isValid());
+}
+
+void TestModels::testMultiTermSearch()
+{
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+    proxyFilter.setShowOffline(true);
+
+    // Initial count
+    QCOMPARE(proxyFilter.rowCount(), 3);
+
+    // Multi-term search: notes and tag
+    // fileA.pdf has tag "work" (1), notes "Boss notes"
+    // Let's search "boss work" -> should match fileA.pdf
+    proxyFilter.setFilterString("boss work");
+    QCOMPARE(proxyFilter.rowCount(), 1);
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+
+    // Case-insensitivity check: "BoSs WoRk"
+    proxyFilter.setFilterString("BoSs WoRk");
+    QCOMPARE(proxyFilter.rowCount(), 1);
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+
+    // Non-matching term: "boss play" -> no match
+    proxyFilter.setFilterString("boss play");
+    QCOMPARE(proxyFilter.rowCount(), 0);
+
+    // Matches notes, content, filename, tag
+    // fileA has filename "fileA.pdf", text "Hello world PDF text.", notes "Boss notes", tags "work", "important"
+    // Search "fileA important pdf" -> should match fileA.pdf
+    proxyFilter.setFilterString("fileA important pdf");
+    QCOMPARE(proxyFilter.rowCount(), 1);
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+
+    // Multi-document matches
+    // "work" tag is on File A and File B
+    // Search "work" -> matches File A and File B
+    proxyFilter.setFilterString("work");
+    QCOMPARE(proxyFilter.rowCount(), 2);
+
+    // "work hello" -> "work" on File A/B, but "hello" is only on File A ("Hello world...") and File C ("Hello duplicate...")
+    // So "work hello" matches only File A
+    proxyFilter.setFilterString("work hello");
+    QCOMPARE(proxyFilter.rowCount(), 1);
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+
+    // Reset filter
+    proxyFilter.setFilterString("");
+    QCOMPARE(proxyFilter.rowCount(), 3);
 }
 
 QTEST_MAIN(TestModels)

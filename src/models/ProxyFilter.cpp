@@ -54,6 +54,23 @@ ProxyFilter::~ProxyFilter()
 {
 }
 
+void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
+{
+    if (this->sourceModel()) {
+        disconnect(this->sourceModel(), &QAbstractItemModel::modelReset, this, &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::rowsInserted, this, &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::rowsRemoved, this, &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::dataChanged, this, &ProxyFilter::updateSearchMatches);
+    }
+    QSortFilterProxyModel::setSourceModel(sourceModel);
+    if (sourceModel) {
+        connect(sourceModel, &QAbstractItemModel::modelReset, this, &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::rowsInserted, this, &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::rowsRemoved, this, &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::dataChanged, this, &ProxyFilter::updateSearchMatches);
+    }
+}
+
 void ProxyFilter::setFilterString(const QString &filter)
 {
     if (m_filterString == filter) return;
@@ -139,38 +156,56 @@ void ProxyFilter::updateSearchMatches()
         return;
     }
 
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return;
+    QAbstractItemModel *model = sourceModel();
+    if (!model) {
+        invalidateFilter();
+        return;
+    }
 
-    // Use clean search terms and wildcard *
     QStringList terms = m_filterString.split(" ", Qt::SkipEmptyParts);
-    QString ftsQuery;
-    for (const QString &term : terms) {
-        if (!ftsQuery.isEmpty()) ftsQuery += " AND ";
-        // Escape quotes to prevent crashes
-        QString escaped = term;
-        escaped.replace("\"", "\"\"");
-        ftsQuery += "\"" + escaped + "*\"";
+    if (terms.isEmpty()) {
+        m_searchActive = false;
+        invalidateFilter();
+        return;
     }
 
-    QSqlQuery query(db);
-    query.prepare("SELECT document_id FROM document_search WHERE document_search MATCH :match;");
-    query.bindValue(":match", ftsQuery);
-    
-    bool ok = query.exec();
-    if (!ok) {
-        // Fallback to LIKE match if MATCH query syntax error
-        query.prepare("SELECT document_id FROM document_search WHERE file_name LIKE :like OR text_snippet LIKE :like OR notes LIKE :like;");
-        query.bindValue(":like", "%" + m_filterString + "%");
-        ok = query.exec();
-    }
+    int rows = model->rowCount();
+    for (int i = 0; i < rows; ++i) {
+        QModelIndex idx = model->index(i, 0);
+        int docId = model->data(idx, DocumentModel::IdRole).toInt();
+        QString fileName = model->data(idx, DocumentModel::FileNameRole).toString();
+        QString textSnippet = model->data(idx, DocumentModel::TextSnippetRole).toString();
+        QString notes = model->data(idx, DocumentModel::NotesRole).toString();
+        QStringList tags = model->data(idx, DocumentModel::TagsRole).toStringList();
 
-    if (ok) {
-        while (query.next()) {
-            m_matchedDocIds.insert(query.value(0).toInt());
+        bool allTermsMatch = true;
+        for (const QString &term : terms) {
+            bool termMatches = false;
+
+            if (fileName.contains(term, Qt::CaseInsensitive)) {
+                termMatches = true;
+            } else if (textSnippet.contains(term, Qt::CaseInsensitive)) {
+                termMatches = true;
+            } else if (notes.contains(term, Qt::CaseInsensitive)) {
+                termMatches = true;
+            } else {
+                for (const QString &tag : tags) {
+                    if (tag.contains(term, Qt::CaseInsensitive)) {
+                        termMatches = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!termMatches) {
+                allTermsMatch = false;
+                break;
+            }
         }
-    } else {
-        qWarning() << "FTS search failed:" << query.lastError().text();
+
+        if (allTermsMatch) {
+            m_matchedDocIds.insert(docId);
+        }
     }
 
     invalidateFilter();
