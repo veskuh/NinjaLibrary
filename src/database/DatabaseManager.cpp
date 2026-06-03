@@ -31,6 +31,25 @@
 #include "DatabaseManager.h"
 #include <QFileInfo>
 #include <QSqlRecord>
+#include <QThreadStorage>
+#include <QCoreApplication>
+
+struct ConnectionHolder {
+    QString name;
+    ~ConnectionHolder() {
+        if (!name.isEmpty() && QCoreApplication::instance()) {
+            {
+                QSqlDatabase db = QSqlDatabase::database(name, false);
+                if (db.isOpen()) {
+                    db.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(name);
+        }
+    }
+};
+
+static QThreadStorage<ConnectionHolder*> s_connectionStorage;
 
 DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent)
     : QObject(parent)
@@ -56,6 +75,24 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
 {
     QString threadId = QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()));
     QString connectionName = QString("NinjaLibrary_Connection_%1").arg(threadId);
+
+    if (!s_connectionStorage.hasLocalData()) {
+        if (QSqlDatabase::contains(connectionName)) {
+            // This is a stale connection from a terminated thread with the same ID.
+            // We must close and remove it to release locks and avoid warnings.
+            {
+                QSqlDatabase staleDb = QSqlDatabase::database(connectionName, false);
+                if (staleDb.isOpen()) {
+                    staleDb.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connectionName);
+        }
+
+        ConnectionHolder *holder = new ConnectionHolder();
+        holder->name = connectionName;
+        s_connectionStorage.setLocalData(holder);
+    }
 
     if (QSqlDatabase::contains(connectionName)) {
         QSqlDatabase db = QSqlDatabase::database(connectionName);

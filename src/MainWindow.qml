@@ -436,6 +436,20 @@ KaakaoWindow {
                 anchors.fill: parent
                 spacing: 0
 
+                KaakaoScopeBar {
+                    id: scopeBar
+                    Layout.fillWidth: true
+                    label: "Scope:"
+                    model: proxyFilter.activeScopes
+                    currentIndex: {
+                        var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
+                        return idx >= 0 ? idx : 0
+                    }
+                    onFilterSelected: (index, name) => {
+                        proxyFilter.scopeFilter = name
+                    }
+                }
+
                 StackLayout {
                     id: canvasStack
                     currentIndex: viewSegment.currentIndex

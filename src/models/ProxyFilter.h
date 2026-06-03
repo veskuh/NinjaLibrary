@@ -46,6 +46,8 @@ class ProxyFilter : public QSortFilterProxyModel
     Q_PROPERTY(bool duplicatesOnly READ duplicatesOnly WRITE setDuplicatesOnly NOTIFY duplicatesOnlyChanged)
     Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
     Q_PROPERTY(QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
+    Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
+    Q_PROPERTY(QStringList activeScopes READ activeScopes NOTIFY activeScopesChanged)
 
 public:
     explicit ProxyFilter(DatabaseManager *dbMgr, QObject *parent = nullptr);
@@ -58,6 +60,8 @@ public:
     bool duplicatesOnly() const { return m_duplicatesOnly; }
     QString categoryFilter() const { return m_categoryFilter; }
     QString folderFilter() const { return m_folderFilter; }
+    QString scopeFilter() const { return m_scopeFilter; }
+    QStringList activeScopes() const { return m_activeScopes; }
 
     Q_INVOKABLE QVariant get(int row, const QString &roleName) const;
     void setSourceModel(QAbstractItemModel *sourceModel) override;
@@ -70,6 +74,9 @@ public slots:
     void setDuplicatesOnly(bool only);
     void setCategoryFilter(const QString &category);
     void setFolderFilter(const QString &folder); // "All", "Recent", "Favorites" etc.
+    void setScopeFilter(const QString &scope);
+    void recalculateScopes();
+    bool filterAcceptsRowWithoutScope(int source_row, const QModelIndex &source_parent) const;
     
     void updateDuplicateHashes();
     void updateSearchMatches();
@@ -82,6 +89,8 @@ signals:
     void duplicatesOnlyChanged();
     void categoryFilterChanged();
     void folderFilterChanged();
+    void scopeFilterChanged();
+    void activeScopesChanged();
 
 protected:
     bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
@@ -96,10 +105,14 @@ private:
     bool m_duplicatesOnly;
     QString m_categoryFilter;
     QString m_folderFilter;
+    QString m_scopeFilter;
+    QStringList m_activeScopes;
 
     QSet<int> m_matchedDocIds;
     QSet<QString> m_duplicateHashes;
     bool m_searchActive;
+
+    void invalidateAndRecalculate();
 };
 
 #endif // PROXYFILTER_H

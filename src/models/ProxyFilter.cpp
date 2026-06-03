@@ -34,6 +34,9 @@
 #include <QSqlError>
 #include <QDateTime>
 #include <QDebug>
+#include <QFileInfo>
+#include <QDate>
+#include <algorithm>
 
 ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     : QSortFilterProxyModel(parent)
@@ -42,6 +45,8 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     , m_showOffline(true)
     , m_duplicatesOnly(false)
     , m_categoryFilter("All")
+    , m_scopeFilter("All")
+    , m_activeScopes(QStringList{"All"})
     , m_searchActive(false)
 {
     setDynamicSortFilter(true);
@@ -69,6 +74,7 @@ void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
         connect(sourceModel, &QAbstractItemModel::rowsRemoved, this, &ProxyFilter::updateSearchMatches);
         connect(sourceModel, &QAbstractItemModel::dataChanged, this, &ProxyFilter::updateSearchMatches);
     }
+    updateSearchMatches();
 }
 
 void ProxyFilter::setFilterString(const QString &filter)
@@ -83,7 +89,7 @@ void ProxyFilter::setSelectedTags(const QStringList &tags)
 {
     if (m_selectedTags == tags) return;
     m_selectedTags = tags;
-    invalidateFilter();
+    invalidateAndRecalculate();
     emit selectedTagsChanged();
 }
 
@@ -91,7 +97,7 @@ void ProxyFilter::setMinRating(int rating)
 {
     if (m_minRating == rating) return;
     m_minRating = rating;
-    invalidateFilter();
+    invalidateAndRecalculate();
     emit minRatingChanged();
 }
 
@@ -99,7 +105,7 @@ void ProxyFilter::setShowOffline(bool show)
 {
     if (m_showOffline == show) return;
     m_showOffline = show;
-    invalidateFilter();
+    invalidateAndRecalculate();
     emit showOfflineChanged();
 }
 
@@ -110,7 +116,7 @@ void ProxyFilter::setDuplicatesOnly(bool only)
     if (m_duplicatesOnly) {
         updateDuplicateHashes();
     }
-    invalidateFilter();
+    invalidateAndRecalculate();
     emit duplicatesOnlyChanged();
 }
 
@@ -123,7 +129,7 @@ void ProxyFilter::setCategoryFilter(const QString &category)
     } else {
         setDuplicatesOnly(false);
     }
-    invalidateFilter();
+    invalidateAndRecalculate();
     emit categoryFilterChanged();
 }
 
@@ -131,8 +137,16 @@ void ProxyFilter::setFolderFilter(const QString &folder)
 {
     if (m_folderFilter == folder) return;
     m_folderFilter = folder;
-    invalidateFilter();
+    invalidateAndRecalculate();
     emit folderFilterChanged();
+}
+
+void ProxyFilter::setScopeFilter(const QString &scope)
+{
+    if (m_scopeFilter == scope) return;
+    m_scopeFilter = scope;
+    emit scopeFilterChanged();
+    invalidateFilter();
 }
 
 void ProxyFilter::updateDuplicateHashes()
@@ -152,20 +166,20 @@ void ProxyFilter::updateSearchMatches()
     m_matchedDocIds.clear();
     m_searchActive = !m_filterString.trimmed().isEmpty();
     if (!m_searchActive) {
-        invalidateFilter();
+        invalidateAndRecalculate();
         return;
     }
 
     QAbstractItemModel *model = sourceModel();
     if (!model) {
-        invalidateFilter();
+        invalidateAndRecalculate();
         return;
     }
 
     QStringList terms = m_filterString.split(" ", Qt::SkipEmptyParts);
     if (terms.isEmpty()) {
         m_searchActive = false;
-        invalidateFilter();
+        invalidateAndRecalculate();
         return;
     }
 
@@ -208,10 +222,10 @@ void ProxyFilter::updateSearchMatches()
         }
     }
 
-    invalidateFilter();
+    invalidateAndRecalculate();
 }
 
-bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
+bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex &source_parent) const
 {
     if (!sourceModel()) return false;
 
@@ -285,6 +299,151 @@ bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_par
     }
 
     return true;
+}
+
+bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
+{
+    if (!filterAcceptsRowWithoutScope(source_row, source_parent)) {
+        return false;
+    }
+
+    if (m_scopeFilter.isEmpty() || m_scopeFilter == "All") {
+        return true;
+    }
+
+    QModelIndex idx = sourceModel()->index(source_row, 0, source_parent);
+    QDateTime dateModified = sourceModel()->data(idx, DocumentModel::DateModifiedRole).toDateTime();
+    bool isOffline = sourceModel()->data(idx, DocumentModel::IsOfflineRole).toBool();
+    QString fileName = sourceModel()->data(idx, DocumentModel::FileNameRole).toString();
+
+    if (m_scopeFilter == "Today") {
+        return dateModified.date() == QDate::currentDate();
+    } else if (m_scopeFilter == "This Week") {
+        QDate today = QDate::currentDate();
+        int days = dateModified.date().daysTo(today);
+        return days >= 0 && days < 7;
+    } else if (m_scopeFilter == "This Month") {
+        QDate today = QDate::currentDate();
+        return dateModified.date().year() == today.year() && dateModified.date().month() == today.month();
+    } else if (m_scopeFilter == "Online") {
+        return !isOffline;
+    } else if (m_scopeFilter == "Offline") {
+        return isOffline;
+    } else {
+        bool isYear = false;
+        int yearVal = m_scopeFilter.toInt(&isYear);
+        if (isYear && m_scopeFilter.length() == 4) {
+            return dateModified.date().year() == yearVal;
+        } else {
+            QString ext = QFileInfo(fileName).suffix().toUpper();
+            return ext == m_scopeFilter;
+        }
+    }
+}
+
+void ProxyFilter::recalculateScopes()
+{
+    QAbstractItemModel *model = sourceModel();
+    if (!model) {
+        QStringList defaultScopes = {"All"};
+        if (m_activeScopes != defaultScopes) {
+            m_activeScopes = defaultScopes;
+            emit activeScopesChanged();
+        }
+        return;
+    }
+
+    bool hasToday = false;
+    bool hasThisWeek = false;
+    bool hasThisMonth = false;
+    bool hasOnline = false;
+    bool hasOffline = false;
+    QSet<int> yearsSet;
+    QSet<QString> docTypesSet;
+
+    QDate today = QDate::currentDate();
+    int rows = model->rowCount();
+
+    for (int i = 0; i < rows; ++i) {
+        if (filterAcceptsRowWithoutScope(i, QModelIndex())) {
+            QModelIndex idx = model->index(i, 0);
+            QDateTime dateModified = model->data(idx, DocumentModel::DateModifiedRole).toDateTime();
+            bool isOffline = model->data(idx, DocumentModel::IsOfflineRole).toBool();
+            QString fileName = model->data(idx, DocumentModel::FileNameRole).toString();
+
+            QDate docDate = dateModified.date();
+            if (docDate == today) {
+                hasToday = true;
+            }
+            int days = docDate.daysTo(today);
+            if (days >= 0 && days < 7) {
+                hasThisWeek = true;
+            }
+            if (docDate.year() == today.year() && docDate.month() == today.month()) {
+                hasThisMonth = true;
+            }
+            if (docDate.isValid()) {
+                yearsSet.insert(docDate.year());
+            }
+            if (isOffline) {
+                hasOffline = true;
+            } else {
+                hasOnline = true;
+            }
+            QString ext = QFileInfo(fileName).suffix().toUpper();
+            if (!ext.isEmpty()) {
+                docTypesSet.insert(ext);
+            }
+        }
+    }
+
+    QStringList newScopes;
+    newScopes.append("All");
+    if (hasToday) {
+        newScopes.append("Today");
+    }
+    if (hasThisWeek) {
+        newScopes.append("This Week");
+    }
+    if (hasThisMonth) {
+        newScopes.append("This Month");
+    }
+
+    QList<int> sortedYears = yearsSet.values();
+    std::sort(sortedYears.begin(), sortedYears.end(), std::greater<int>());
+    for (int y : sortedYears) {
+        newScopes.append(QString::number(y));
+    }
+
+    if (hasOnline) {
+        newScopes.append("Online");
+    }
+    if (hasOffline) {
+        newScopes.append("Offline");
+    }
+
+    QList<QString> sortedDocTypes = docTypesSet.values();
+    std::sort(sortedDocTypes.begin(), sortedDocTypes.end());
+    for (const QString &ext : sortedDocTypes) {
+        newScopes.append(ext);
+    }
+
+    if (m_activeScopes != newScopes) {
+        m_activeScopes = newScopes;
+        emit activeScopesChanged();
+    }
+
+    if (!m_activeScopes.contains(m_scopeFilter)) {
+        m_scopeFilter = "All";
+        emit scopeFilterChanged();
+        invalidateFilter();
+    }
+}
+
+void ProxyFilter::invalidateAndRecalculate()
+{
+    invalidateFilter();
+    recalculateScopes();
 }
 
 bool ProxyFilter::lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const

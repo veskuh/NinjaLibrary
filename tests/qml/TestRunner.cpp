@@ -128,8 +128,14 @@ class MockProxyFilter : public QAbstractListModel
     Q_PROPERTY(QString filterString READ filterString WRITE setFilterString NOTIFY filterStringChanged)
     Q_PROPERTY(QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
     Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
+    Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
+    Q_PROPERTY(QStringList activeScopes READ activeScopes WRITE setActiveScopes NOTIFY activeScopesChanged)
 public:
-    explicit MockProxyFilter(QObject *parent = nullptr) : QAbstractListModel(parent) {}
+    explicit MockProxyFilter(QObject *parent = nullptr)
+        : QAbstractListModel(parent)
+        , m_scopeFilter("All")
+        , m_activeScopes(QStringList{"All"})
+    {}
     int rowCount(const QModelIndex &parent = QModelIndex()) const override { return 0; }
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override { return QVariant(); }
 
@@ -139,14 +145,22 @@ public:
     void setFolderFilter(const QString &s) { if (m_folderFilter != s) { m_folderFilter = s; emit folderFilterChanged(); } }
     QString categoryFilter() const { return m_categoryFilter; }
     void setCategoryFilter(const QString &s) { if (m_categoryFilter != s) { m_categoryFilter = s; emit categoryFilterChanged(); } }
+    QString scopeFilter() const { return m_scopeFilter; }
+    void setScopeFilter(const QString &s) { if (m_scopeFilter != s) { m_scopeFilter = s; emit scopeFilterChanged(); } }
+    QStringList activeScopes() const { return m_activeScopes; }
+    void setActiveScopes(const QStringList &l) { if (m_activeScopes != l) { m_activeScopes = l; emit activeScopesChanged(); } }
 signals:
     void filterStringChanged();
     void folderFilterChanged();
     void categoryFilterChanged();
+    void scopeFilterChanged();
+    void activeScopesChanged();
 private:
     QString m_filterString;
     QString m_folderFilter;
     QString m_categoryFilter;
+    QString m_scopeFilter;
+    QStringList m_activeScopes;
 };
 
 class Setup : public QObject

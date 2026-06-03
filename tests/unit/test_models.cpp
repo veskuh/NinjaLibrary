@@ -44,6 +44,7 @@ private slots:
     void testProxyFilterGet();
     void testProxyFilterGetBounds();
     void testMultiTermSearch();
+    void testScopeFiltering();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -63,20 +64,20 @@ void TestModels::initTestCase()
 
     // Doc 1: File A, size 100, hash123, rating 5, online, tags: work, important
     QVERIFY(query.exec(QString(
-        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline) "
-        "VALUES (%1, 'fileA.pdf', '/test/docs/fileA.pdf', 100, 'hash123', 5, 0);").arg(folderId)));
+        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline, date_modified) "
+        "VALUES (%1, 'fileA.pdf', '/test/docs/fileA.pdf', 100, 'hash123', 5, 0, datetime('now'));").arg(folderId)));
     int docAId = query.lastInsertId().toInt();
 
     // Doc 2: File B, size 200, hash456, rating 3, online, tags: work, personal
     QVERIFY(query.exec(QString(
-        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline) "
-        "VALUES (%1, 'fileB.png', '/test/docs/fileB.png', 200, 'hash456', 3, 0);").arg(folderId)));
+        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline, date_modified) "
+        "VALUES (%1, 'fileB.png', '/test/docs/fileB.png', 200, 'hash456', 3, 0, datetime('now'));").arg(folderId)));
     int docBId = query.lastInsertId().toInt();
 
     // Doc 3: File C, size 100, hash123, rating 2, offline, tags: personal (shares hash123 with File A -> Duplicate!)
     QVERIFY(query.exec(QString(
-        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline) "
-        "VALUES (%1, 'fileC.pdf', '/test/docs/fileC.pdf', 100, 'hash123', 2, 1);").arg(folderId)));
+        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline, date_modified) "
+        "VALUES (%1, 'fileC.pdf', '/test/docs/fileC.pdf', 100, 'hash123', 2, 1, datetime('now'));").arg(folderId)));
     int docCId = query.lastInsertId().toInt();
 
     // Insert FTS text
@@ -301,6 +302,75 @@ void TestModels::testMultiTermSearch()
     // Reset filter
     proxyFilter.setFilterString("");
     QCOMPARE(proxyFilter.rowCount(), 3);
+}
+
+void TestModels::testScopeFiltering()
+{
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+    proxyFilter.setShowOffline(true);
+
+    // Initial check: activeScopes should contain All, Today, This Week, This Month, current year, Online, Offline, PDF, PNG
+    QStringList active = proxyFilter.activeScopes();
+    QVERIFY(active.contains("All"));
+    QVERIFY(active.contains("Today"));
+    QVERIFY(active.contains("This Week"));
+    QVERIFY(active.contains("This Month"));
+    QVERIFY(active.contains(QString::number(QDate::currentDate().year())));
+    QVERIFY(active.contains("Online"));
+    QVERIFY(active.contains("Offline"));
+    QVERIFY(active.contains("PDF"));
+    QVERIFY(active.contains("PNG"));
+
+    // Test PDF filtering
+    proxyFilter.setScopeFilter("PDF");
+    QCOMPARE(proxyFilter.rowCount(), 2); // fileA.pdf and fileC.pdf
+    for (int i = 0; i < proxyFilter.rowCount(); ++i) {
+        QString name = proxyFilter.get(i, "fileName").toString();
+        QVERIFY(name.endsWith(".pdf"));
+    }
+
+    // Test PNG filtering
+    proxyFilter.setScopeFilter("PNG");
+    QCOMPARE(proxyFilter.rowCount(), 1); // fileB.png
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileB.png");
+
+    // Test Online filtering
+    proxyFilter.setScopeFilter("Online");
+    QCOMPARE(proxyFilter.rowCount(), 2); // fileA.pdf and fileB.png
+    for (int i = 0; i < proxyFilter.rowCount(); ++i) {
+        QVERIFY(!proxyFilter.get(i, "isOffline").toBool());
+    }
+
+    // Test Offline filtering
+    proxyFilter.setScopeFilter("Offline");
+    QCOMPARE(proxyFilter.rowCount(), 1); // fileC.pdf
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileC.pdf");
+    QVERIFY(proxyFilter.get(0, "isOffline").toBool());
+
+    // Reset scope
+    proxyFilter.setScopeFilter("All");
+    QCOMPARE(proxyFilter.rowCount(), 3);
+
+    // Now test that scopes are updated when other filters change.
+    // Set min rating to 4. Only fileA.pdf (PDF, Online, Rating 5) matches.
+    // fileB.png (rating 3) and fileC.pdf (rating 2) are filtered out by rating.
+    proxyFilter.setMinRating(4);
+    
+    // Active scopes should now NOT contain Offline or PNG
+    QStringList active2 = proxyFilter.activeScopes();
+    QVERIFY(active2.contains("All"));
+    QVERIFY(active2.contains("PDF"));
+    QVERIFY(!active2.contains("PNG"));
+    QVERIFY(active2.contains("Online"));
+    QVERIFY(!active2.contains("Offline"));
+
+    // Reset rating filter
+    proxyFilter.setMinRating(0);
+    QStringList active3 = proxyFilter.activeScopes();
+    QVERIFY(active3.contains("PNG"));
+    QVERIFY(active3.contains("Offline"));
 }
 
 QTEST_MAIN(TestModels)
