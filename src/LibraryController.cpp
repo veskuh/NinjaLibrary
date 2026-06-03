@@ -40,6 +40,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFile>
+#include <QUrl>
+#include <QFileInfo>
 #include <thread>
 
 #ifdef Q_OS_MAC
@@ -212,6 +214,227 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
     db.commit();
     emit libraryChanged();
     return true;
+}
+
+bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStringList &tags)
+{
+    if (documentIds.isEmpty() || tags.isEmpty()) return true;
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return false;
+
+    db.transaction();
+    QSqlQuery query(db);
+
+    for (int docId : documentIds) {
+        for (const QString &tagName : tags) {
+            if (tagName.trimmed().isEmpty()) continue;
+
+            // Ensure tag exists globally
+            query.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
+            query.bindValue(":name", tagName.trimmed());
+            if (!query.exec()) {
+                db.rollback();
+                return false;
+            }
+
+            // Get tag ID
+            query.prepare("SELECT id FROM tags WHERE name = :name;");
+            query.bindValue(":name", tagName.trimmed());
+            if (!query.exec() || !query.next()) {
+                db.rollback();
+                return false;
+            }
+            int tagId = query.value(0).toInt();
+
+            // Link tag to document
+            query.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+            query.bindValue(":docId", docId);
+            query.bindValue(":tagId", tagId);
+            if (!query.exec()) {
+                db.rollback();
+                return false;
+            }
+        }
+        
+        // Fetch all current tags for this document to write the sidecar
+        QSqlQuery fetchTags(db);
+        fetchTags.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :docId;");
+        fetchTags.bindValue(":docId", docId);
+        QStringList allDocTags;
+        if (fetchTags.exec()) {
+            while (fetchTags.next()) {
+                allDocTags << fetchTags.value(0).toString();
+            }
+        }
+        
+        // Fetch path, rating, notes for sidecar
+        QSqlQuery docQuery(db);
+        docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
+        docQuery.bindValue(":docId", docId);
+        if (docQuery.exec() && docQuery.next()) {
+            QString docPath = docQuery.value(0).toString();
+            int rating = docQuery.value(1).toInt();
+            
+            QSqlQuery notesQuery(db);
+            notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
+            notesQuery.bindValue(":docId", docId);
+            QString notes;
+            if (notesQuery.exec() && notesQuery.next()) {
+                notes = notesQuery.value(0).toString();
+            }
+            writeSidecar(docPath, allDocTags, rating, notes);
+        }
+    }
+
+    db.commit();
+    emit libraryChanged();
+    return true;
+}
+
+bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QStringList &tags)
+{
+    if (documentIds.isEmpty() || tags.isEmpty()) return true;
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return false;
+
+    db.transaction();
+    QSqlQuery query(db);
+
+    for (int docId : documentIds) {
+        for (const QString &tagName : tags) {
+            if (tagName.trimmed().isEmpty()) continue;
+
+            // Get tag ID
+            query.prepare("SELECT id FROM tags WHERE name = :name;");
+            query.bindValue(":name", tagName.trimmed());
+            if (!query.exec() || !query.next()) {
+                continue; // Tag doesn't exist globally, nothing to remove
+            }
+            int tagId = query.value(0).toInt();
+
+            // Delete link
+            query.prepare("DELETE FROM document_tags WHERE document_id = :docId AND tag_id = :tagId;");
+            query.bindValue(":docId", docId);
+            query.bindValue(":tagId", tagId);
+            if (!query.exec()) {
+                db.rollback();
+                return false;
+            }
+        }
+
+        // Fetch all current tags for this document to write the sidecar
+        QSqlQuery fetchTags(db);
+        fetchTags.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :docId;");
+        fetchTags.bindValue(":docId", docId);
+        QStringList allDocTags;
+        if (fetchTags.exec()) {
+            while (fetchTags.next()) {
+                allDocTags << fetchTags.value(0).toString();
+            }
+        }
+        
+        // Fetch path, rating, notes for sidecar
+        QSqlQuery docQuery(db);
+        docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
+        docQuery.bindValue(":docId", docId);
+        if (docQuery.exec() && docQuery.next()) {
+            QString docPath = docQuery.value(0).toString();
+            int rating = docQuery.value(1).toInt();
+            
+            QSqlQuery notesQuery(db);
+            notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
+            notesQuery.bindValue(":docId", docId);
+            QString notes;
+            if (notesQuery.exec() && notesQuery.next()) {
+                notes = notesQuery.value(0).toString();
+            }
+            writeSidecar(docPath, allDocTags, rating, notes);
+        }
+    }
+
+    db.commit();
+    emit libraryChanged();
+    return true;
+}
+
+QStringList LibraryController::getUniqueTags() const
+{
+    QStringList tags;
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return tags;
+
+    QSqlQuery query("SELECT DISTINCT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id ORDER BY t.name COLLATE NOCASE ASC;", db);
+    while (query.next()) {
+        tags << query.value(0).toString();
+    }
+    return tags;
+}
+
+QVariantMap LibraryController::handleDroppedUrl(const QString &urlStr)
+{
+    QVariantMap result;
+    result["status"] = "error";
+    result["isFolder"] = false;
+    result["watchedFolder"] = "";
+    result["docPath"] = "";
+    result["docId"] = -1;
+
+    QUrl url(urlStr);
+    QString path = url.toLocalFile();
+    if (path.isEmpty()) {
+        path = urlStr;
+    }
+
+    QFileInfo fileInfo(path);
+    if (!fileInfo.exists()) {
+        qWarning() << "Dropped path does not exist:" << path;
+        return result;
+    }
+
+    path = fileInfo.canonicalFilePath();
+    if (path.isEmpty()) {
+        path = fileInfo.absoluteFilePath();
+    }
+    fileInfo = QFileInfo(path);
+
+    bool isFolder = fileInfo.isDir();
+    QString watchedFolder;
+    QString docPath;
+    int docId = -1;
+
+    if (isFolder) {
+        watchedFolder = path;
+        if (!addWatchedFolder(watchedFolder)) {
+            qWarning() << "Failed to add watched folder:" << watchedFolder;
+            return result;
+        }
+    } else {
+        docPath = path;
+        watchedFolder = fileInfo.absolutePath();
+        if (!addWatchedFolder(watchedFolder)) {
+            qWarning() << "Failed to add watched folder parent:" << watchedFolder;
+            return result;
+        }
+
+        QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+        if (db.isOpen()) {
+            QSqlQuery query(db);
+            query.prepare("SELECT id FROM documents WHERE absolute_path = :path;");
+            query.bindValue(":path", docPath);
+            if (query.exec() && query.next()) {
+                docId = query.value(0).toInt();
+            }
+        }
+    }
+
+    result["status"] = "success";
+    result["isFolder"] = isFolder;
+    result["watchedFolder"] = watchedFolder;
+    result["docPath"] = docPath;
+    result["docId"] = docId;
+    return result;
 }
 
 bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rating)

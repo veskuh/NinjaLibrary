@@ -31,6 +31,23 @@ TestCase {
         return null;
     }
 
+    // Helper to find a child by objectName
+    function findChildByName(parent, name) {
+        if (!parent) return null;
+        if (parent.objectName === name) return parent;
+        if (parent.children) {
+            for (let i = 0; i < parent.children.length; ++i) {
+                let found = findChildByName(parent.children[i], name);
+                if (found) return found;
+            }
+        }
+        if (parent.contentItem) {
+            let found = findChildByName(parent.contentItem, name);
+            if (found) return found;
+        }
+        return null;
+    }
+
     // Helper to recursively find a KaakaoToolButton by its text label
     function findToolButtonByText(parent, text) {
         if (!parent) return null;
@@ -272,6 +289,44 @@ TestCase {
         compare(notesSpy.signalArguments[0][1], "Edited Notes 43", "Saved notes text should match edited text");
 
         notesSpy.destroy();
+        win.destroy();
+    }
+
+    function test_drag_and_drop_mechanism() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+
+        // Clear existing model rows
+        documentModel.clear();
+
+        // 1. Verify helper findDocIdByPath and selectDocument
+        documentModel.append({
+            "257": 101,
+            "260": "/path/to/doc.pdf",
+            "id": 101,
+            "absolutePath": "/path/to/doc.pdf"
+        });
+
+        compare(win.findDocIdByPath("/path/to/doc.pdf"), 101, "findDocIdByPath should return matching docId");
+        compare(win.findDocIdByPath("/path/to/nonexistent.pdf"), -1, "findDocIdByPath should return -1 for nonexistent files");
+
+        win.selectDocument(101);
+        let inspector = findChildByType(win, "Inspector");
+        compare(inspector.selectedIds.length, 1, "Inspector selectedIds should have 1 item");
+        compare(inspector.selectedId, 101, "Inspector selectedId should match");
+
+        // 2. Verify visual drag overlay and DropArea
+        let dropArea = findChildByName(win, "dropArea");
+        verify(dropArea !== null, "DropArea should exist in MainWindow");
+
+        let dragOverlay = findChildByName(win, "dragOverlay");
+        verify(dragOverlay !== null, "dragOverlay should exist in MainWindow");
+        compare(dragOverlay.visible, false, "dragOverlay should be hidden by default");
+
         win.destroy();
     }
 }

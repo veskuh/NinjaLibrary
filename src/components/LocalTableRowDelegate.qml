@@ -41,15 +41,49 @@ ItemDelegate {
 
     property list<KaakaoTableColumn> columns
     readonly property int rowIndex: index
+    property int modelUpdateCount: 0
 
     readonly property bool isEvenRow: index % 2 === 0
     readonly property bool isSelected: ListView.isCurrentItem
     readonly property var rowData: modelData
+    readonly property bool isOffline: {
+        let dummy = control.modelUpdateCount
+        if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+            let val = control.ListView.view.model.get(control.rowIndex, "isOffline")
+            return val !== undefined ? (val === true || val === "true" || val === 1 || val === "1") : false
+        }
+        return false
+    }
 
     onClicked: {
         if (ListView.view) {
             ListView.view.currentIndex = index
             ListView.view.forceActiveFocus()
+        }
+    }
+
+    Connections {
+        target: control.ListView.view ? control.ListView.view.model : null
+        ignoreUnknownSignals: true
+        function onLayoutChanged() {
+            control.modelUpdateCount++
+        }
+        function onModelReset() {
+            control.modelUpdateCount++
+        }
+        function onRowsInserted() {
+            control.modelUpdateCount++
+        }
+        function onRowsRemoved() {
+            control.modelUpdateCount++
+        }
+        function onRowsMoved() {
+            control.modelUpdateCount++
+        }
+        function onDataChanged(topLeft, bottomRight) {
+            if (control.rowIndex >= topLeft.row && control.rowIndex <= bottomRight.row) {
+                control.modelUpdateCount++
+            }
         }
     }
 
@@ -79,6 +113,7 @@ ItemDelegate {
                 clip: true
 
                 readonly property string cellValue: {
+                    let dummy = control.modelUpdateCount
                     let roleName = modelData.role
                     if (control.rowData !== undefined && control.rowData[roleName] !== undefined)
                         return control.rowData[roleName]
@@ -88,13 +123,12 @@ ItemDelegate {
                         return val !== undefined ? val.toString() : ""
                     }
                     
-                    if (model[roleName] !== undefined)
-                        return model[roleName]
                     return ""
                 }
 
                 ToolTip.visible: cellMouse.containsMouse && ToolTip.text !== ""
                 ToolTip.text: {
+                    let dummy = control.modelUpdateCount
                     if (modelData.showAsIndicator) {
                         return cellItem.cellValue
                     }
@@ -106,8 +140,6 @@ ItemDelegate {
                         valTooltip = control.rowData[tooltipRole]
                     } else if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
                         valTooltip = control.ListView.view.model.get(control.rowIndex, tooltipRole)
-                    } else if (model[tooltipRole] !== undefined) {
-                        valTooltip = model[tooltipRole]
                     }
                     
                     if (valTooltip !== undefined && valTooltip !== "") {
@@ -134,14 +166,13 @@ ItemDelegate {
                     radius: 5
                     visible: modelData.showAsIndicator
                     color: {
+                        let dummy = control.modelUpdateCount
                         let colorRole = modelData.indicatorColorRole
                         let valColor = undefined
                         if (control.rowData !== undefined && control.rowData[colorRole] !== undefined) {
                             valColor = control.rowData[colorRole]
                         } else if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
                             valColor = control.ListView.view.model.get(control.rowIndex, colorRole)
-                        } else if (model[colorRole] !== undefined) {
-                            valColor = model[colorRole]
                         }
                         
                         if (valColor !== undefined && valColor !== "") {
@@ -172,9 +203,14 @@ ItemDelegate {
                     font: Theme.defaultFont
                     elide: modelData.elide !== undefined ? modelData.elide : Text.ElideRight
                     renderType: Text.NativeRendering
-                    color: (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) 
-                           ? Theme.selectionTextActive 
-                           : Theme.selectionTextInactive
+                    color: {
+                        if (control.isOffline) {
+                            return "#8e8e93"
+                        }
+                        return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) 
+                               ? Theme.selectionTextActive 
+                               : Theme.selectionTextInactive
+                    }
                 }
 
                 // Vertical divider line

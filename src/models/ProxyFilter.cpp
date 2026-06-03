@@ -55,6 +55,11 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     sort(0, Qt::AscendingOrder);
 }
 
+void ProxyFilter::setSortRole(int role)
+{
+    QSortFilterProxyModel::setSortRole(role);
+}
+
 ProxyFilter::~ProxyFilter()
 {
 }

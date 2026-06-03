@@ -42,6 +42,29 @@ Rectangle {
     property bool collapsed: false
     
     property var docData: null
+    property var multiDocData: []
+
+    property var allSelectedTags: {
+        var tagsSet = {}
+        for (var i = 0; i < multiDocData.length; i++) {
+            var docTags = multiDocData[i].tags
+            for (var j = 0; j < docTags.length; j++) {
+                tagsSet[docTags[j]] = (tagsSet[docTags[j]] || 0) + 1
+            }
+        }
+        return Object.keys(tagsSet).sort()
+    }
+
+    property var tagCounts: {
+        var tagsSet = {}
+        for (var i = 0; i < multiDocData.length; i++) {
+            var docTags = multiDocData[i].tags
+            for (var j = 0; j < docTags.length; j++) {
+                tagsSet[docTags[j]] = (tagsSet[docTags[j]] || 0) + 1
+            }
+        }
+        return tagsSet
+    }
 
     function saveNotes() {
         if (notesArea && docData && notesArea.text !== docData.notes) {
@@ -85,9 +108,37 @@ Rectangle {
         }
     }
 
+    function updateMultiDocData() {
+        if (selectedIds.length <= 1) {
+            multiDocData = []
+            return
+        }
+        var temp = []
+        for (var k = 0; k < selectedIds.length; k++) {
+            var targetId = selectedIds[k]
+            for (var i = 0; i < documentModel.rowCount(); i++) {
+                var idx = documentModel.index(i, 0)
+                if (documentModel.data(idx, 257) === targetId) {
+                    temp.push({
+                        docId: targetId,
+                        fileName: documentModel.data(idx, 259),
+                        tags: documentModel.data(idx, 269) || [],
+                        notes: documentModel.data(idx, 271) || "",
+                        starRating: documentModel.data(idx, 267) || 0
+                    })
+                    break
+                }
+            }
+        }
+        multiDocData = temp
+    }
+
     onSelectedIdChanged: {
         saveNotes()
         updateDocData()
+    }
+    onSelectedIdsChanged: {
+        updateMultiDocData()
     }
     onCollapsedChanged: {
         if (collapsed) {
@@ -97,15 +148,18 @@ Rectangle {
     Component.onDestruction: {
         saveNotes()
     }
-    Component.onCompleted: updateDocData()
+    Component.onCompleted: {
+        updateDocData()
+        updateMultiDocData()
+    }
 
     Connections {
         target: documentModel
         ignoreUnknownSignals: true
-        function onDataChanged(topLeft, bottomRight, roles) { updateDocData() }
-        function onModelReset() { updateDocData() }
-        function onRowsInserted(parent, first, last) { updateDocData() }
-        function onRowsRemoved(parent, first, last) { updateDocData() }
+        function onDataChanged(topLeft, bottomRight, roles) { updateDocData(); updateMultiDocData() }
+        function onModelReset() { updateDocData(); updateMultiDocData() }
+        function onRowsInserted(parent, first, last) { updateDocData(); updateMultiDocData() }
+        function onRowsRemoved(parent, first, last) { updateDocData(); updateMultiDocData() }
     }
 
     implicitWidth: collapsed ? 0 : 260
@@ -210,21 +264,38 @@ Rectangle {
                 KaakaoSeparator { Layout.fillWidth: true }
 
                 KaakaoLabel {
-                    text: "Batch Add Tags"
+                    text: "Tags"
                     role: KaakaoLabel.Role.Small
                     font.weight: Font.DemiBold
                     color: Theme.sidebarSectionText
                     opacity: 1.0
                 }
 
+                // Tags Flow layout list for multiple selection
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
+                    Repeater {
+                        model: inspector.allSelectedTags
+                        TagPill {
+                            text: modelData
+                            isMixed: (inspector.tagCounts[modelData] || 0) < inspector.selectedIds.length
+                            showDelete: true
+                            onRemoveRequested: {
+                                libraryController.batchRemoveTags(inspector.selectedIds, [modelData])
+                            }
+                        }
+                    }
+                }
+
                 KaakaoTextField {
                     id: batchTagField
-                    placeholderText: "Type tag and press Enter..."
+                    placeholderText: "Add tag to all selected..."
                     Layout.fillWidth: true
                     onAccepted: {
                         var newTag = text.trim()
                         if (newTag !== "") {
-                            libraryController.batchUpdateTags(inspector.selectedIds, [newTag])
+                            libraryController.batchAddTags(inspector.selectedIds, [newTag])
                             text = ""
                         }
                     }

@@ -20,6 +20,11 @@ public:
     }
     Q_INVOKABLE void addWatchedFolder(const QString &) {}
     Q_INVOKABLE void removeWatchedFolder(const QString &) {}
+    Q_INVOKABLE QStringList getUniqueTags() const { return QStringList(); }
+    Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &) { return QVariantMap(); }
+    Q_INVOKABLE void batchUpdateRating(const QVariantList &, int) {}
+    Q_INVOKABLE void batchRemoveTags(const QVariantList &, const QStringList &) {}
+    Q_INVOKABLE void batchAddTags(const QVariantList &, const QStringList &) {}
 signals:
     void watchedFoldersChanged();
     void notesUpdated(int docId, const QString &notes);
@@ -67,7 +72,9 @@ public:
             {272, "thumbnailPath"},
             {273, "fileSizeStr"},
             {274, "starRatingStr"},
-            {275, "offlineColor"}
+            {275, "offlineColor"},
+            {276, "dateModifiedStr"},
+            {277, "tagsStr"}
         };
         QString name = roleNameMap.value(role);
         if (!name.isEmpty() && rowMap.contains(name)) {
@@ -96,7 +103,9 @@ public:
             {272, "thumbnailPath"},
             {273, "fileSizeStr"},
             {274, "starRatingStr"},
-            {275, "offlineColor"}
+            {275, "offlineColor"},
+            {276, "dateModifiedStr"},
+            {277, "tagsStr"}
         };
     }
 
@@ -149,6 +158,8 @@ public:
     void setScopeFilter(const QString &s) { if (m_scopeFilter != s) { m_scopeFilter = s; emit scopeFilterChanged(); } }
     QStringList activeScopes() const { return m_activeScopes; }
     void setActiveScopes(const QStringList &l) { if (m_activeScopes != l) { m_activeScopes = l; emit activeScopesChanged(); } }
+    Q_INVOKABLE void setSortRole(int) {}
+    Q_INVOKABLE void sort(int, int) {}
 signals:
     void filterStringChanged();
     void folderFilterChanged();

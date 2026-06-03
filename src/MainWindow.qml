@@ -59,6 +59,43 @@ KaakaoWindow {
         property int height: 700
     }
 
+    property string pendingSelectDocPath: ""
+
+    function selectDocument(docId) {
+        inspector.selectedIds = [docId]
+        gridCanvas.selectId(docId)
+        tableCanvas.selectId(docId)
+    }
+
+    function findDocIdByPath(path) {
+        for (var i = 0; i < documentModel.rowCount(); i++) {
+            var idx = documentModel.index(i, 0)
+            var absPath = documentModel.data(idx, 260) // AbsolutePathRole
+            if (absPath === path) {
+                return documentModel.data(idx, 257) // IdRole
+            }
+        }
+        return -1
+    }
+
+    function checkPendingSelection() {
+        if (pendingSelectDocPath !== "") {
+            var docId = findDocIdByPath(pendingSelectDocPath)
+            if (docId !== -1) {
+                selectDocument(docId)
+                pendingSelectDocPath = ""
+            }
+        }
+    }
+
+    Connections {
+        target: documentModel
+        ignoreUnknownSignals: true
+        function onDataChanged(topLeft, bottomRight, roles) { window.checkPendingSelection() }
+        function onModelReset() { window.checkPendingSelection() }
+        function onRowsInserted(parent, first, last) { window.checkPendingSelection() }
+    }
+
     onXChanged: {
         if (window.visibility === Window.Windowed) {
             winSettings.x = window.x
@@ -332,12 +369,20 @@ KaakaoWindow {
 
                     onSectionSelected: (section) => {
                         proxyFilter.folderFilter = ""
+                        proxyFilter.selectedTags = []
                         proxyFilter.categoryFilter = section
                         canvasStack.clearSelections()
                     }
                     onFolderSelected: (path) => {
                         proxyFilter.categoryFilter = "All"
+                        proxyFilter.selectedTags = []
                         proxyFilter.folderFilter = path
+                        canvasStack.clearSelections()
+                    }
+                    onTagSelected: (tag) => {
+                        proxyFilter.categoryFilter = "All"
+                        proxyFilter.folderFilter = ""
+                        proxyFilter.selectedTags = [tag]
                         canvasStack.clearSelections()
                     }
                 }
@@ -528,6 +573,77 @@ KaakaoWindow {
             SplitView.minimumWidth: collapsed ? 0 : 220
             SplitView.preferredWidth: 260
             SplitView.maximumWidth: 350
+        }
+    }
+
+    // Visual Drag & Drop Overlay
+    Rectangle {
+        id: dragOverlay
+        objectName: "dragOverlay"
+        anchors.fill: parent
+        color: Theme.isDarkMode ? Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.15) : Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.04)
+        border.color: Theme.primaryAccent
+        border.width: 3
+        visible: dropArea.containsDrag
+        z: 9999
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 300
+            height: 180
+            color: Theme.isDarkMode ? Qt.rgba(0.12, 0.12, 0.12, 0.9) : Qt.rgba(1, 1, 1, 0.95)
+            radius: 12
+            border.color: Theme.buttonBorder
+            border.width: 1
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 12
+
+                Text {
+                    text: "📥"
+                    font.pixelSize: 48
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                KaakaoLabel {
+                    text: "Drop File or Folder"
+                    font.pixelSize: 18
+                    font.weight: Font.Bold
+                    color: Theme.primaryText
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                KaakaoLabel {
+                    text: "Add to watched folders and select"
+                    font.pixelSize: 12
+                    color: Theme.sidebarSectionText
+                    Layout.alignment: Qt.AlignHCenter
+                }
+            }
+        }
+    }
+
+    DropArea {
+        id: dropArea
+        objectName: "dropArea"
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        onDropped: (drop) => {
+            if (drop.hasUrls) {
+                var url = drop.urls[0].toString()
+                var result = libraryController.handleDroppedUrl(url)
+                if (result.status === "success") {
+                    sidebar.selectFolder(result.watchedFolder)
+                    if (!result.isFolder) {
+                        if (result.docId !== -1) {
+                            window.selectDocument(result.docId)
+                        } else {
+                            window.pendingSelectDocPath = result.docPath
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -36,6 +36,7 @@
 #include <QFileSystemWatcher>
 #include <QTimer>
 #include <QThreadPool>
+#include <QVariantMap>
 #include "database/DatabaseManager.h"
 
 class LibraryController : public QObject
@@ -56,7 +57,11 @@ public slots:
     // Batch operations executed inside SQL transactions
     bool batchUpdateTags(const QList<int> &documentIds, const QStringList &tags);
     bool batchUpdateRating(const QList<int> &documentIds, int rating);
+    bool batchAddTags(const QList<int> &documentIds, const QStringList &tags);
+    bool batchRemoveTags(const QList<int> &documentIds, const QStringList &tags);
     bool updateNotes(int documentId, const QString &notes);
+    QStringList getUniqueTags() const;
+    Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &urlStr);
     
     // Centralized sidecar read/write APIs
     bool writeSidecar(const QString &documentPath, const QStringList &tags, int rating, const QString &notes);

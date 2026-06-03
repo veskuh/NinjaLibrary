@@ -40,10 +40,13 @@ KaakaoSidebar {
 
     signal folderSelected(string path)
     signal sectionSelected(string section)
+    signal tagSelected(string tag)
 
     model: ListModel {
         id: sidebarModel
     }
+
+    property bool rebuilding: false
 
     function rebuildModel() {
         var prevIndex = sidebar.currentIndex
@@ -56,6 +59,7 @@ KaakaoSidebar {
             prevType = prevItem.type
         }
 
+        sidebar.rebuilding = true
         sidebarModel.clear()
         
         // Add Library items
@@ -74,35 +78,64 @@ KaakaoSidebar {
             sidebarModel.append({ "name": name, "icon": "📁", "category": "Folders", "type": "folder", "target": path })
         }
 
+        // Add Tags
+        var tags = libraryController.getUniqueTags()
+        for (var k = 0; k < tags.length; k++) {
+            var tag = tags[k]
+            sidebarModel.append({ "name": tag, "icon": "🏷️", "category": "Tags", "type": "tag", "target": tag })
+        }
+
         // Restore selection
+        var restored = false
         if (prevTarget !== "") {
             for (var j = 0; j < sidebarModel.count; j++) {
                 var item = sidebarModel.get(j)
                 if (item.target === prevTarget && item.type === prevType) {
                     sidebar.currentIndex = j;
-                    return;
+                    restored = true;
+                    break;
                 }
             }
         }
         
         // Fallback to select first item (All Documents)
-        if (sidebarModel.count > 0) {
+        if (!restored && sidebarModel.count > 0) {
             sidebar.currentIndex = 0
+        }
+
+        sidebar.rebuilding = false
+
+        // Only fire selection change signals if the target or type actually changed
+        var currentItem = currentIndex >= 0 ? sidebarModel.get(currentIndex) : null
+        if (currentItem) {
+            if (currentItem.target !== prevTarget || currentItem.type !== prevType) {
+                if (currentItem.type === "section") {
+                    sidebar.sectionSelected(currentItem.target)
+                } else if (currentItem.type === "folder") {
+                    sidebar.folderSelected(currentItem.target)
+                } else if (currentItem.type === "tag") {
+                    sidebar.tagSelected(currentItem.target)
+                }
+            }
         }
     }
 
     Component.onCompleted: {
         rebuildModel()
         libraryController.watchedFoldersChanged.connect(rebuildModel)
+        libraryController.libraryChanged.connect(rebuildModel)
     }
 
     onCurrentIndexChanged: {
+        if (rebuilding) return
         if (currentIndex < 0 || currentIndex >= sidebarModel.count) return
         var item = sidebarModel.get(currentIndex)
         if (item.type === "section") {
             sidebar.sectionSelected(item.target)
         } else if (item.type === "folder") {
             sidebar.folderSelected(item.target)
+        } else if (item.type === "tag") {
+            sidebar.tagSelected(item.target)
         }
     }
 
@@ -135,5 +168,16 @@ KaakaoSidebar {
             }
         }
         return ""
+    }
+
+    function selectFolder(path) {
+        for (var i = 0; i < sidebarModel.count; i++) {
+            var item = sidebarModel.get(i)
+            if (item && item.type === "folder" && item.target === path) {
+                sidebar.currentIndex = i
+                return true
+            }
+        }
+        return false
     }
 }

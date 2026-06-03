@@ -45,6 +45,7 @@ private slots:
     void testProxyFilterGetBounds();
     void testMultiTermSearch();
     void testScopeFiltering();
+    void testSorting();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -371,6 +372,47 @@ void TestModels::testScopeFiltering()
     QStringList active3 = proxyFilter.activeScopes();
     QVERIFY(active3.contains("PNG"));
     QVERIFY(active3.contains("Offline"));
+}
+
+void TestModels::testSorting()
+{
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+    proxyFilter.setShowOffline(true);
+
+    // 1. Sort by FileNameRole (259) Ascending
+    proxyFilter.setSortRole(259);
+    proxyFilter.sort(0, Qt::AscendingOrder);
+    QCOMPARE(proxyFilter.rowCount(), 3);
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png"));
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileC.pdf"));
+
+    // 2. Sort by FileNameRole (259) Descending
+    proxyFilter.sort(0, Qt::DescendingOrder);
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileC.pdf"));
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png"));
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileA.pdf"));
+
+    // 3. Sort by StarRatingRole (267) Ascending
+    proxyFilter.setSortRole(267);
+    proxyFilter.sort(0, Qt::AscendingOrder);
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileC.pdf")); // Rating 2
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png")); // Rating 3
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileA.pdf")); // Rating 5
+
+    // 4. Sort by StarRatingRole (267) Descending
+    proxyFilter.sort(0, Qt::DescendingOrder);
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileA.pdf")); // Rating 5
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png")); // Rating 3
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileC.pdf")); // Rating 2
+
+    // 5. Sort by FileSizeRole (261) Ascending
+    proxyFilter.setSortRole(261);
+    proxyFilter.sort(0, Qt::AscendingOrder);
+    // fileB.png (size 200) must be the last one since it's the largest
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileB.png"));
 }
 
 QTEST_MAIN(TestModels)

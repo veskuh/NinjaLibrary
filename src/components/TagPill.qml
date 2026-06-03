@@ -37,6 +37,7 @@ Rectangle {
     property string text: ""
     property bool isSelected: false
     property bool showDelete: false
+    property bool isMixed: false
     property color tagColor: "#3498db"
 
     signal clicked()
@@ -46,8 +47,9 @@ Rectangle {
     implicitHeight: 20
     radius: 4
     
+    opacity: isMixed ? 0.7 : 1.0
     color: isSelected ? Theme.primaryAccent : (hoverArea.containsMouse ? Theme.toolButtonHovered : Theme.contentBackground)
-    border.color: isSelected ? Theme.accentBorder : Theme.buttonBorder
+    border.color: isSelected ? Theme.accentBorder : (isMixed ? Theme.sidebarSectionText : Theme.buttonBorder)
     border.width: 1
 
     MouseArea {
@@ -78,6 +80,7 @@ Rectangle {
             color: pill.isSelected ? Theme.selectionTextActive : Theme.primaryText
             role: KaakaoLabel.Role.Small
             font.weight: Font.Medium
+            font.italic: pill.isMixed
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -92,6 +95,7 @@ Rectangle {
 
             MouseArea {
                 anchors.fill: parent
+                anchors.margins: -4
                 onClicked: {
                     pill.removeRequested()
                 }

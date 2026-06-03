@@ -93,6 +93,12 @@ QVariant DocumentModel::data(const QModelIndex &index, int role) const
         case OfflineColorRole: {
             return doc.isOffline ? "red" : "green";
         }
+        case DateModifiedStrRole: {
+            return doc.dateModified.toString("yyyy-MM-dd hh:mm");
+        }
+        case TagsStrRole: {
+            return doc.tags.join(", ");
+        }
         default: return QVariant();
     }
 }
@@ -119,6 +125,8 @@ QHash<int, QByteArray> DocumentModel::roleNames() const
     roles[FileSizeStrRole] = "fileSizeStr";
     roles[StarRatingStrRole] = "starRatingStr";
     roles[OfflineColorRole] = "offlineColor";
+    roles[DateModifiedStrRole] = "dateModifiedStr";
+    roles[TagsStrRole] = "tagsStr";
     return roles;
 }
 

@@ -341,6 +341,64 @@ void TestWorkers::testLibraryControllerAPIs()
     // Test batchUpdateTags empty inputs (graceful return)
     QVERIFY(m_controller->batchUpdateTags({}, {"tagC"}));
 
+    // 3b. Test batchAddTags, batchRemoveTags, and getUniqueTags
+    // Insert a second document for batch operations
+    QSqlQuery insertDoc2(db);
+    insertDoc2.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+                       "VALUES (1, 'image2.jpg', :path, 100, 0);");
+    insertDoc2.bindValue(":path", tempPath + "/image2.jpg");
+    QVERIFY(insertDoc2.exec());
+    int docId2 = insertDoc2.lastInsertId().toInt();
+
+    // Verify initial unique tags
+    QStringList uniqueTags = m_controller->getUniqueTags();
+    QVERIFY(uniqueTags.contains("tagA"));
+    QVERIFY(uniqueTags.contains("tagB"));
+
+    // Batch Add Tags "tagB" and "tagC" to both docId and docId2
+    QVERIFY(m_controller->batchAddTags({docId, docId2}, {"tagB", "tagC"}));
+
+    // Verify tags in DB
+    query.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :id;");
+    query.bindValue(":id", docId);
+    QVERIFY(query.exec());
+    QStringList doc1Tags;
+    while (query.next()) { doc1Tags << query.value(0).toString(); }
+    QVERIFY(doc1Tags.contains("tagA")); // preserved!
+    QVERIFY(doc1Tags.contains("tagB"));
+    QVERIFY(doc1Tags.contains("tagC"));
+
+    query.bindValue(":id", docId2);
+    QVERIFY(query.exec());
+    QStringList doc2Tags;
+    while (query.next()) { doc2Tags << query.value(0).toString(); }
+    QVERIFY(!doc2Tags.contains("tagA"));
+    QVERIFY(doc2Tags.contains("tagB"));
+    QVERIFY(doc2Tags.contains("tagC"));
+
+    // Batch Remove tagB from both docId and docId2
+    QVERIFY(m_controller->batchRemoveTags({docId, docId2}, {"tagB"}));
+
+    query.bindValue(":id", docId);
+    QVERIFY(query.exec());
+    doc1Tags.clear();
+    while (query.next()) { doc1Tags << query.value(0).toString(); }
+    QVERIFY(!doc1Tags.contains("tagB"));
+    QVERIFY(doc1Tags.contains("tagC"));
+
+    query.bindValue(":id", docId2);
+    QVERIFY(query.exec());
+    doc2Tags.clear();
+    while (query.next()) { doc2Tags << query.value(0).toString(); }
+    QVERIFY(!doc2Tags.contains("tagB"));
+    QVERIFY(doc2Tags.contains("tagC"));
+
+    // Verify getUniqueTags contains tagC and tagA, but not tagB (since it was removed from all documents)
+    uniqueTags = m_controller->getUniqueTags();
+    QVERIFY(uniqueTags.contains("tagA"));
+    QVERIFY(uniqueTags.contains("tagC"));
+    QVERIFY(!uniqueTags.contains("tagB"));
+
     // 4. Test batchUpdateRating
     QVERIFY(m_controller->batchUpdateRating({docId}, 4));
     // Verify in DB
@@ -378,6 +436,45 @@ void TestWorkers::testLibraryControllerAPIs()
     int dummyRating = 0;
     QString dummyNotes;
     QVERIFY(!m_controller->readSidecar("/no/such/document/path.pdf", dummyTags, dummyRating, dummyNotes));
+
+    // 7. Test handleDroppedUrl
+    // A. Dropping a folder URL
+    QString dirUrl = "file://" + tempPath;
+    QVariantMap dirResult = m_controller->handleDroppedUrl(dirUrl);
+    QCOMPARE(dirResult["status"].toString(), QString("success"));
+    QCOMPARE(dirResult["isFolder"].toBool(), true);
+    QCOMPARE(dirResult["watchedFolder"].toString(), tempPath);
+    QCOMPARE(dirResult["docPath"].toString(), QString(""));
+
+    // B. Dropping a file URL that already exists in database
+    QString fileUrl = "file://" + imgPath;
+    QVariantMap fileResult = m_controller->handleDroppedUrl(fileUrl);
+    QCOMPARE(fileResult["status"].toString(), QString("success"));
+    QCOMPARE(fileResult["isFolder"].toBool(), false);
+    QCOMPARE(fileResult["watchedFolder"].toString(), tempPath);
+    QCOMPARE(fileResult["docPath"].toString(), imgPath);
+    QCOMPARE(fileResult["docId"].toInt(), docId);
+
+    // C. Dropping a file URL that is not yet in the database (new watched folder)
+    QTemporaryDir tempDir2;
+    QVERIFY(tempDir2.isValid());
+    QString newFolderPath = QFileInfo(tempDir2.path()).canonicalFilePath();
+    QString newFilePath = QDir(newFolderPath).filePath("new_document.pdf");
+    QFile newFile(newFilePath);
+    QVERIFY(newFile.open(QIODevice::WriteOnly));
+    newFile.write("dummy content");
+    newFile.close();
+    newFilePath = QFileInfo(newFilePath).canonicalFilePath();
+
+    QVariantMap newFileResult = m_controller->handleDroppedUrl("file://" + newFilePath);
+    QCOMPARE(newFileResult["status"].toString(), QString("success"));
+    QCOMPARE(newFileResult["isFolder"].toBool(), false);
+    QCOMPARE(newFileResult["watchedFolder"].toString(), newFolderPath);
+    QCOMPARE(newFileResult["docPath"].toString(), newFilePath);
+    QCOMPARE(newFileResult["docId"].toInt(), -1); // not in database yet because background scanner hasn't run for it
+
+    // Clean up watched folder for tempDir2
+    QVERIFY(m_controller->removeWatchedFolder(newFolderPath));
 
     // Test removeWatchedFolder with empty/invalid inputs
     QVERIFY(!m_controller->removeWatchedFolder(""));

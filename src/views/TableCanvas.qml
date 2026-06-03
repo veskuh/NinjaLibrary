@@ -87,14 +87,6 @@ Item {
 
         columns: [
             KaakaoTableColumn {
-                role: "offlineColor"
-                title: "Status"
-                width: 55
-                showAsIndicator: true
-                indicatorColorRole: "offlineColor"
-                sortable: false
-            },
-            KaakaoTableColumn {
                 role: "fileName"
                 title: "Name"
                 width: 320
@@ -117,6 +109,24 @@ Item {
                 title: "Rating"
                 width: 110
                 sortable: true
+            },
+            KaakaoTableColumn {
+                role: "dateModifiedStr"
+                title: "Last Modified"
+                width: 130
+                sortable: true
+            },
+            KaakaoTableColumn {
+                role: "tagsStr"
+                title: "Tags"
+                width: 150
+                sortable: false
+            },
+            KaakaoTableColumn {
+                role: "notes"
+                title: "Notes"
+                width: Math.max(150, tableView.width - 890)
+                sortable: false
             }
         ]
 
@@ -140,6 +150,8 @@ Item {
                 proxyFilter.setSortRole(266) // PageCountRole
             } else if (role === "starRatingStr") {
                 proxyFilter.setSortRole(267) // StarRatingRole
+            } else if (role === "dateModifiedStr") {
+                proxyFilter.setSortRole(264) // DateModifiedRole
             }
             proxyFilter.sort(0, order)
         }

@@ -64,6 +64,7 @@ public:
     QStringList activeScopes() const { return m_activeScopes; }
 
     Q_INVOKABLE QVariant get(int row, const QString &roleName) const;
+    Q_INVOKABLE void setSortRole(int role);
     void setSourceModel(QAbstractItemModel *sourceModel) override;
 
 public slots:

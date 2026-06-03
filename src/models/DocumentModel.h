@@ -79,7 +79,9 @@ public:
         ThumbnailPathRole,
         FileSizeStrRole,
         StarRatingStrRole,
-        OfflineColorRole
+        OfflineColorRole,
+        DateModifiedStrRole,
+        TagsStrRole
     };
 
     explicit DocumentModel(DatabaseManager *dbMgr, QObject *parent = nullptr);
