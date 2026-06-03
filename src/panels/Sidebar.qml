@@ -126,4 +126,14 @@ KaakaoSidebar {
             }
         }
     }
+
+    function getSelectedFolder() {
+        if (currentIndex >= 0 && currentIndex < sidebarModel.count) {
+            var item = sidebarModel.get(currentIndex)
+            if (item && item.type === "folder") {
+                return item.target
+            }
+        }
+        return ""
+    }
 }

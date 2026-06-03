@@ -170,9 +170,54 @@ KaakaoWindow {
         id: prefsDialog
     }
 
+    KaakaoMenu {
+        id: gearMenu
+        
+        KaakaoMenuItem {
+            text: "Add Watched Folder..."
+            onTriggered: folderDialog.open()
+        }
+        KaakaoMenuItem {
+            text: "Refresh Library"
+            onTriggered: documentModel.refresh()
+        }
+        KaakaoMenuSeparator {
+            visible: sidebar.getSelectedFolder() !== ""
+        }
+        KaakaoMenuItem {
+            text: "Open in Finder"
+            visible: sidebar.getSelectedFolder() !== ""
+            onTriggered: {
+                var folderPath = sidebar.getSelectedFolder()
+                if (folderPath !== "") {
+                    Qt.openUrlExternally("file://" + folderPath)
+                }
+            }
+        }
+        KaakaoMenuItem {
+            text: "Stop Watching Folder"
+            visible: sidebar.getSelectedFolder() !== ""
+            onTriggered: {
+                var folderPath = sidebar.getSelectedFolder()
+                if (folderPath !== "") {
+                    libraryController.removeWatchedFolder(folderPath)
+                }
+            }
+        }
+    }
+
     // Top Header ToolBar
     header: KaakaoToolBar {
         id: toolbar
+
+        // View Mode segmented control centered exactly in the middle of the toolbar
+        KaakaoSegmentedControl {
+            id: viewSegment
+            model: ["Grid", "Table"]
+            implicitWidth: 120
+            anchors.centerIn: parent
+            z: 1 // Ensure it sits on top of layout if needed
+        }
         
         RowLayout {
             anchors.fill: parent
@@ -182,58 +227,18 @@ KaakaoWindow {
             anchors.rightMargin: Theme.paddingSmall
             spacing: Theme.paddingSmall
 
-            // View Mode segmented control
-            KaakaoSegmentedControl {
-                id: viewSegment
-                model: ["Grid", "Table"]
-                implicitWidth: 120
-            }
-
-            // Watch Folder button
-            KaakaoToolButton {
-                id: addFolderButton
-                iconEmoji: "➕"
-                text: "Add Folder"
-                padding: 0
-                topPadding: 0
-                bottomPadding: 0
-                onClicked: folderDialog.open()
-
-                contentItem: Column {
-                    spacing: 2
-                    opacity: addFolderButton.enabled ? 1.0 : 0.4
-                    
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: addFolderButton.iconEmoji
-                        font.pixelSize: 20
-                        renderType: Text.NativeRendering
-                    }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: addFolderButton.text
-                        font: addFolderButton.font
-                        color: Theme.primaryText
-                        renderType: Text.NativeRendering
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                }
-            }
-
+            // Spacer to push the search and inspector controls to the far right
             Item { Layout.fillWidth: true }
 
-            // Search box
+            // Search box firmly on the right
             KaakaoSearchField {
                 id: searchField
                 placeholderText: "Search documents..."
                 implicitWidth: 260
-                Layout.alignment: Qt.AlignHCenter
                 onTextChanged: {
                     proxyFilter.filterString = text
                 }
             }
-
-            Item { Layout.fillWidth: true }
 
             // Toggle Right Inspector
             KaakaoToolButton {
@@ -275,48 +280,196 @@ KaakaoWindow {
         anchors.fill: parent
         orientation: Qt.Horizontal
 
-        // Left Navigation Sidebar
-        Sidebar {
-            id: sidebar
-            visible: !collapsed
-            SplitView.minimumWidth: collapsed ? 0 : 150
+        // Left Navigation Sidebar Column
+        Item {
+            id: sidebarContainer
+            visible: !sidebar.collapsed
+            SplitView.minimumWidth: sidebar.collapsed ? 0 : 150
             SplitView.preferredWidth: 200
             SplitView.maximumWidth: 300
 
-            onSectionSelected: (section) => {
-                proxyFilter.folderFilter = ""
-                proxyFilter.categoryFilter = section
-                canvasStack.clearSelections()
-            }
-            onFolderSelected: (path) => {
-                proxyFilter.categoryFilter = "All"
-                proxyFilter.folderFilter = path
-                canvasStack.clearSelections()
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                Sidebar {
+                    id: sidebar
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    onSectionSelected: (section) => {
+                        proxyFilter.folderFilter = ""
+                        proxyFilter.categoryFilter = section
+                        canvasStack.clearSelections()
+                    }
+                    onFolderSelected: (path) => {
+                        proxyFilter.categoryFilter = "All"
+                        proxyFilter.folderFilter = path
+                        canvasStack.clearSelections()
+                    }
+                }
+
+                // Sidebar Footer Bar
+                Rectangle {
+                    id: sidebarFooter
+                    Layout.fillWidth: true
+                    implicitHeight: 28
+                    color: Theme.sidebarBackground
+
+                    Rectangle {
+                        anchors.top: parent.top
+                        width: parent.width
+                        height: 1
+                        color: Theme.sidebarBorder
+                    }
+                    Rectangle {
+                        anchors.right: parent.right
+                        width: 1
+                        height: parent.height
+                        color: Theme.sidebarBorder
+                    }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
+                        spacing: 4
+
+                        KaakaoToolButton {
+                            id: footerAddButton
+                            text: "Add Folder"
+                            iconEmoji: "➕"
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            Layout.alignment: Qt.AlignVCenter
+                            padding: 0
+                            topPadding: 0
+                            bottomPadding: 0
+
+                            contentItem: Text {
+                                text: footerAddButton.iconEmoji
+                                font.pixelSize: 14
+                                color: Theme.primaryText
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: folderDialog.open()
+
+                            ToolTip.text: "Add Watched Folder"
+                            ToolTip.visible: hovered
+                        }
+
+                        KaakaoToolButton {
+                            id: footerGearButton
+                            text: "Actions"
+                            iconEmoji: "⚙️"
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            Layout.alignment: Qt.AlignVCenter
+                            padding: 0
+                            topPadding: 0
+                            bottomPadding: 0
+                            enabled: sidebar.getSelectedFolder() !== ""
+
+                            contentItem: Text {
+                                text: footerGearButton.iconEmoji
+                                font.pixelSize: 12
+                                color: Theme.primaryText
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                opacity: footerGearButton.enabled ? 1.0 : 0.4
+                            }
+
+                            onClicked: gearMenu.popup(footerGearButton.mapToItem(null, 0, footerGearButton.height))
+
+                            ToolTip.text: "Folder / Library Actions"
+                            ToolTip.visible: hovered
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
             }
         }
 
-        // Center Content Stack
-        StackLayout {
-            id: canvasStack
-            currentIndex: viewSegment.currentIndex
+        // Center Content Column (Canvas Stack + Main Status Bar)
+        Item {
             SplitView.fillWidth: true
 
-            function clearSelections() {
-                gridCanvas.clearSelection()
-                tableCanvas.clearSelection()
-            }
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
 
-            GridCanvas {
-                id: gridCanvas
-                scaleFactor: zoomSlider.value
-                onSelectionChanged: (ids) => inspector.selectedIds = ids
-                onDoubleClicked: (path) => Qt.openUrlExternally("file://" + path)
-            }
+                StackLayout {
+                    id: canvasStack
+                    currentIndex: viewSegment.currentIndex
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
 
-            TableCanvas {
-                id: tableCanvas
-                onSelectionChanged: (ids) => inspector.selectedIds = ids
-                onDoubleClicked: (path) => Qt.openUrlExternally("file://" + path)
+                    function clearSelections() {
+                        gridCanvas.clearSelection()
+                        tableCanvas.clearSelection()
+                    }
+
+                    GridCanvas {
+                        id: gridCanvas
+                        scaleFactor: zoomSlider.value
+                        onSelectionChanged: (ids) => inspector.selectedIds = ids
+                        onDoubleClicked: (path) => Qt.openUrlExternally("file://" + path)
+                    }
+
+                    TableCanvas {
+                        id: tableCanvas
+                        onSelectionChanged: (ids) => inspector.selectedIds = ids
+                        onDoubleClicked: (path) => Qt.openUrlExternally("file://" + path)
+                    }
+                }
+
+                // Pinned status bar at the bottom of the content
+                KaakaoStatusBar {
+                    id: statusBar
+                    Layout.fillWidth: true
+                    height: 24
+                    leftPadding: 8
+                    rightPadding: 8
+
+                    KaakaoLabel {
+                        text: "Indexed Items: " + documentModel.rowCount() + "  |  Selected: " + inspector.selectedIds.length
+                        role: KaakaoLabel.Role.Small
+                        color: Theme.sidebarSectionText
+                        opacity: 1.0
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+
+                    // Scaling Zoom Slider for Grid Canvas
+                    RowLayout {
+                        spacing: 4
+                        visible: viewSegment.currentIndex === 0
+                        Layout.alignment: Qt.AlignVCenter
+
+                        KaakaoLabel {
+                            text: "⚲"
+                            font.pixelSize: 12
+                            color: Theme.sidebarSectionText
+                            opacity: 1.0
+                        }
+
+                        KaakaoSlider {
+                            id: zoomSlider
+                            from: 100
+                            to: 240
+                            value: 150
+                            implicitWidth: 100
+                        }
+                    }
+                }
             }
         }
 
@@ -328,48 +481,6 @@ KaakaoWindow {
             SplitView.minimumWidth: collapsed ? 0 : 220
             SplitView.preferredWidth: 260
             SplitView.maximumWidth: 350
-        }
-    }
-
-    // Bottom Status Indicator Frame
-    footer: KaakaoStatusBar {
-        id: statusBar
-        height: 24
-        leftPadding: 8
-        rightPadding: 8
-
-        KaakaoLabel {
-            text: "Indexed Items: " + documentModel.rowCount() + "  |  Selected: " + inspector.selectedIds.length
-            role: KaakaoLabel.Role.Small
-            color: Theme.sidebarSectionText
-            opacity: 1.0
-            Layout.alignment: Qt.AlignVCenter
-        }
-
-        Item {
-            Layout.fillWidth: true
-        }
-
-        // Scaling Zoom Slider for Grid Canvas
-        RowLayout {
-            spacing: 4
-            visible: viewSegment.currentIndex === 0 // Grid only
-            Layout.alignment: Qt.AlignVCenter
-
-            KaakaoLabel {
-                text: "⚲"
-                font.pixelSize: 12
-                color: Theme.sidebarSectionText
-                opacity: 1.0
-            }
-
-            KaakaoSlider {
-                id: zoomSlider
-                from: 100
-                to: 240
-                value: 150
-                implicitWidth: 100
-            }
         }
     }
 }
