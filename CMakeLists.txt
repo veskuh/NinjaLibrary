@@ -57,7 +57,7 @@ add_subdirectory(3rdparty/Kaakao/src 3rdparty/Kaakao/src)
 
 # Define the NinjaLibrary application target
 qt_add_executable(NinjaLibraryApp
-    src/NinjaLibraryApp.cpp
+    src/app/NinjaLibraryApp.cpp
 )
 
 # Set deployment targets for macOS
@@ -77,8 +77,8 @@ qt_add_qml_module(NinjaLibrary
     VERSION 26.6.0
     RESOURCE_PREFIX "/qt/qml"
     SOURCES
-        src/LibraryController.h
-        src/LibraryController.cpp
+        src/controllers/LibraryController.h
+        src/controllers/LibraryController.cpp
         src/database/DatabaseManager.h
         src/database/DatabaseManager.cpp
         src/models/DocumentModel.h
@@ -96,7 +96,7 @@ qt_add_qml_module(NinjaLibrary
         src/utils/PdfUtils.h
         src/utils/DocUtils.h
     QML_FILES
-        src/MainWindow.qml
+        src/views/MainWindow.qml
         src/components/DocumentCard.qml
         src/components/TagPill.qml
         src/components/LocalTableRowDelegate.qml

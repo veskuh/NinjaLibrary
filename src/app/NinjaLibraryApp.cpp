@@ -32,10 +32,10 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
-#include "database/DatabaseManager.h"
-#include "LibraryController.h"
-#include "models/DocumentModel.h"
-#include "models/ProxyFilter.h"
+#include "../database/DatabaseManager.h"
+#include "../controllers/LibraryController.h"
+#include "../models/DocumentModel.h"
+#include "../models/ProxyFilter.h"
 
 int main(int argc, char *argv[])
 {
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     // Add Kaakao import path so it is resolved properly
     engine.addImportPath("qrc:/qt/qml");
 
-    const QUrl url(QStringLiteral("qrc:/qt/qml/NinjaLibrary/src/MainWindow.qml"));
+    const QUrl url(QStringLiteral("qrc:/qt/qml/NinjaLibrary/src/views/MainWindow.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
         &app, []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);

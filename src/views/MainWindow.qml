@@ -34,8 +34,7 @@ import QtQuick.Layouts
 import Qt.labs.platform 1.1 as Labs
 import QtCore
 import Kaakao 1.0
-import "views"
-import "panels"
+import "../panels"
 
 KaakaoWindow {
     id: window

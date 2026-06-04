@@ -29,10 +29,10 @@
  */
 
 #include "LibraryController.h"
-#include "workers/ScannerTask.h"
-#include "workers/OcrTask.h"
-#include "workers/ThumbnailTask.h"
-#include "utils/DocUtils.h"
+#include "../workers/ScannerTask.h"
+#include "../workers/OcrTask.h"
+#include "../workers/ThumbnailTask.h"
+#include "../utils/DocUtils.h"
 #include <QDir>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -48,7 +48,7 @@
 #include <thread>
 
 #ifdef Q_OS_MAC
-#include "utils/MacBookmarks.h"
+#include "../utils/MacBookmarks.h"
 #endif
 
 LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)

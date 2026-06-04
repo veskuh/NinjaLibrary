@@ -53,8 +53,8 @@ if(APPLE)
         integration/test_workers.cpp
         ../src/database/DatabaseManager.h
         ../src/database/DatabaseManager.cpp
-        ../src/LibraryController.h
-        ../src/LibraryController.cpp
+        ../src/controllers/LibraryController.h
+        ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h
         ../src/workers/ScannerTask.cpp
         ../src/workers/OcrTask.h
@@ -76,8 +76,8 @@ else()
         integration/test_workers.cpp
         ../src/database/DatabaseManager.h
         ../src/database/DatabaseManager.cpp
-        ../src/LibraryController.h
-        ../src/LibraryController.cpp
+        ../src/controllers/LibraryController.h
+        ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h
         ../src/workers/ScannerTask.cpp
         ../src/workers/OcrTask.h

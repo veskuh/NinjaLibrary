@@ -37,7 +37,7 @@
 #include <QTimer>
 #include <QThreadPool>
 #include <QVariantMap>
-#include "database/DatabaseManager.h"
+#include "../database/DatabaseManager.h"
 
 class LibraryController : public QObject
 {

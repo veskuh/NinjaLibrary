@@ -76,6 +76,11 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
     QString threadId = QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()));
     QString connectionName = QString("NinjaLibrary_Connection_%1").arg(threadId);
 
+    QString expectedDbName = m_dbPath;
+    if (expectedDbName == ":memory:") {
+        expectedDbName = "file:ninjalib_shared_test?mode=memory&cache=shared";
+    }
+
     if (!s_connectionStorage.hasLocalData()) {
         if (QSqlDatabase::contains(connectionName)) {
             // This is a stale connection from a terminated thread with the same ID.
@@ -92,6 +97,24 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
         ConnectionHolder *holder = new ConnectionHolder();
         holder->name = connectionName;
         s_connectionStorage.setLocalData(holder);
+    } else {
+        // If the connection name exists but points to a different database path,
+        // we must close and recreate it.
+        if (QSqlDatabase::contains(connectionName)) {
+            bool mismatch = false;
+            {
+                QSqlDatabase db = QSqlDatabase::database(connectionName, false);
+                if (db.databaseName() != expectedDbName) {
+                    mismatch = true;
+                    if (db.isOpen()) {
+                        db.close();
+                    }
+                }
+            }
+            if (mismatch) {
+                QSqlDatabase::removeDatabase(connectionName);
+            }
+        }
     }
 
     if (QSqlDatabase::contains(connectionName)) {
@@ -102,14 +125,7 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
     }
 
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-    
-    // For in-memory, we can translate standard ":memory:" to a shared cache URI 
-    // so multiple connections on different threads in the same process can access it
-    if (m_dbPath == ":memory:") {
-        db.setDatabaseName("file:ninjalib_shared_test?mode=memory&cache=shared");
-    } else {
-        db.setDatabaseName(m_dbPath);
-    }
+    db.setDatabaseName(expectedDbName);
 
     if (!db.open()) {
         qWarning() << "Failed to open database connection" << connectionName << ":" << db.lastError().text();
@@ -132,91 +148,217 @@ bool DatabaseManager::initializeDatabase()
         return false;
     }
 
-    QSqlQuery query(db);
     int currentVersion = 0;
-    if (query.exec("PRAGMA user_version;")) {
-        if (query.next()) {
-            currentVersion = query.value(0).toInt();
+    {
+        QSqlQuery query(db);
+        if (query.exec("PRAGMA user_version;")) {
+            if (query.next()) {
+                currentVersion = query.value(0).toInt();
+            }
         }
     }
 
     if (currentVersion == 0) {
         db.transaction();
         bool ok = true;
+        {
+            QSqlQuery query(db);
 
-        ok &= query.exec(
-            "CREATE TABLE IF NOT EXISTS watched_folders ("
-            "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "    absolute_path TEXT UNIQUE NOT NULL,"
-            "    macos_bookmark BLOB,"
-            "    is_available BOOLEAN DEFAULT 1"
-            ");"
-        );
+            ok &= query.exec(
+                "CREATE TABLE IF NOT EXISTS watched_folders ("
+                "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "    absolute_path TEXT UNIQUE NOT NULL,"
+                "    macos_bookmark BLOB,"
+                "    is_available BOOLEAN DEFAULT 1"
+                ");"
+            );
 
-        ok &= query.exec(
-            "CREATE TABLE IF NOT EXISTS documents ("
-            "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "    folder_id INTEGER,"
-            "    file_name TEXT NOT NULL,"
-            "    absolute_path TEXT UNIQUE NOT NULL,"
-            "    file_size INTEGER NOT NULL,"
-            "    file_hash TEXT,"
-            "    date_created DATETIME,"
-            "    date_modified DATETIME,"
-            "    date_added DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            "    page_count INTEGER DEFAULT 0,"
-            "    star_rating INTEGER DEFAULT 0 CHECK(star_rating BETWEEN 0 AND 5),"
-            "    is_offline BOOLEAN DEFAULT 0,"
-            "    FOREIGN KEY(folder_id) REFERENCES watched_folders(id) ON DELETE CASCADE"
-            ");"
-        );
+            ok &= query.exec(
+                "CREATE TABLE IF NOT EXISTS documents ("
+                "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "    folder_id INTEGER,"
+                "    file_name TEXT NOT NULL,"
+                "    absolute_path TEXT UNIQUE NOT NULL,"
+                "    file_size INTEGER NOT NULL,"
+                "    file_hash TEXT,"
+                "    date_created DATETIME,"
+                "    date_modified DATETIME,"
+                "    date_added DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                "    page_count INTEGER DEFAULT 0,"
+                "    star_rating INTEGER DEFAULT 0 CHECK(star_rating BETWEEN 0 AND 5),"
+                "    is_offline BOOLEAN DEFAULT 0,"
+                "    FOREIGN KEY(folder_id) REFERENCES watched_folders(id) ON DELETE CASCADE"
+                ");"
+            );
 
-        // FTS5 Virtual Table for Instant Search
-        ok &= query.exec(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS document_search USING fts5("
-            "    document_id UNINDEXED,"
-            "    file_name,"
-            "    text_snippet,"
-            "    notes"
-            ");"
-        );
+            // FTS5 Virtual Table for Instant Search
+            ok &= query.exec(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS document_search USING fts5("
+                "    document_id UNINDEXED,"
+                "    file_name,"
+                "    text_snippet,"
+                "    notes"
+                ");"
+            );
 
-        ok &= query.exec(
-            "CREATE TABLE IF NOT EXISTS tags ("
-            "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "    name TEXT UNIQUE NOT NULL,"
-            "    color_hex TEXT DEFAULT '#3498db'"
-            ");"
-        );
+            ok &= query.exec(
+                "CREATE TABLE IF NOT EXISTS tags ("
+                "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "    name TEXT UNIQUE COLLATE NOCASE NOT NULL,"
+                "    color_hex TEXT DEFAULT '#3498db'"
+                ");"
+            );
 
-        ok &= query.exec(
-            "CREATE TABLE IF NOT EXISTS document_tags ("
-            "    document_id INTEGER,"
-            "    tag_id INTEGER,"
-            "    PRIMARY KEY (document_id, tag_id),"
-            "    FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,"
-            "    FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE"
-            ");"
-        );
+            ok &= query.exec(
+                "CREATE TABLE IF NOT EXISTS document_tags ("
+                "    document_id INTEGER,"
+                "    tag_id INTEGER,"
+                "    PRIMARY KEY (document_id, tag_id),"
+                "    FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,"
+                "    FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE"
+                ");"
+            );
 
-        ok &= query.exec(
-            "CREATE TABLE IF NOT EXISTS smart_collections ("
-            "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "    name TEXT UNIQUE NOT NULL,"
-            "    query_json TEXT NOT NULL"
-            ");"
-        );
+            ok &= query.exec(
+                "CREATE TABLE IF NOT EXISTS smart_collections ("
+                "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "    name TEXT UNIQUE NOT NULL,"
+                "    query_json TEXT NOT NULL"
+                ");"
+            );
 
-        if (ok) {
-            ok &= query.exec("PRAGMA user_version = 1;");
+            if (ok) {
+                ok &= query.exec("PRAGMA user_version = 2;");
+            }
         }
 
         if (ok) {
             db.commit();
         } else {
             db.rollback();
-            qWarning() << "Schema creation failed: " << query.lastError().text();
+            qWarning() << "Schema creation failed.";
             return false;
+        }
+    }
+
+    if (currentVersion > 0 && currentVersion < 2) {
+        // Disable foreign keys outside the transaction
+        {
+            QSqlQuery disableFk(db);
+            disableFk.exec("PRAGMA foreign_keys = OFF;");
+        }
+
+        db.transaction();
+        QSqlQuery q(db);
+        bool ok = true;
+
+        // 1. Deduplicate tags
+        {
+            QSqlQuery dupQuery("SELECT LOWER(name) as lname, MIN(id) as keep_id FROM tags GROUP BY lname HAVING COUNT(*) > 1;", db);
+            struct MergeJob {
+                int keepId;
+                QString lname;
+            };
+            QList<MergeJob> jobs;
+            while (dupQuery.next()) {
+                jobs.append({dupQuery.value(1).toInt(), dupQuery.value(0).toString()});
+            }
+
+            for (const auto &job : jobs) {
+                QSqlQuery findDups(db);
+                findDups.prepare("SELECT id FROM tags WHERE name = :lname COLLATE NOCASE AND id != :keepId;");
+                findDups.bindValue(":lname", job.lname);
+                findDups.bindValue(":keepId", job.keepId);
+                if (findDups.exec()) {
+                    while (findDups.next()) {
+                        int dupId = findDups.value(0).toInt();
+
+                        QSqlQuery mergeDocs(db);
+                        mergeDocs.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) "
+                                          "SELECT document_id, :keepId FROM document_tags WHERE tag_id = :dupId;");
+                        mergeDocs.bindValue(":keepId", job.keepId);
+                        mergeDocs.bindValue(":dupId", dupId);
+                        if (!mergeDocs.exec()) {
+                            qWarning() << "Migration: mergeDocs failed:" << mergeDocs.lastError().text();
+                            ok = false;
+                        }
+
+                        QSqlQuery deleteDupLinks(db);
+                        deleteDupLinks.prepare("DELETE FROM document_tags WHERE tag_id = :dupId;");
+                        deleteDupLinks.bindValue(":dupId", dupId);
+                        if (!deleteDupLinks.exec()) {
+                            qWarning() << "Migration: deleteDupLinks failed:" << deleteDupLinks.lastError().text();
+                            ok = false;
+                        }
+
+                        QSqlQuery deleteDupTag(db);
+                        deleteDupTag.prepare("DELETE FROM tags WHERE id = :dupId;");
+                        deleteDupTag.bindValue(":dupId", dupId);
+                        if (!deleteDupTag.exec()) {
+                            qWarning() << "Migration: deleteDupTag failed:" << deleteDupTag.lastError().text();
+                            ok = false;
+                        }
+                    }
+                } else {
+                    qWarning() << "Migration: findDups failed:" << findDups.lastError().text();
+                    ok = false;
+                }
+            }
+        }
+
+        // 2. Recreate tags table with COLLATE NOCASE
+        {
+            QSqlQuery debugQ(db);
+            if (debugQ.exec("SELECT id, name FROM tags;")) {
+                while (debugQ.next()) {
+                    qDebug() << "MIGRATION BEFORE RECREATE:" << debugQ.value(0).toInt() << debugQ.value(1).toString();
+                }
+            }
+        }
+        if (ok && !q.exec("CREATE TABLE tags_new ("
+                          "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                          "    name TEXT UNIQUE COLLATE NOCASE NOT NULL,"
+                          "    color_hex TEXT DEFAULT '#3498db'"
+                          ");")) {
+            qWarning() << "Migration: CREATE TABLE tags_new failed:" << q.lastError().text();
+            ok = false;
+        }
+        if (ok && !q.exec("INSERT INTO tags_new (id, name, color_hex) SELECT id, name, color_hex FROM tags;")) {
+            qWarning() << "Migration: INSERT INTO tags_new failed:" << q.lastError().text();
+            ok = false;
+        }
+        if (ok && !q.exec("DROP TABLE tags;")) {
+            qWarning() << "Migration: DROP TABLE tags failed:" << q.lastError().text();
+            ok = false;
+        }
+        if (ok && !q.exec("ALTER TABLE tags_new RENAME TO tags;")) {
+            qWarning() << "Migration: ALTER TABLE tags_new RENAME failed:" << q.lastError().text();
+            ok = false;
+        }
+
+        if (ok) {
+            if (!q.exec("PRAGMA user_version = 2;")) {
+                qWarning() << "Migration: Set user_version = 2 failed:" << q.lastError().text();
+                ok = false;
+            }
+        }
+
+        if (ok) {
+            db.commit();
+        } else {
+            db.rollback();
+            qWarning() << "Database migration to version 2 failed.";
+            {
+                QSqlQuery enableFk(db);
+                enableFk.exec("PRAGMA foreign_keys = ON;");
+            }
+            return false;
+        }
+
+        // Re-enable foreign keys outside/after transaction commit
+        {
+            QSqlQuery enableFk(db);
+            enableFk.exec("PRAGMA foreign_keys = ON;");
         }
     }
 

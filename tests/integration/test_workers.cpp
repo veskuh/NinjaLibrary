@@ -40,7 +40,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include "../../src/database/DatabaseManager.h"
-#include "../../src/LibraryController.h"
+#include "../../src/controllers/LibraryController.h"
 #include "../../src/workers/ScannerTask.h"
 #include "../../src/workers/OcrTask.h"
 #include "../../src/workers/ThumbnailTask.h"
