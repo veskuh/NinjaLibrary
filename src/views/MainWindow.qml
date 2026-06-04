@@ -156,6 +156,17 @@ KaakaoWindow {
         id: prefsDialog
     }
 
+    Shortcut {
+        sequence: "Escape"
+        onActivated: {
+            if (searchField.text !== "") {
+                searchField.text = ""
+            }
+            window.contentItem.forceActiveFocus()
+            canvasStack.clearSelections()
+        }
+    }
+
     KaakaoMenu {
         id: gearMenu
         
@@ -223,6 +234,7 @@ KaakaoWindow {
             // Search box firmly on the right
             KaakaoSearchField {
                 id: searchField
+                objectName: "searchField"
                 placeholderText: "Search documents..."
                 implicitWidth: 260
                 onTextChanged: {
@@ -455,18 +467,26 @@ KaakaoWindow {
                 // Pinned status bar at the bottom of the content
                 KaakaoStatusBar {
                     id: statusBar
+                    objectName: "statusBar"
                     Layout.fillWidth: true
                     height: 24
                     leftPadding: 8
                     rightPadding: 8
 
                     KaakaoLabel {
-                        text: "Indexed Items: " + documentModel.rowCount() + "  |  Selected: " + inspector.selectedIds.length
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
-                        Layout.alignment: Qt.AlignVCenter
-                    }
+                        objectName: "statusLabel"
+                        text: "Indexed: " + documentModel.totalCount + " items (" +
+                               documentModel.pdfCount + " PDFs, " +
+                               documentModel.imageCount + " Images, " +
+                               documentModel.textCount + " Text/Other)  |  " +
+                               documentModel.onlineCount + " Online, " +
+                               documentModel.offlineCount + " Offline  |  Selected: " +
+                               inspector.selectedIds.length
+                         role: KaakaoLabel.Role.Small
+                         color: Theme.sidebarSectionText
+                         opacity: 1.0
+                         Layout.alignment: Qt.AlignVCenter
+                     }
 
                     Item {
                         Layout.fillWidth: true

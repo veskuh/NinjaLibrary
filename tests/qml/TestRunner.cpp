@@ -36,12 +36,78 @@ signals:
 class MockDocumentModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(int totalCount READ totalCount NOTIFY countsChanged)
+    Q_PROPERTY(int pdfCount READ pdfCount NOTIFY countsChanged)
+    Q_PROPERTY(int imageCount READ imageCount NOTIFY countsChanged)
+    Q_PROPERTY(int textCount READ textCount NOTIFY countsChanged)
+    Q_PROPERTY(int onlineCount READ onlineCount NOTIFY countsChanged)
+    Q_PROPERTY(int offlineCount READ offlineCount NOTIFY countsChanged)
     QList<QVariantMap> m_rows;
 public:
     explicit MockDocumentModel(QObject *parent = nullptr) : QAbstractListModel(parent) {}
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override {
         return m_rows.size();
+    }
+
+    int totalCount() const { return m_rows.size(); }
+
+    int pdfCount() const {
+        int count = 0;
+        for (const auto &row : m_rows) {
+            QString name = row.value("fileName").toString();
+            if (name.endsWith(".pdf", Qt::CaseInsensitive)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    int imageCount() const {
+        int count = 0;
+        for (const auto &row : m_rows) {
+            QString name = row.value("fileName").toString();
+            QString ext = name.split('.').last().toLower();
+            if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "bmp" || ext == "tiff") {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    int textCount() const {
+        int count = 0;
+        for (const auto &row : m_rows) {
+            QString name = row.value("fileName").toString();
+            if (name.isEmpty()) continue;
+            QString ext = name.split('.').last().toLower();
+            if (ext != "pdf" && ext != "png" && ext != "jpg" && ext != "jpeg" && ext != "gif" && ext != "bmp" && ext != "tiff") {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    int onlineCount() const {
+        int count = 0;
+        for (const auto &row : m_rows) {
+            bool isOffline = row.value("isOffline").toBool() || row.value("268").toBool();
+            if (!isOffline) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    int offlineCount() const {
+        int count = 0;
+        for (const auto &row : m_rows) {
+            bool isOffline = row.value("isOffline").toBool() || row.value("268").toBool();
+            if (isOffline) {
+                count++;
+            }
+        }
+        return count;
     }
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
@@ -113,12 +179,14 @@ public:
         beginResetModel();
         m_rows.clear();
         endResetModel();
+        emit countsChanged();
     }
 
     Q_INVOKABLE void append(const QVariantMap &row) {
         beginInsertRows(QModelIndex(), m_rows.size(), m_rows.size());
         m_rows.append(row);
         endInsertRows();
+        emit countsChanged();
     }
 
     Q_INVOKABLE void updateRow(int rowIdx, const QVariantMap &values) {
@@ -127,8 +195,12 @@ public:
                 m_rows[rowIdx].insert(it.key(), it.value());
             }
             emit dataChanged(index(rowIdx), index(rowIdx));
+            emit countsChanged();
         }
     }
+
+signals:
+    void countsChanged();
 };
 
 class MockProxyFilter : public QAbstractListModel

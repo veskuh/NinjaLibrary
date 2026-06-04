@@ -35,6 +35,10 @@ TestCase {
     function findChildByName(parent, name) {
         if (!parent) return null;
         if (parent.objectName === name) return parent;
+        if (parent.header) {
+            let found = findChildByName(parent.header, name);
+            if (found) return found;
+        }
         if (parent.children) {
             for (let i = 0; i < parent.children.length; ++i) {
                 let found = findChildByName(parent.children[i], name);
@@ -403,6 +407,78 @@ TestCase {
         keyClick(Qt.Key_Right);
         wait(50);
         compare(gridCanvas.selectedIds.length, 0, "Selection should remain empty");
+
+        win.destroy();
+    }
+
+    function test_escape_shortcut_and_status_bar() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        // 1. Verify Status Bar is bound to documentModel properties
+        let statusBar = findChildByName(win, "statusBar");
+        verify(statusBar !== null, "statusBar should be found by name");
+
+        let statusLabel = findChildByName(statusBar, "statusLabel");
+        verify(statusLabel !== null, "statusLabel should be found by name");
+
+        // Clear and add mock data to documentModel
+        documentModel.clear();
+        documentModel.append({
+            "id": 1,
+            "fileName": "document.pdf",
+            "isOffline": false
+        });
+        documentModel.append({
+            "id": 2,
+            "fileName": "photo.png",
+            "isOffline": true
+        });
+        documentModel.append({
+            "id": 3,
+            "fileName": "note.txt",
+            "isOffline": false
+        });
+
+        // Let QML properties and bindings update
+        wait(100);
+
+        // Check if counts match in MockDocumentModel
+        compare(documentModel.totalCount, 3, "totalCount should be 3");
+        compare(documentModel.pdfCount, 1, "pdfCount should be 1");
+        compare(documentModel.imageCount, 1, "imageCount should be 1");
+        compare(documentModel.textCount, 1, "textCount should be 1");
+        compare(documentModel.onlineCount, 2, "onlineCount should be 2");
+        compare(documentModel.offlineCount, 1, "offlineCount should be 1");
+
+        // Verify status bar text reflects these counts
+        let expectedText = "Indexed: 3 items (1 PDFs, 1 Images, 1 Text/Other)  |  2 Online, 1 Offline  |  Selected: 0";
+        compare(statusLabel.text, expectedText, "Status bar text should match expected breakdown");
+
+        // 2. Verify Escape shortcut clears selection and search text
+        let searchField = findChildByName(win, "searchField");
+        verify(searchField !== null, "searchField should be found by name");
+
+        // Set search text and selection
+        searchField.text = "test query";
+        let inspector = findChildByType(win, "Inspector");
+        inspector.selectedIds = [1];
+
+        compare(searchField.text, "test query", "Search text should be set");
+        compare(inspector.selectedIds.length, 1, "Inspector should have 1 selected ID");
+
+        // Direct focus to searchField first to test escape handling
+        searchField.forceActiveFocus();
+        verify(searchField.activeFocus, "Search field should have focus");
+
+        // Press Escape key
+        keyClick(Qt.Key_Escape);
+        wait(100);
+
+        // Verify search field is cleared and selection is empty
+        compare(searchField.text, "", "Search field should be cleared after Escape");
+        compare(inspector.selectedIds.length, 0, "Selection should be empty after Escape");
 
         win.destroy();
     }

@@ -60,6 +60,12 @@ struct DocumentInfo {
 class DocumentModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(int totalCount READ totalCount NOTIFY countsChanged)
+    Q_PROPERTY(int pdfCount READ pdfCount NOTIFY countsChanged)
+    Q_PROPERTY(int imageCount READ imageCount NOTIFY countsChanged)
+    Q_PROPERTY(int textCount READ textCount NOTIFY countsChanged)
+    Q_PROPERTY(int onlineCount READ onlineCount NOTIFY countsChanged)
+    Q_PROPERTY(int offlineCount READ offlineCount NOTIFY countsChanged)
 public:
     enum DocumentRoles {
         IdRole = Qt::UserRole + 1,
@@ -93,6 +99,16 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
+    int totalCount() const { return m_documents.size(); }
+    int pdfCount() const { return m_pdfCount; }
+    int imageCount() const { return m_imageCount; }
+    int textCount() const { return m_textCount; }
+    int onlineCount() const { return m_onlineCount; }
+    int offlineCount() const { return m_offlineCount; }
+
+signals:
+    void countsChanged();
+
 public slots:
     void refresh();
     void updateThumbnail(int docId, const QString &thumbnailPath);
@@ -100,6 +116,11 @@ public slots:
 private:
     DatabaseManager *m_dbMgr;
     QList<DocumentInfo> m_documents;
+    int m_pdfCount = 0;
+    int m_imageCount = 0;
+    int m_textCount = 0;
+    int m_onlineCount = 0;
+    int m_offlineCount = 0;
 };
 
 #endif // DOCUMENTMODEL_H

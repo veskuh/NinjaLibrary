@@ -194,7 +194,44 @@ void DocumentModel::refresh()
         m_documents.append(doc);
     }
 
+    int tempPdf = 0;
+    int tempImage = 0;
+    int tempText = 0;
+    int tempOnline = 0;
+    int tempOffline = 0;
+
+    for (const auto &doc : m_documents) {
+        if (doc.isOffline) {
+            tempOffline++;
+        } else {
+            tempOnline++;
+        }
+
+        QString ext = doc.fileName.split('.').last().toLower();
+        if (ext == "pdf") {
+            tempPdf++;
+        } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "bmp" || ext == "tiff") {
+            tempImage++;
+        } else {
+            tempText++;
+        }
+    }
+
+    bool changed = (m_pdfCount != tempPdf || m_imageCount != tempImage ||
+                    m_textCount != tempText || m_onlineCount != tempOnline ||
+                    m_offlineCount != tempOffline);
+
+    m_pdfCount = tempPdf;
+    m_imageCount = tempImage;
+    m_textCount = tempText;
+    m_onlineCount = tempOnline;
+    m_offlineCount = tempOffline;
+
     endResetModel();
+
+    if (changed) {
+        emit countsChanged();
+    }
 }
 
 void DocumentModel::updateThumbnail(int docId, const QString &thumbnailPath)

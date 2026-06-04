@@ -128,6 +128,7 @@ ItemDelegate {
         id: cellRow
         anchors.fill: parent
         spacing: 0
+        z: 1
 
         Repeater {
             model: control.columns
@@ -223,7 +224,7 @@ ItemDelegate {
                     anchors.leftMargin: 8
                     anchors.rightMargin: 8
                     verticalAlignment: Text.AlignVCenter
-                    visible: !modelData.showAsIndicator
+                    visible: !modelData.showAsIndicator && modelData.role !== "starRatingStr"
                     text: cellItem.cellValue
                     font: Theme.defaultFont
                     elide: modelData.elide !== undefined ? modelData.elide : Text.ElideRight
@@ -235,6 +236,56 @@ ItemDelegate {
                         return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) 
                                ? Theme.selectionTextActive 
                                : Theme.selectionTextInactive
+                    }
+                }
+
+                Row {
+                    id: starRow
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    visible: modelData.role === "starRatingStr"
+                    spacing: 2
+
+                    property int hoveredIndex: -1
+
+                    Repeater {
+                        model: 5
+                        Text {
+                            text: {
+                                if (starRow.hoveredIndex >= 0) {
+                                    return index <= starRow.hoveredIndex ? "★" : "☆";
+                                }
+                                return index < control.starRatingValue ? "★" : "☆";
+                            }
+                            font.pixelSize: 14
+                            color: {
+                                if (control.isOffline) return "#8e8e93";
+                                return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus)
+                                       ? Theme.selectionTextActive
+                                       : (starRow.hoveredIndex >= 0 ? Theme.primaryAccent : Theme.primaryText);
+                            }
+                            verticalAlignment: Text.AlignVCenter
+                            height: parent.height
+                            renderType: Text.NativeRendering
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton
+                                onEntered: starRow.hoveredIndex = index
+                                onExited: starRow.hoveredIndex = -1
+                                onClicked: {
+                                    if (control.ListView.view) {
+                                        control.ListView.view.currentIndex = control.rowIndex
+                                        control.ListView.view.forceActiveFocus()
+                                    }
+                                    if (control.docIdValue !== -1) {
+                                        libraryController.batchUpdateRating([control.docIdValue], index + 1);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
