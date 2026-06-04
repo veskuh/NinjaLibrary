@@ -139,14 +139,105 @@ class MockProxyFilter : public QAbstractListModel
     Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
     Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
     Q_PROPERTY(QStringList activeScopes READ activeScopes WRITE setActiveScopes NOTIFY activeScopesChanged)
+    QList<QVariantMap> m_rows;
 public:
     explicit MockProxyFilter(QObject *parent = nullptr)
         : QAbstractListModel(parent)
         , m_scopeFilter("All")
         , m_activeScopes(QStringList{"All"})
     {}
-    int rowCount(const QModelIndex &parent = QModelIndex()) const override { return 0; }
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override { return QVariant(); }
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        return m_rows.size();
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!index.isValid() || index.row() < 0 || index.row() >= m_rows.size())
+            return QVariant();
+
+        const auto &rowMap = m_rows.at(index.row());
+        QString roleStr = QString::number(role);
+        if (rowMap.contains(roleStr))
+            return rowMap.value(roleStr);
+
+        static QHash<int, QString> roleNameMap = {
+            {257, "docId"},
+            {258, "folderId"},
+            {259, "fileName"},
+            {260, "absolutePath"},
+            {261, "fileSize"},
+            {262, "fileHash"},
+            {263, "dateCreated"},
+            {264, "dateModified"},
+            {265, "dateAdded"},
+            {266, "pageCount"},
+            {267, "starRating"},
+            {268, "isOffline"},
+            {269, "tags"},
+            {270, "textSnippet"},
+            {271, "notes"},
+            {272, "thumbnailPath"},
+            {273, "fileSizeStr"},
+            {274, "starRatingStr"},
+            {275, "offlineColor"},
+            {276, "dateModifiedStr"},
+            {277, "tagsStr"}
+        };
+        QString name = roleNameMap.value(role);
+        if (!name.isEmpty() && rowMap.contains(name)) {
+            return rowMap.value(name);
+        }
+        return QVariant();
+    }
+
+    QHash<int, QByteArray> roleNames() const override {
+        return {
+            {257, "docId"},
+            {258, "folderId"},
+            {259, "fileName"},
+            {260, "absolutePath"},
+            {261, "fileSize"},
+            {262, "fileHash"},
+            {263, "dateCreated"},
+            {264, "dateModified"},
+            {265, "dateAdded"},
+            {266, "pageCount"},
+            {267, "starRating"},
+            {268, "isOffline"},
+            {269, "tags"},
+            {270, "textSnippet"},
+            {271, "notes"},
+            {272, "thumbnailPath"},
+            {273, "fileSizeStr"},
+            {274, "starRatingStr"},
+            {275, "offlineColor"},
+            {276, "dateModifiedStr"},
+            {277, "tagsStr"}
+        };
+    }
+
+    Q_INVOKABLE void clear() {
+        beginResetModel();
+        m_rows.clear();
+        endResetModel();
+    }
+
+    Q_INVOKABLE void append(const QVariantMap &row) {
+        beginInsertRows(QModelIndex(), m_rows.size(), m_rows.size());
+        m_rows.append(row);
+        endInsertRows();
+    }
+
+    Q_INVOKABLE QVariant get(int row, const QString &roleName) const {
+        if (row < 0 || row >= m_rows.size())
+            return QVariant();
+        const auto &rowMap = m_rows.at(row);
+        if (rowMap.contains(roleName))
+            return rowMap.value(roleName);
+        if (roleName == "docId" && rowMap.contains("id"))
+            return rowMap.value("id");
+        return QVariant();
+    }
 
     QString filterString() const { return m_filterString; }
     void setFilterString(const QString &s) { if (m_filterString != s) { m_filterString = s; emit filterStringChanged(); } }

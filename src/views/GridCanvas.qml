@@ -45,11 +45,19 @@ Item {
     function selectId(docId) {
         selectedIds = [docId]
         selectionChanged(selectedIds)
+        for (var i = 0; i < proxyFilter.rowCount(); i++) {
+            var idx = proxyFilter.index(i, 0)
+            if (proxyFilter.data(idx, 257) === docId) {
+                gridView.currentIndex = i
+                break
+            }
+        }
     }
 
     function clearSelection() {
         selectedIds = []
         selectionChanged(selectedIds)
+        gridView.currentIndex = -1
     }
 
     KaakaoGridView {
@@ -64,6 +72,28 @@ Item {
         model: proxyFilter
         cellWidth: scaleFactor + Theme.paddingMedium
         cellHeight: scaleFactor * 1.25 + Theme.paddingMedium
+
+        Connections {
+            target: gridView.gridView.Keys
+            function onPressed(event) {
+                if (gridCanvas.selectedIds.length !== 1) {
+                    if (event.key === Qt.Key_Up || event.key === Qt.Key_Down ||
+                        event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                        event.accepted = true;
+                    }
+                }
+            }
+        }
+
+        onCurrentIndexChanged: {
+            if (gridCanvas.selectedIds.length === 1 && currentIndex >= 0 && currentIndex < gridView.gridView.count) {
+                var docId = model.get(currentIndex, "docId")
+                if (docId !== undefined) {
+                    gridCanvas.selectedIds = [docId]
+                    gridCanvas.selectionChanged(gridCanvas.selectedIds)
+                }
+            }
+        }
 
         delegate: Item {
             width: gridView.cellWidth
@@ -104,7 +134,7 @@ Item {
                         if (gridCanvas.selectedIds.indexOf(docId) < 0) {
                             gridCanvas.selectedIds = [docId]
                             gridView.currentIndex = index
-                            gridView.forceActiveFocus()
+                            gridView.gridView.forceActiveFocus()
                             gridCanvas.selectionChanged(gridCanvas.selectedIds)
                         }
                         var globalPos = docCard.mapToItem(null, event.x, event.y)
@@ -131,7 +161,7 @@ Item {
                     }
                     
                     gridView.currentIndex = index
-                    gridView.forceActiveFocus()
+                    gridView.gridView.forceActiveFocus()
                     gridCanvas.selectionChanged(gridCanvas.selectedIds)
                 }
 

@@ -329,4 +329,81 @@ TestCase {
 
         win.destroy();
     }
+
+    function test_grid_canvas_key_navigation() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        win.width = 1024;
+        win.height = 768;
+        wait(200);
+
+        // Find GridCanvas
+        let gridCanvas = findChildByType(win, "GridCanvas");
+        verify(gridCanvas !== null, "GridCanvas should be found");
+
+        let gridView = findChildByType(gridCanvas, "KaakaoGridView");
+        verify(gridView !== null, "KaakaoGridView should be found");
+        let innerGridView = gridView.gridView;
+        verify(innerGridView !== null, "Inner GridView should be found");
+
+        // Clear and populate model
+        documentModel.clear();
+        proxyFilter.clear();
+        let doc1 = { "257": 101, "id": 101, "docId": 101, "fileName": "doc1.pdf", "absolutePath": "/path/1" };
+        let doc2 = { "257": 102, "id": 102, "docId": 102, "fileName": "doc2.pdf", "absolutePath": "/path/2" };
+        let doc3 = { "257": 103, "id": 103, "docId": 103, "fileName": "doc3.pdf", "absolutePath": "/path/3" };
+        documentModel.append(doc1);
+        proxyFilter.append(doc1);
+        documentModel.append(doc2);
+        proxyFilter.append(doc2);
+        documentModel.append(doc3);
+        proxyFilter.append(doc3);
+        
+        wait(100);
+
+        console.log("DEBUG: proxyFilter rowCount =", proxyFilter.rowCount());
+        console.log("DEBUG: innerGridView.count =", innerGridView.count);
+        console.log("DEBUG: innerGridView.model =", innerGridView.model);
+        console.log("DEBUG: innerGridView.width =", innerGridView.width);
+
+        verify(innerGridView.width > 0, "Inner GridView should have non-zero width");
+        compare(innerGridView.count, 3, "Inner GridView count should match appended docs");
+
+        // 1. Single selection navigation test
+        gridCanvas.selectedIds = [101];
+        gridView.currentIndex = 0;
+        innerGridView.forceActiveFocus();
+        verify(innerGridView.activeFocus, "Inner GridView should have active focus");
+
+        // Click right arrow key
+        keyClick(Qt.Key_Right);
+        wait(50);
+
+        compare(gridCanvas.selectedIds.length, 1, "Should have 1 selected ID after Right key press");
+        compare(gridCanvas.selectedIds[0], 102, "Selected ID should move to 102");
+
+        // Click right arrow key again
+        keyClick(Qt.Key_Right);
+        wait(50);
+        compare(gridCanvas.selectedIds.length, 1, "Should have 1 selected ID after second Right key press");
+        compare(gridCanvas.selectedIds[0], 103, "Selected ID should move to 103");
+
+        // 2. Multi-selection navigation block test
+        gridCanvas.selectedIds = [101, 102];
+        gridView.currentIndex = 0;
+        keyClick(Qt.Key_Right);
+        wait(50);
+        compare(gridCanvas.selectedIds.length, 2, "Selection length should remain 2");
+        compare(gridCanvas.selectedIds[0], 101, "First selected ID should remain 101");
+        compare(gridCanvas.selectedIds[1], 102, "Second selected ID should remain 102");
+
+        // 3. No selection navigation block test
+        gridCanvas.selectedIds = [];
+        gridView.currentIndex = 0;
+        keyClick(Qt.Key_Right);
+        wait(50);
+        compare(gridCanvas.selectedIds.length, 0, "Selection should remain empty");
+
+        win.destroy();
+    }
 }
