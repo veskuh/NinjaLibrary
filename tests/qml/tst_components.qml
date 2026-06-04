@@ -147,7 +147,7 @@ TestCase {
         }
 
         // Wait for layout flow pass
-        wait(50)
+        wait(200)
 
         // Simulate click on the main pill area
         mouseClick(pill)

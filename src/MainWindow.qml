@@ -276,6 +276,66 @@ KaakaoWindow {
         }
     }
 
+    KaakaoMenu {
+        id: itemContextMenu
+        
+        property int targetDocId: -1
+        property string targetPath: ""
+        property int targetRating: 0
+        
+        KaakaoMenuItem {
+            text: "Open"
+            onTriggered: {
+                if (itemContextMenu.targetPath !== "") {
+                    Qt.openUrlExternally("file://" + itemContextMenu.targetPath)
+                }
+            }
+        }
+        
+        KaakaoMenuItem {
+            text: "Show in Finder"
+            onTriggered: {
+                if (itemContextMenu.targetPath !== "") {
+                    libraryController.showInFinder(itemContextMenu.targetPath)
+                }
+            }
+        }
+        
+        KaakaoMenuSeparator {}
+        
+        KaakaoMenu {
+            id: rateMenu
+            title: "Rate"
+            
+            onAboutToShow: {
+                for (var i = 0; i < 5; i++) {
+                    var item = rateRepeater.itemAt(i)
+                    if (item) {
+                        item.checked = (i + 1) === itemContextMenu.targetRating
+                    }
+                }
+            }
+            
+            Repeater {
+                id: rateRepeater
+                model: 5
+                KaakaoMenuItem {
+                    text: {
+                        var stars = ""
+                        for (var i = 0; i <= index; i++) stars += "★"
+                        for (var j = index + 1; j < 5; j++) stars += "☆"
+                        return stars
+                    }
+                    checkable: true
+                    checked: (index + 1) === itemContextMenu.targetRating
+                    onTriggered: {
+                        libraryController.batchUpdateRating([itemContextMenu.targetDocId], index + 1)
+                    }
+                }
+            }
+        }
+    }
+
     // Top Header ToolBar
     header: KaakaoToolBar {
         id: toolbar

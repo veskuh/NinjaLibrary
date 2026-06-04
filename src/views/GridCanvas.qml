@@ -70,6 +70,7 @@ Item {
             height: gridView.cellHeight
 
             DocumentCard {
+                id: docCard
                 anchors.centerIn: parent
                 fileName: model.fileName
                 absolutePath: model.absolutePath
@@ -98,6 +99,23 @@ Item {
                 onClicked: (event) => {
                     var docId = model.docId
                     var isCtrl = (event.modifiers & Qt.ControlModifier) || (event.modifiers & Qt.MetaModifier)
+                    
+                    if (event.button === Qt.RightButton) {
+                        if (gridCanvas.selectedIds.indexOf(docId) < 0) {
+                            gridCanvas.selectedIds = [docId]
+                            gridView.currentIndex = index
+                            gridView.forceActiveFocus()
+                            gridCanvas.selectionChanged(gridCanvas.selectedIds)
+                        }
+                        var globalPos = docCard.mapToItem(null, event.x, event.y)
+                        if (typeof itemContextMenu !== "undefined") {
+                            itemContextMenu.targetDocId = docId
+                            itemContextMenu.targetPath = model.absolutePath
+                            itemContextMenu.targetRating = model.starRating
+                            itemContextMenu.popup(globalPos.x, globalPos.y)
+                        }
+                        return
+                    }
                     
                     if (isCtrl) {
                         var idx = gridCanvas.selectedIds.indexOf(docId)

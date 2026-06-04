@@ -46,6 +46,36 @@ ItemDelegate {
     readonly property bool isEvenRow: index % 2 === 0
     readonly property bool isSelected: ListView.isCurrentItem
     readonly property var rowData: modelData
+    readonly property var docIdValue: {
+        let dummy = control.modelUpdateCount
+        if (typeof model !== "undefined" && model.docId !== undefined) return model.docId
+        if (control.rowData !== undefined && control.rowData.docId !== undefined) return control.rowData.docId
+        if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+            let val = control.ListView.view.model.get(control.rowIndex, "docId")
+            return val !== undefined ? val : -1
+        }
+        return -1
+    }
+    readonly property string absolutePathValue: {
+        let dummy = control.modelUpdateCount
+        if (typeof model !== "undefined" && model.absolutePath !== undefined) return model.absolutePath
+        if (control.rowData !== undefined && control.rowData.absolutePath !== undefined) return control.rowData.absolutePath
+        if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+            let val = control.ListView.view.model.get(control.rowIndex, "absolutePath")
+            return val !== undefined ? val.toString() : ""
+        }
+        return ""
+    }
+    readonly property var starRatingValue: {
+        let dummy = control.modelUpdateCount
+        if (typeof model !== "undefined" && model.starRating !== undefined) return model.starRating
+        if (control.rowData !== undefined && control.rowData.starRating !== undefined) return control.rowData.starRating
+        if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+            let val = control.ListView.view.model.get(control.rowIndex, "starRating")
+            return val !== undefined ? val : 0
+        }
+        return 0
+    }
     readonly property bool isOffline: {
         let dummy = control.modelUpdateCount
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
@@ -221,6 +251,24 @@ ItemDelegate {
                     color: Theme.headerDivider
                     visible: index < control.columns.length - 1
                 }
+            }
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onClicked: (mouse) => {
+            if (ListView.view) {
+                ListView.view.currentIndex = index
+                ListView.view.forceActiveFocus()
+            }
+            var globalPos = mapToItem(null, mouse.x, mouse.y)
+            if (typeof itemContextMenu !== "undefined") {
+                itemContextMenu.targetDocId = control.docIdValue
+                itemContextMenu.targetPath = control.absolutePathValue
+                itemContextMenu.targetRating = control.starRatingValue
+                itemContextMenu.popup(globalPos.x, globalPos.y)
             }
         }
     }

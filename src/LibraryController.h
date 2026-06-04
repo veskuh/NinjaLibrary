@@ -62,6 +62,7 @@ public slots:
     bool updateNotes(int documentId, const QString &notes);
     QStringList getUniqueTags() const;
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &urlStr);
+    Q_INVOKABLE void showInFinder(const QString &filePath);
     
     // Centralized sidecar read/write APIs
     bool writeSidecar(const QString &documentPath, const QStringList &tags, int rating, const QString &notes);

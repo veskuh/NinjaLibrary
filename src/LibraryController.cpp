@@ -43,6 +43,8 @@
 #include <QFile>
 #include <QUrl>
 #include <QFileInfo>
+#include <QProcess>
+#include <QDesktopServices>
 #include <thread>
 
 #ifdef Q_OS_MAC
@@ -679,5 +681,17 @@ void LibraryController::onOcrTaskFinished(int docId)
 void LibraryController::onThumbnailTaskFinished(int docId, const QString &thumbnailPath)
 {
     emit thumbnailGenerated(docId, thumbnailPath);
+}
+
+void LibraryController::showInFinder(const QString &filePath)
+{
+#if defined(Q_OS_MAC)
+    QProcess::startDetached("open", QStringList() << "-R" << filePath);
+#elif defined(Q_OS_WIN)
+    QProcess::startDetached("explorer.exe", QStringList() << "/select," << QDir::toNativeSeparators(filePath));
+#else
+    QFileInfo fi(filePath);
+    QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absolutePath()));
+#endif
 }
 
