@@ -293,9 +293,19 @@ Rectangle {
                     placeholderText: "Add tag to all selected..."
                     Layout.fillWidth: true
                     onAccepted: {
-                        var newTag = text.trim()
-                        if (newTag !== "") {
-                            libraryController.batchAddTags(inspector.selectedIds, [newTag])
+                        var rawText = text.trim()
+                        if (rawText !== "") {
+                            var parts = rawText.split(",")
+                            var tagsToAdd = []
+                            for (var i = 0; i < parts.length; i++) {
+                                var part = parts[i].trim()
+                                if (part !== "" && tagsToAdd.indexOf(part) === -1) {
+                                    tagsToAdd.push(part)
+                                }
+                            }
+                            if (tagsToAdd.length > 0) {
+                                libraryController.batchAddTags(inspector.selectedIds, tagsToAdd)
+                            }
                             text = ""
                         }
                     }
@@ -453,11 +463,19 @@ Rectangle {
                     placeholderText: "Add tag..."
                     Layout.fillWidth: true
                     onAccepted: {
-                        var newTag = text.trim()
-                        if (newTag !== "" && inspector.docData) {
+                        var rawText = text.trim()
+                        if (rawText !== "" && inspector.docData) {
                             var currentTags = inspector.docData.tags.slice()
-                            if (currentTags.indexOf(newTag) === -1) {
-                                currentTags.push(newTag)
+                            var parts = rawText.split(",")
+                            var addedAny = false
+                            for (var i = 0; i < parts.length; i++) {
+                                var part = parts[i].trim()
+                                if (part !== "" && currentTags.indexOf(part) === -1) {
+                                    currentTags.push(part)
+                                    addedAny = true
+                                }
+                            }
+                            if (addedAny) {
                                 libraryController.batchUpdateTags([inspector.selectedId], currentTags)
                             }
                             text = ""
