@@ -75,10 +75,10 @@ void TestDatabase::testInitialization()
     QSqlQuery query(db);
     QVERIFY(query.exec("SELECT * FROM document_search;"));
     
-    // Check user_version PRAGMA is 2
+    // Check user_version PRAGMA is 3
     QVERIFY(query.exec("PRAGMA user_version;"));
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 2);
+    QCOMPARE(query.value(0).toInt(), 3);
 }
 
 void TestDatabase::testThreadSafety()
@@ -210,10 +210,15 @@ void TestDatabase::testMigration()
 
             QSqlQuery query(db);
 
-            // Check user_version PRAGMA is 2
+            // Check user_version PRAGMA is 3
             QVERIFY(query.exec("PRAGMA user_version;"));
             QVERIFY(query.next());
-            QCOMPARE(query.value(0).toInt(), 2);
+            QCOMPARE(query.value(0).toInt(), 3);
+
+            // Check that the last_opened column exists on documents and defaults to 0
+            QVERIFY(query.exec("SELECT last_opened FROM documents WHERE id = 1;"));
+            QVERIFY(query.next());
+            QCOMPARE(query.value(0).toInt(), 0);
 
             // Check remaining tags (should only be 'Notes' (1) and 'Other' (4))
             QVERIFY(query.exec("SELECT id, name FROM tags ORDER BY id;"));

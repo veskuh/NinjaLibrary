@@ -63,6 +63,7 @@ public slots:
     QStringList getUniqueTags() const;
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &urlStr);
     Q_INVOKABLE void showInFinder(const QString &filePath);
+    bool markDocumentOpened(int docId);
     
     // Centralized sidecar read/write APIs
     bool writeSidecar(const QString &documentPath, const QStringList &tags, int rating, const QString &notes);

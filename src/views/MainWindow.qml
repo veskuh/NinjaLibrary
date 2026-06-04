@@ -287,6 +287,9 @@ KaakaoWindow {
             onTriggered: {
                 if (itemContextMenu.targetPath !== "") {
                     Qt.openUrlExternally("file://" + itemContextMenu.targetPath)
+                    if (itemContextMenu.targetDocId !== -1) {
+                        libraryController.markDocumentOpened(itemContextMenu.targetDocId)
+                    }
                 }
             }
         }
@@ -569,13 +572,25 @@ KaakaoWindow {
                         id: gridCanvas
                         scaleFactor: zoomSlider.value
                         onSelectionChanged: (ids) => inspector.selectedIds = ids
-                        onDoubleClicked: (path) => Qt.openUrlExternally("file://" + path)
+                        onDoubleClicked: (path) => {
+                            Qt.openUrlExternally("file://" + path)
+                            var docId = window.findDocIdByPath(path)
+                            if (docId !== -1) {
+                                libraryController.markDocumentOpened(docId)
+                            }
+                        }
                     }
 
                     TableCanvas {
                         id: tableCanvas
                         onSelectionChanged: (ids) => inspector.selectedIds = ids
-                        onDoubleClicked: (path) => Qt.openUrlExternally("file://" + path)
+                        onDoubleClicked: (path) => {
+                            Qt.openUrlExternally("file://" + path)
+                            var docId = window.findDocIdByPath(path)
+                            if (docId !== -1) {
+                                libraryController.markDocumentOpened(docId)
+                            }
+                        }
                     }
                 }
 

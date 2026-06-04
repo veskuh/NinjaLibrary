@@ -695,3 +695,22 @@ void LibraryController::showInFinder(const QString &filePath)
 #endif
 }
 
+bool LibraryController::markDocumentOpened(int docId)
+{
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return false;
+
+    QSqlQuery query(db);
+    query.prepare("UPDATE documents SET last_opened = :lastOpened WHERE id = :docId;");
+    query.bindValue(":lastOpened", QDateTime::currentSecsSinceEpoch());
+    query.bindValue(":docId", docId);
+    if (!query.exec()) {
+        qWarning() << "Failed to mark document opened:" << query.lastError().text();
+        return false;
+    }
+
+    emit libraryChanged();
+    return true;
+}
+
+

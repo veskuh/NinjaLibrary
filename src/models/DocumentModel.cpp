@@ -99,6 +99,7 @@ QVariant DocumentModel::data(const QModelIndex &index, int role) const
         case TagsStrRole: {
             return doc.tags.join(", ");
         }
+        case LastOpenedRole: return doc.lastOpened;
         default: return QVariant();
     }
 }
@@ -127,6 +128,7 @@ QHash<int, QByteArray> DocumentModel::roleNames() const
     roles[OfflineColorRole] = "offlineColor";
     roles[DateModifiedStrRole] = "dateModifiedStr";
     roles[TagsStrRole] = "tagsStr";
+    roles[LastOpenedRole] = "lastOpened";
     return roles;
 }
 
@@ -141,6 +143,7 @@ void DocumentModel::refresh()
     QSqlQuery query(
         "SELECT d.id, d.folder_id, d.file_name, d.absolute_path, d.file_size, d.file_hash, "
         "       d.date_created, d.date_modified, d.date_added, d.page_count, d.star_rating, d.is_offline, "
+        "       d.last_opened, "
         "       (SELECT group_concat(t.name, ',') FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = d.id) as tags_list, "
         "       (SELECT text_snippet FROM document_search WHERE document_id = d.id) as text, "
         "       (SELECT notes FROM document_search WHERE document_id = d.id) as notes "
@@ -163,16 +166,17 @@ void DocumentModel::refresh()
         doc.pageCount = query.value(9).toInt();
         doc.starRating = query.value(10).toInt();
         doc.isOffline = query.value(11).toBool();
+        doc.lastOpened = query.value(12).toLongLong();
 
-        QString tagsStr = query.value(12).toString();
+        QString tagsStr = query.value(13).toString();
         if (!tagsStr.isEmpty()) {
             doc.tags = tagsStr.split(",", Qt::SkipEmptyParts);
         } else {
             doc.tags = QStringList();
         }
 
-        doc.textSnippet = query.value(13).toString();
-        doc.notes = query.value(14).toString();
+        doc.textSnippet = query.value(14).toString();
+        doc.notes = query.value(15).toString();
 
         // Calculate expected thumbnail location
         QCryptographicHash hasher(QCryptographicHash::Sha256);

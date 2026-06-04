@@ -54,6 +54,7 @@ struct DocumentInfo {
     QString textSnippet;
     QString notes;
     QString thumbnailPath;
+    qint64 lastOpened;
 };
 
 class DocumentModel : public QAbstractListModel
@@ -81,7 +82,8 @@ public:
         StarRatingStrRole,
         OfflineColorRole,
         DateModifiedStrRole,
-        TagsStrRole
+        TagsStrRole,
+        LastOpenedRole
     };
 
     explicit DocumentModel(DatabaseManager *dbMgr, QObject *parent = nullptr);

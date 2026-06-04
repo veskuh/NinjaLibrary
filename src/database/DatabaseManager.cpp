@@ -187,6 +187,7 @@ bool DatabaseManager::initializeDatabase()
                 "    page_count INTEGER DEFAULT 0,"
                 "    star_rating INTEGER DEFAULT 0 CHECK(star_rating BETWEEN 0 AND 5),"
                 "    is_offline BOOLEAN DEFAULT 0,"
+                "    last_opened INTEGER DEFAULT 0,"
                 "    FOREIGN KEY(folder_id) REFERENCES watched_folders(id) ON DELETE CASCADE"
                 ");"
             );
@@ -228,7 +229,7 @@ bool DatabaseManager::initializeDatabase()
             );
 
             if (ok) {
-                ok &= query.exec("PRAGMA user_version = 2;");
+                ok &= query.exec("PRAGMA user_version = 3;");
             }
         }
 
@@ -345,6 +346,7 @@ bool DatabaseManager::initializeDatabase()
 
         if (ok) {
             db.commit();
+            currentVersion = 2;
         } else {
             db.rollback();
             qWarning() << "Database migration to version 2 failed.";
@@ -359,6 +361,24 @@ bool DatabaseManager::initializeDatabase()
         {
             QSqlQuery enableFk(db);
             enableFk.exec("PRAGMA foreign_keys = ON;");
+        }
+    }
+
+    if (currentVersion > 0 && currentVersion < 3) {
+        db.transaction();
+        QSqlQuery q(db);
+        bool ok = q.exec("ALTER TABLE documents ADD COLUMN last_opened INTEGER DEFAULT 0;");
+        if (ok) {
+            ok &= q.exec("PRAGMA user_version = 3;");
+        }
+
+        if (ok) {
+            db.commit();
+            currentVersion = 3;
+        } else {
+            db.rollback();
+            qWarning() << "Database migration to version 3 failed:" << q.lastError().text();
+            return false;
         }
     }
 

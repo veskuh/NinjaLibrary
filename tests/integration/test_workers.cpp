@@ -474,6 +474,21 @@ void TestWorkers::testLibraryControllerAPIs()
     QCOMPARE(newFileResult["docPath"].toString(), newFilePath);
     QCOMPARE(newFileResult["docId"].toInt(), -1); // not in database yet because background scanner hasn't run for it
 
+    // 8. Test markDocumentOpened
+    spyLibrary.clear();
+    QVERIFY(m_controller->markDocumentOpened(docId));
+    QCOMPARE(spyLibrary.count(), 1); // should emit libraryChanged
+
+    // Verify last_opened updated in DB
+    query.prepare("SELECT last_opened FROM documents WHERE id = :id;");
+    query.bindValue(":id", docId);
+    QVERIFY(query.exec());
+    QVERIFY(query.next());
+    qint64 lastOpenedVal = query.value(0).toLongLong();
+    QVERIFY(lastOpenedVal > 0);
+    qint64 nowSecs = QDateTime::currentSecsSinceEpoch();
+    QVERIFY(qAbs(nowSecs - lastOpenedVal) < 5); // within 5 seconds
+
     // Clean up watched folder for tempDir2
     QVERIFY(m_controller->removeWatchedFolder(newFolderPath));
 

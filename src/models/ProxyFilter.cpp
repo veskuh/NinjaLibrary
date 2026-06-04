@@ -134,6 +134,15 @@ void ProxyFilter::setCategoryFilter(const QString &category)
     } else {
         setDuplicatesOnly(false);
     }
+
+    if (m_categoryFilter == "Recent") {
+        setSortRole(DocumentModel::LastOpenedRole);
+        sort(0, Qt::DescendingOrder);
+    } else {
+        setSortRole(DocumentModel::FileNameRole);
+        sort(0, Qt::AscendingOrder);
+    }
+
     invalidateAndRecalculate();
     emit categoryFilterChanged();
 }
@@ -281,8 +290,8 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex
 
     // 6. Category filters
     if (m_categoryFilter == "Recent") {
-        QDateTime dateAdded = sourceModel()->data(idx, DocumentModel::DateAddedRole).toDateTime();
-        if (dateAdded.daysTo(QDateTime::currentDateTime()) > 7) {
+        qint64 lastOpened = sourceModel()->data(idx, DocumentModel::LastOpenedRole).toLongLong();
+        if (lastOpened <= 0) {
             return false;
         }
     } else if (m_categoryFilter == "Favorites") {

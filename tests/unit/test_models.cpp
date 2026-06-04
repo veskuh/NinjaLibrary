@@ -46,6 +46,7 @@ private slots:
     void testMultiTermSearch();
     void testScopeFiltering();
     void testSorting();
+    void testRecentCategory();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -413,6 +414,40 @@ void TestModels::testSorting()
     proxyFilter.sort(0, Qt::AscendingOrder);
     // fileB.png (size 200) must be the last one since it's the largest
     QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileB.png"));
+}
+
+void TestModels::testRecentCategory()
+{
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery query(db);
+
+    // Clear last_opened first to make sure test starts with clean state
+    QVERIFY(query.exec("UPDATE documents SET last_opened = 0;"));
+    sourceModel.refresh();
+
+    // By default, category filter "Recent" should show nothing because last_opened is 0 for all
+    proxyFilter.setCategoryFilter("Recent");
+    QCOMPARE(proxyFilter.rowCount(), 0);
+
+    // Now set last_opened for fileA.pdf to 100, and fileB.png to 200
+    // fileB.png is opened more recently (larger timestamp)
+    QVERIFY(query.exec("UPDATE documents SET last_opened = 100 WHERE file_name = 'fileA.pdf';"));
+    QVERIFY(query.exec("UPDATE documents SET last_opened = 200 WHERE file_name = 'fileB.png';"));
+    sourceModel.refresh();
+
+    // Should show 2 documents (File A and File B, but not File C)
+    QCOMPARE(proxyFilter.rowCount(), 2);
+
+    // They must be sorted by last_opened DESC: fileB.png (200) should be first, then fileA.pdf (100)
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileB.png"));
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileA.pdf"));
+
+    // Clean up category filter
+    proxyFilter.setCategoryFilter("All");
 }
 
 QTEST_MAIN(TestModels)
