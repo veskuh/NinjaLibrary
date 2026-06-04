@@ -118,99 +118,16 @@ KaakaoWindow {
 
     property alias mainMenuBar: mainMenuBar
 
-    menuBar: MenuBar {
+    menuBar: AppMenuBar {
         id: mainMenuBar
-
-        Menu {
-            title: "File"
-            MenuItem {
-                action: Action {
-                    text: "Add Watched Folder..."
-                    shortcut: StandardKey.Open
-                    onTriggered: folderDialog.open()
-                }
-            }
-            MenuSeparator {}
-            MenuItem {
-                action: Action {
-                    text: "Quit"
-                    shortcut: StandardKey.Quit
-                    onTriggered: Qt.quit()
-                }
-            }
-        }
-
-        Menu {
-            title: "Edit"
-            MenuItem {
-                action: Action {
-                    text: "Find..."
-                    shortcut: StandardKey.Find
-                    onTriggered: searchField.forceActiveFocus()
-                }
-            }
-        }
-
-        Menu {
-            title: "View"
-            MenuItem {
-                action: Action {
-                    text: "Toggle Sidebar"
-                    shortcut: "Ctrl+Alt+S"
-                    onTriggered: sidebar.collapsed = !sidebar.collapsed
-                }
-            }
-            MenuItem {
-                action: Action {
-                    text: "Toggle Inspector"
-                    shortcut: "Ctrl+Alt+I"
-                    onTriggered: inspector.collapsed = !inspector.collapsed
-                }
-            }
-            MenuSeparator {}
-            MenuItem {
-                action: Action {
-                    text: "Grid View Layout"
-                    shortcut: "Ctrl+1"
-                    onTriggered: viewSegment.currentIndex = 0
-                }
-            }
-            MenuItem {
-                action: Action {
-                    text: "Table View Layout"
-                    shortcut: "Ctrl+2"
-                    onTriggered: viewSegment.currentIndex = 1
-                }
-            }
-        }
-
-        Menu {
-            title: "Window"
-            MenuItem {
-                action: Action {
-                    text: "Minimize"
-                    shortcut: "Ctrl+M"
-                    onTriggered: window.showMinimized()
-                }
-            }
-        }
-
-        Menu {
-            title: "Help"
-            MenuItem {
-                action: Action {
-                    text: "About NinjaLibrary"
-                    onTriggered: aboutDialog.open()
-                }
-            }
-            MenuItem {
-                action: Action {
-                    text: "Preferences..."
-                    shortcut: StandardKey.Preferences
-                    onTriggered: prefsDialog.open()
-                }
-            }
-        }
+        onOpenFolderRequested: folderDialog.open()
+        onFocusSearchRequested: searchField.forceActiveFocus()
+        onToggleSidebarRequested: sidebar.collapsed = !sidebar.collapsed
+        onToggleInspectorRequested: inspector.collapsed = !inspector.collapsed
+        onSetViewModeRequested: (index) => viewSegment.currentIndex = index
+        onMinimizeRequested: window.showMinimized()
+        onOpenAboutRequested: aboutDialog.open()
+        onOpenPreferencesRequested: prefsDialog.open()
     }
 
     // Native macOS / Platform folder picker
@@ -275,67 +192,8 @@ KaakaoWindow {
         }
     }
 
-    KaakaoMenu {
+    ItemContextMenu {
         id: itemContextMenu
-        
-        property int targetDocId: -1
-        property string targetPath: ""
-        property int targetRating: 0
-        
-        KaakaoMenuItem {
-            text: "Open"
-            onTriggered: {
-                if (itemContextMenu.targetPath !== "") {
-                    Qt.openUrlExternally("file://" + itemContextMenu.targetPath)
-                    if (itemContextMenu.targetDocId !== -1) {
-                        libraryController.markDocumentOpened(itemContextMenu.targetDocId)
-                    }
-                }
-            }
-        }
-        
-        KaakaoMenuItem {
-            text: "Show in Finder"
-            onTriggered: {
-                if (itemContextMenu.targetPath !== "") {
-                    libraryController.showInFinder(itemContextMenu.targetPath)
-                }
-            }
-        }
-        
-        KaakaoMenuSeparator {}
-        
-        KaakaoMenu {
-            id: rateMenu
-            title: "Rate"
-            
-            onAboutToShow: {
-                for (var i = 0; i < 5; i++) {
-                    var item = rateRepeater.itemAt(i)
-                    if (item) {
-                        item.checked = (i + 1) === itemContextMenu.targetRating
-                    }
-                }
-            }
-            
-            Repeater {
-                id: rateRepeater
-                model: 5
-                KaakaoMenuItem {
-                    text: {
-                        var stars = ""
-                        for (var i = 0; i <= index; i++) stars += "★"
-                        for (var j = index + 1; j < 5; j++) stars += "☆"
-                        return stars
-                    }
-                    checkable: true
-                    checked: (index + 1) === itemContextMenu.targetRating
-                    onTriggered: {
-                        libraryController.batchUpdateRating([itemContextMenu.targetDocId], index + 1)
-                    }
-                }
-            }
-        }
     }
 
     // Top Header ToolBar
@@ -651,51 +509,9 @@ KaakaoWindow {
     }
 
     // Visual Drag & Drop Overlay
-    Rectangle {
+    DragOverlay {
         id: dragOverlay
-        objectName: "dragOverlay"
-        anchors.fill: parent
-        color: Theme.isDarkMode ? Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.15) : Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.04)
-        border.color: Theme.primaryAccent
-        border.width: 3
-        visible: dropArea.containsDrag
-        z: 9999
-
-        Rectangle {
-            anchors.centerIn: parent
-            width: 300
-            height: 180
-            color: Theme.isDarkMode ? Qt.rgba(0.12, 0.12, 0.12, 0.9) : Qt.rgba(1, 1, 1, 0.95)
-            radius: 12
-            border.color: Theme.buttonBorder
-            border.width: 1
-
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: 12
-
-                Text {
-                    text: "📥"
-                    font.pixelSize: 48
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                KaakaoLabel {
-                    text: "Drop File or Folder"
-                    font.pixelSize: 18
-                    font.weight: Font.Bold
-                    color: Theme.primaryText
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                KaakaoLabel {
-                    text: "Add to watched folders and select"
-                    font.pixelSize: 12
-                    color: Theme.sidebarSectionText
-                    Layout.alignment: Qt.AlignHCenter
-                }
-            }
-        }
+        containsDrag: dropArea.containsDrag
     }
 
     DropArea {

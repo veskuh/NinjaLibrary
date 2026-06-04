@@ -97,6 +97,9 @@ qt_add_qml_module(NinjaLibrary
         src/utils/DocUtils.h
     QML_FILES
         src/views/MainWindow.qml
+        src/views/AppMenuBar.qml
+        src/views/ItemContextMenu.qml
+        src/views/DragOverlay.qml
         src/components/DocumentCard.qml
         src/components/TagPill.qml
         src/components/LocalTableRowDelegate.qml
