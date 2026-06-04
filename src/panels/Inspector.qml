@@ -90,11 +90,14 @@ Rectangle {
                     fileSizeStr: documentModel.data(idx, 273),
                     pageCount: documentModel.data(idx, 266),
                     starRating: documentModel.data(idx, 267),
-                    isOffline: documentModel.data(idx, 268),
+                    isOffline: documentModel.data(idx, 268) === true || documentModel.data(idx, 268) === "true" || documentModel.data(idx, 268) === 1 || documentModel.data(idx, 268) === "1",
                     tags: documentModel.data(idx, 269) || [],
                     textSnippet: documentModel.data(idx, 270) || "",
                     notes: documentModel.data(idx, 271) || "",
-                    thumbnailPath: documentModel.data(idx, 272) || ""
+                    thumbnailPath: documentModel.data(idx, 272) || "",
+                    dateAdded: documentModel.data(idx, 265),
+                    dateModified: documentModel.data(idx, 264),
+                    lastOpened: documentModel.data(idx, 278)
                 }
                 if (notesArea) {
                     notesArea.text = docData.notes
@@ -131,6 +134,33 @@ Rectangle {
             }
         }
         multiDocData = temp
+    }
+
+    function formatDate(val) {
+        if (!val) return "";
+        var date = new Date(val);
+        if (isNaN(date.getTime())) return "";
+        return Qt.formatDateTime(date, "yyyy-MM-dd hh:mm");
+    }
+
+    function formatLastOpened(timestamp) {
+        if (!timestamp || timestamp === 0) return "Never";
+        var date = new Date(timestamp * 1000); // timestamp in epoch seconds
+        if (isNaN(date.getTime())) return "Never";
+        var now = new Date();
+        var diffMs = now - date;
+        var diffSec = Math.floor(diffMs / 1000);
+        var diffMin = Math.floor(diffSec / 60);
+        var diffHr = Math.floor(diffMin / 60);
+        var diffDays = Math.floor(diffHr / 24);
+
+        if (diffSec < 60) return "Just now";
+        if (diffMin < 60) return diffMin + "m ago";
+        if (diffHr < 24) return diffHr + "h ago";
+        if (diffDays === 1) return "Yesterday";
+        if (diffDays < 7) return diffDays + " days ago";
+        
+        return Qt.formatDateTime(date, "yyyy-MM-dd");
     }
 
     onSelectedIdChanged: {
@@ -355,14 +385,48 @@ Rectangle {
                     elide: Text.ElideMiddle
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+
+                    ToolTip.visible: filenameMouse.containsMouse && text !== ""
+                    ToolTip.text: text
+
+                    MouseArea {
+                        id: filenameMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                    }
                 }
 
                 KaakaoLabel {
-                    text: inspector.docData ? (inspector.docData.isOffline ? "Status: Offline" : "Status: Online") : ""
+                    text: "Offline"
+                    visible: !!(inspector.docData && inspector.docData.isOffline)
                     role: KaakaoLabel.Role.Small
-                    color: inspector.docData && inspector.docData.isOffline ? Theme.colorError : Theme.colorSuccess
+                    color: Theme.colorError
                     opacity: 1.0
                     Layout.alignment: Qt.AlignHCenter
+                }
+
+                KaakaoDisclosureTriangle {
+                    id: previewDisclosure
+                    text: "Extracted Text Preview"
+                    expanded: false
+                    visible: inspector.docData && inspector.docData.textSnippet !== ""
+                    Layout.fillWidth: true
+                }
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    height: 100
+                    clip: true
+                    visible: inspector.docData && inspector.docData.textSnippet !== "" && previewDisclosure.expanded
+                    
+                    KaakaoTextArea {
+                        text: inspector.docData ? inspector.docData.textSnippet : ""
+                        readOnly: true
+                        placeholderText: "No text content extracted."
+                        placeholderTextColor: Theme.sidebarSectionText
+                        font.pixelSize: 11
+                    }
                 }
 
                 KaakaoSeparator { Layout.fillWidth: true }
@@ -384,13 +448,71 @@ Rectangle {
                     KaakaoLabel {
                         text: {
                             if (!inspector.docData || !inspector.docData.fileName) return ""
-                            var ext = inspector.docData.fileName.substring(inspector.docData.fileName.lastIndexOf('.') + 1).toUpperCase()
-                            return ext + " Document"
+                            var parts = inspector.docData.fileName.split('.')
+                            if (parts.length <= 1) return "Unknown File"
+                            var ext = parts[parts.length - 1].toLowerCase()
+                            var types = {
+                                "pdf": "PDF Document",
+                                "doc": "Word Document",
+                                "docx": "Word Document",
+                                "xls": "Excel Spreadsheet",
+                                "xlsx": "Excel Spreadsheet",
+                                "ppt": "PowerPoint Presentation",
+                                "pptx": "PowerPoint Presentation",
+                                "txt": "Plain Text File",
+                                "md": "Markdown Document",
+                                "png": "PNG Image",
+                                "jpg": "JPEG Image",
+                                "jpeg": "JPEG Image",
+                                "gif": "GIF Image",
+                                "bmp": "BMP Image",
+                                "tiff": "TIFF Image",
+                                "tif": "TIFF Image",
+                                "rtf": "Rich Text Format",
+                                "html": "HTML Document",
+                                "htm": "HTML Document",
+                                "json": "JSON Document",
+                                "csv": "Comma-Separated Values File",
+                                "xml": "XML Document",
+                                "zip": "ZIP Archive",
+                                "tar": "TAR Archive",
+                                "gz": "GZIP Archive"
+                            }
+                            return types[ext] || (ext.toUpperCase() + " File")
                         }
                         role: KaakaoLabel.Role.Small
                         color: Theme.primaryText
                         opacity: 1.0
                     }
+
+                    KaakaoLabel { text: "Path:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
+                    KaakaoLabel {
+                        text: (inspector.docData && inspector.docData.absolutePath) || ""
+                        role: KaakaoLabel.Role.Small
+                        color: Theme.primaryText
+                        opacity: 1.0
+                        elide: Text.ElideLeft
+                        Layout.fillWidth: true
+
+                        ToolTip.visible: pathMouse.containsMouse && text !== ""
+                        ToolTip.text: text
+
+                        MouseArea {
+                            id: pathMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                        }
+                    }
+
+                    KaakaoLabel { text: "Modified:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.dateModified) ? inspector.formatDate(inspector.docData.dateModified) : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+
+                    KaakaoLabel { text: "Imported:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.dateAdded) ? inspector.formatDate(inspector.docData.dateAdded) : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+
+                    KaakaoLabel { text: "Opened:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.lastOpened !== undefined) ? inspector.formatLastOpened(inspector.docData.lastOpened) : "Never"; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
                 }
 
                 KaakaoSeparator { Layout.fillWidth: true }
@@ -501,6 +623,7 @@ Rectangle {
                     
                     KaakaoTextArea {
                         id: notesArea
+                        objectName: "notesArea"
                         text: inspector.docData ? inspector.docData.notes : ""
                         placeholderText: "Write details or thoughts..."
                         placeholderTextColor: Theme.sidebarSectionText

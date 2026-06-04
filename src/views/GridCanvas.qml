@@ -76,7 +76,20 @@ Item {
         Connections {
             target: gridView.gridView.Keys
             function onPressed(event) {
-                if (gridCanvas.selectedIds.length !== 1) {
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (gridCanvas.selectedIds.length === 1) {
+                        var docId = gridCanvas.selectedIds[0]
+                        for (var i = 0; i < proxyFilter.rowCount(); i++) {
+                            var idx = proxyFilter.index(i, 0)
+                            if (proxyFilter.data(idx, 257) === docId) {
+                                var path = proxyFilter.data(idx, 260) // 260 is absolutePath
+                                gridCanvas.doubleClicked(path)
+                                event.accepted = true
+                                break
+                            }
+                        }
+                    }
+                } else if (gridCanvas.selectedIds.length !== 1) {
                     if (event.key === Qt.Key_Up || event.key === Qt.Key_Down ||
                         event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
                         event.accepted = true;

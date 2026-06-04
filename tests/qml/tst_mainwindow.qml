@@ -266,7 +266,7 @@ TestCase {
         compare(inspector.selectedId, 42, "Document 42 should be selected");
         
         // Find notesArea
-        let notesArea = findChildByType(inspector, "KaakaoTextArea");
+        let notesArea = findChildByName(inspector, "notesArea");
         verify(notesArea !== null, "notesArea should exist inside Inspector");
         compare(notesArea.text, "Notes 42", "notesArea text should show initial notes");
 
@@ -480,6 +480,75 @@ TestCase {
         compare(searchField.text, "", "Search field should be cleared after Escape");
         compare(inspector.selectedIds.length, 0, "Selection should be empty after Escape");
 
+        win.destroy();
+    }
+
+    function test_enter_key_to_open_document() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        win.width = 1024;
+        win.height = 768;
+        wait(200);
+
+        // Find GridCanvas & TableCanvas
+        let gridCanvas = findChildByType(win, "GridCanvas");
+        verify(gridCanvas !== null, "GridCanvas should be found");
+        let tableCanvas = findChildByType(win, "TableCanvas");
+        verify(tableCanvas !== null, "TableCanvas should be found");
+
+        let viewSegment = findChildByName(win, "viewSegment");
+        verify(viewSegment !== null, "viewSegment should be found");
+
+        // Clear and populate model
+        documentModel.clear();
+        proxyFilter.clear();
+        let doc1 = { "257": 101, "id": 101, "docId": 101, "fileName": "doc1.pdf", "absolutePath": "/path/1" };
+        let doc2 = { "257": 102, "id": 102, "docId": 102, "fileName": "doc2.pdf", "absolutePath": "/path/2" };
+        documentModel.append(doc1);
+        proxyFilter.append(doc1);
+        documentModel.append(doc2);
+        proxyFilter.append(doc2);
+
+        // Create Spy for markDocumentOpened signal on libraryController
+        let openSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        openSpy.target = libraryController;
+        openSpy.signalName = "documentOpened";
+
+        // 1. GridView Enter key test
+        viewSegment.currentIndex = 0; // Grid
+        gridCanvas.selectedIds = [101];
+        gridCanvas.selectId(101);
+        
+        let gridView = findChildByType(gridCanvas, "KaakaoGridView");
+        verify(gridView !== null, "KaakaoGridView should be found");
+        gridView.gridView.forceActiveFocus();
+        verify(gridView.gridView.activeFocus, "Grid view should have focus");
+
+        keyClick(Qt.Key_Return);
+        wait(50);
+        compare(openSpy.count, 1, "Enter in Grid View should trigger markDocumentOpened");
+        compare(openSpy.signalArguments[0][0], 101, "Opened document ID in Grid View should be 101");
+        openSpy.clear();
+
+        // 2. TableView Enter key test
+        viewSegment.currentIndex = 1; // Table
+        tableCanvas.selectId(102);
+        
+        let tableView = findChildByType(tableCanvas, "KaakaoTableView");
+        verify(tableView !== null, "KaakaoTableView should be found");
+        
+        // Find inner ListView
+        let innerListView = tableCanvas.innerListView;
+        verify(innerListView !== null, "Inner table ListView should be found");
+        innerListView.forceActiveFocus();
+        verify(innerListView.activeFocus, "Table view should have focus");
+
+        keyClick(Qt.Key_Return);
+        wait(50);
+        compare(openSpy.count, 1, "Enter in Table View should trigger markDocumentOpened");
+        compare(openSpy.signalArguments[0][0], 102, "Opened document ID in Table View should be 102");
+
+        openSpy.destroy();
         win.destroy();
     }
 }

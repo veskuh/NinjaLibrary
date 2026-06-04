@@ -25,9 +25,13 @@ public:
     Q_INVOKABLE void batchUpdateRating(const QVariantList &, int) {}
     Q_INVOKABLE void batchRemoveTags(const QVariantList &, const QStringList &) {}
     Q_INVOKABLE void batchAddTags(const QVariantList &, const QStringList &) {}
+    Q_INVOKABLE void markDocumentOpened(int docId) {
+        emit documentOpened(docId);
+    }
 signals:
     void watchedFoldersChanged();
     void notesUpdated(int docId, const QString &notes);
+    void documentOpened(int docId);
 };
 
 #include <QHash>
@@ -140,7 +144,8 @@ public:
             {274, "starRatingStr"},
             {275, "offlineColor"},
             {276, "dateModifiedStr"},
-            {277, "tagsStr"}
+            {277, "tagsStr"},
+            {278, "lastOpened"}
         };
         QString name = roleNameMap.value(role);
         if (!name.isEmpty() && rowMap.contains(name)) {
@@ -171,7 +176,8 @@ public:
             {274, "starRatingStr"},
             {275, "offlineColor"},
             {276, "dateModifiedStr"},
-            {277, "tagsStr"}
+            {277, "tagsStr"},
+            {278, "lastOpened"}
         };
     }
 
@@ -253,7 +259,8 @@ public:
             {274, "starRatingStr"},
             {275, "offlineColor"},
             {276, "dateModifiedStr"},
-            {277, "tagsStr"}
+            {277, "tagsStr"},
+            {278, "lastOpened"}
         };
         QString name = roleNameMap.value(role);
         if (!name.isEmpty() && rowMap.contains(name)) {
@@ -284,7 +291,8 @@ public:
             {274, "starRatingStr"},
             {275, "offlineColor"},
             {276, "dateModifiedStr"},
-            {277, "tagsStr"}
+            {277, "tagsStr"},
+            {278, "lastOpened"}
         };
     }
 

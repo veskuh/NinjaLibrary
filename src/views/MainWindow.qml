@@ -214,6 +214,7 @@ KaakaoWindow {
         // View Mode segmented control centered exactly in the middle of the toolbar
         KaakaoSegmentedControl {
             id: viewSegment
+            objectName: "viewSegment"
             model: ["Grid", "Table"]
             implicitWidth: 120
             anchors.centerIn: parent

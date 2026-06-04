@@ -39,10 +39,13 @@ Item {
     signal selectionChanged(var ids)
     signal doubleClicked(string path)
 
+    property var innerListView: null
+
     Component.onCompleted: {
         let lv = findListView(tableView)
         if (lv) {
             lv.delegate = rowDelegateComponent
+            innerListView = lv
         }
     }
 
@@ -157,5 +160,20 @@ Item {
         }
 
 
+    }
+
+    Connections {
+        target: tableCanvas.innerListView ? tableCanvas.innerListView.Keys : null
+        ignoreUnknownSignals: true
+        function onPressed(event) {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if (tableView.currentIndex >= 0 && tableView.currentIndex < proxyFilter.rowCount()) {
+                    var idx = proxyFilter.index(tableView.currentIndex, 0)
+                    var path = proxyFilter.data(idx, 260) // 260 is absolutePath
+                    tableCanvas.doubleClicked(path)
+                    event.accepted = true
+                }
+            }
+        }
     }
 }
