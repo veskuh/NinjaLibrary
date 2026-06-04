@@ -277,4 +277,46 @@ TestCase {
 
         tableView.destroy()
     }
+
+    function test_table_view_click_selection() {
+        let tableView = tableViewComponent.createObject(this)
+        verify(tableView !== null, "TableView should be created")
+        tableView.model = mockModel
+        wait(200)
+
+        let listView = null
+        for (let i = 0; i < tableView.children.length; ++i) {
+            let child = tableView.children[i];
+            if (child.children) {
+                for (let j = 0; j < child.children.length; ++j) {
+                    let inner = child.children[j];
+                    if (inner.toString().indexOf("ListView") >= 0) {
+                        listView = inner;
+                        break;
+                    }
+                }
+            }
+        }
+        verify(listView !== null, "Inner ListView should be found")
+
+        let contentItem = listView.contentItem
+        verify(contentItem !== null, "contentItem should exist")
+
+        let delegate1 = null
+        for (let i = 0; i < contentItem.children.length; ++i) {
+            let delegate = contentItem.children[i];
+            if (delegate.toString().indexOf("TableRowDelegate") >= 0 && delegate.rowIndex === 1) {
+                delegate1 = delegate
+                break
+            }
+        }
+        verify(delegate1 !== null, "Delegate at index 1 should be found")
+
+        // Click the delegate
+        mouseClick(delegate1)
+        wait(50)
+
+        compare(listView.currentIndex, 1, "ListView currentIndex should change to 1 after click")
+        tableView.destroy()
+    }
 }

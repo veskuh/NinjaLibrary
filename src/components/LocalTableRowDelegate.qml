@@ -85,12 +85,7 @@ ItemDelegate {
         return false
     }
 
-    onClicked: {
-        if (ListView.view) {
-            ListView.view.currentIndex = index
-            ListView.view.forceActiveFocus()
-        }
-    }
+
 
     Connections {
         target: control.ListView.view ? control.ListView.view.model : null
@@ -257,18 +252,27 @@ ItemDelegate {
 
     MouseArea {
         anchors.fill: parent
-        acceptedButtons: Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: (mouse) => {
-            if (ListView.view) {
-                ListView.view.currentIndex = index
-                ListView.view.forceActiveFocus()
+            if (control.ListView.view) {
+                control.ListView.view.currentIndex = index
+                control.ListView.view.forceActiveFocus()
             }
-            var globalPos = mapToItem(null, mouse.x, mouse.y)
-            if (typeof itemContextMenu !== "undefined") {
-                itemContextMenu.targetDocId = control.docIdValue
-                itemContextMenu.targetPath = control.absolutePathValue
-                itemContextMenu.targetRating = control.starRatingValue
-                itemContextMenu.popup(globalPos.x, globalPos.y)
+            if (mouse.button === Qt.RightButton) {
+                var globalPos = mapToItem(null, mouse.x, mouse.y)
+                if (typeof itemContextMenu !== "undefined") {
+                    itemContextMenu.targetDocId = control.docIdValue
+                    itemContextMenu.targetPath = control.absolutePathValue
+                    itemContextMenu.targetRating = control.starRatingValue
+                    itemContextMenu.popup(globalPos.x, globalPos.y)
+                }
+            }
+        }
+        onDoubleClicked: (mouse) => {
+            if (mouse.button === Qt.LeftButton) {
+                if (typeof tableCanvas !== "undefined") {
+                    tableCanvas.doubleClicked(control.absolutePathValue)
+                }
             }
         }
     }

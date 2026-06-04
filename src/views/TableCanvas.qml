@@ -156,24 +156,6 @@ Item {
             proxyFilter.sort(0, order)
         }
 
-        MouseArea {
-            anchors.fill: parent
-            anchors.topMargin: 25 // Ignore table header clicks (height is 25)
-            acceptedButtons: Qt.LeftButton
-            propagateComposedEvents: true
-            onDoubleClicked: (mouse) => {
-                if (tableView.currentIndex >= 0 && tableView.currentIndex < proxyFilter.rowCount()) {
-                    var idx = proxyFilter.index(tableView.currentIndex, 0)
-                    var path = proxyFilter.data(idx, 260) // AbsolutePathRole
-                    tableCanvas.doubleClicked(path)
-                }
-            }
-            onClicked: (mouse) => {
-                mouse.accepted = false
-            }
-            onPressed: (mouse) => {
-                mouse.accepted = false
-            }
-        }
+
     }
 }
