@@ -74,6 +74,41 @@ TestCase {
         card.isOffline = true
         compare(card.isOffline, true)
 
+        // Helper to find status label inside DocumentCard (identified by font.pixelSize === 9)
+        function findStatusLabel(parent) {
+            if (!parent) return null;
+            if (parent.toString().indexOf("Label") >= 0 && parent.font.pixelSize === 9) {
+                return parent;
+            }
+            if (parent.children) {
+                for (let i = 0; i < parent.children.length; ++i) {
+                    let found = findStatusLabel(parent.children[i]);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        let statusLabel = findStatusLabel(card);
+        verify(statusLabel !== null, "Status label should exist");
+
+        // Set card online and empty thumbnail path (simulating a text file card)
+        card.isOffline = false
+        card.thumbnailPath = ""
+        compare(statusLabel.visible, false, "Status label should be hidden when online and thumbnailPath is empty")
+        compare(statusLabel.text, "", "Status label text should be empty when online and thumbnailPath is empty")
+
+        // Set card offline
+        card.isOffline = true
+        compare(statusLabel.text, "OFFLINE", "Status label text should be OFFLINE when offline")
+        compare(statusLabel.visible, true, "Status label should be visible when offline")
+
+        // Set card online but with a thumbnail path (simulating loading a PDF thumbnail)
+        card.isOffline = false
+        card.thumbnailPath = "file:///tmp/dummy.png"
+        compare(statusLabel.text, "LOADING...", "Status label text should be LOADING... when thumbnail is set but not ready")
+        compare(statusLabel.visible, true, "Status label should be visible when loading thumbnail")
+
         // Verify there are ZERO raw Text elements (only KaakaoLabel/Label should be used)
         let hasRaw = hasRawTextElement(card);
         verify(!hasRaw, "DocumentCard must not contain raw Text elements");

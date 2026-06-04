@@ -122,8 +122,14 @@ KaakaoSidebar {
 
     Component.onCompleted: {
         rebuildModel()
-        libraryController.watchedFoldersChanged.connect(rebuildModel)
-        libraryController.libraryChanged.connect(rebuildModel)
+        if (typeof libraryController !== "undefined" && libraryController) {
+            if (libraryController.watchedFoldersChanged) {
+                libraryController.watchedFoldersChanged.connect(rebuildModel)
+            }
+            if (libraryController.libraryChanged) {
+                libraryController.libraryChanged.connect(rebuildModel)
+            }
+        }
     }
 
     onCurrentIndexChanged: {

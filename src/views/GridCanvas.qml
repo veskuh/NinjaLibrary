@@ -74,7 +74,7 @@ Item {
                 fileName: model.fileName
                 absolutePath: model.absolutePath
                 fileSize: model.fileSize
-                thumbnailPath: model.thumbnailPath
+                thumbnailPath: model.thumbnailPath || ""
                 starRating: model.starRating
                 isOffline: model.isOffline
                 
@@ -86,7 +86,12 @@ Item {
                 // Request thumbnail if not loaded yet
                 Component.onCompleted: {
                     if (model.thumbnailPath === "" && !model.isOffline) {
-                        libraryController.requestThumbnail(model.docId, model.absolutePath, false)
+                        var ext = model.fileName.substring(model.fileName.lastIndexOf('.') + 1).toLowerCase();
+                        var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" ||
+                                         ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
+                        if (!isTextDoc) {
+                            libraryController.requestThumbnail(model.docId, model.absolutePath, false)
+                        }
                     }
                 }
 

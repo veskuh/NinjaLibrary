@@ -33,6 +33,7 @@
 #include <QPair>
 #include "../utils/HashUtils.h"
 #include "../utils/PdfUtils.h"
+#include "../utils/DocUtils.h"
 
 #include <QDir>
 #include <QDirIterator>
@@ -98,6 +99,7 @@ void ScannerTask::run()
 
         filesOnDisk.insert(filePath);
         QFileInfo fileInfo(filePath);
+        QString ext = fileInfo.suffix().toLower();
         qint64 currentSize = fileInfo.size();
         QDateTime currentModified = fileInfo.lastModified();
 
@@ -123,9 +125,12 @@ void ScannerTask::run()
                 QString fileHash = HashUtils::computeSha256(filePath);
                 int pageCount = 0;
                 QString extractedText;
-                if (fileInfo.suffix().toLower() == "pdf") {
+                if (ext == "pdf") {
                     pageCount = PdfUtils::getPdfPageCount(filePath);
                     extractedText = PdfUtils::extractPdfText(filePath);
+                } else if (DocUtils::isSupportedTextDocument(filePath)) {
+                    pageCount = 1;
+                    extractedText = DocUtils::extractText(filePath);
                 } else {
                     pageCount = 1;
                 }
@@ -207,26 +212,35 @@ void ScannerTask::run()
                     }
                 }
 
-                if (fileInfo.suffix().toLower() != "pdf" || countWords(extractedText) < 10) {
+                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
                     pendingOcr.append({docId, filePath});
                 }
-                pendingThumbnails.append({docId, filePath});
+                if (isImage || ext == "pdf") {
+                    pendingThumbnails.append({docId, filePath});
+                }
             } else if (isOffline) {
                 // File came back online
                 QSqlQuery updateOffline(db);
                 updateOffline.prepare("UPDATE documents SET is_offline = 0 WHERE id = :id;");
                 updateOffline.bindValue(":id", docId);
                 updateOffline.exec();
-                pendingThumbnails.append({docId, filePath});
+                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                if (isImage || ext == "pdf") {
+                    pendingThumbnails.append({docId, filePath});
+                }
             }
         } else {
             // New document: Ingest
             QString fileHash = HashUtils::computeSha256(filePath);
             int pageCount = 0;
             QString extractedText;
-            if (fileInfo.suffix().toLower() == "pdf") {
+            if (ext == "pdf") {
                 pageCount = PdfUtils::getPdfPageCount(filePath);
                 extractedText = PdfUtils::extractPdfText(filePath);
+            } else if (DocUtils::isSupportedTextDocument(filePath)) {
+                pageCount = 1;
+                extractedText = DocUtils::extractText(filePath);
             } else {
                 pageCount = 1;
             }
@@ -315,10 +329,13 @@ void ScannerTask::run()
                     }
                 }
 
-                if (fileInfo.suffix().toLower() != "pdf" || countWords(extractedText) < 10) {
+                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
                     pendingOcr.append({docId, filePath});
                 }
-                pendingThumbnails.append({docId, filePath});
+                if (isImage || ext == "pdf") {
+                    pendingThumbnails.append({docId, filePath});
+                }
             } else {
                 qWarning() << "Failed to insert document" << filePath << ":" << insertDoc.lastError().text();
             }
@@ -357,7 +374,7 @@ void ScannerTask::run()
 bool ScannerTask::isSupportedDocument(const QString &filePath) const
 {
     QString ext = QFileInfo(filePath).suffix().toLower();
-    return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp";
+    return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp" || DocUtils::isSupportedTextDocument(filePath);
 }
 
 int ScannerTask::countWords(const QString &text) const

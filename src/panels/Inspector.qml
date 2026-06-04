@@ -321,7 +321,7 @@ Rectangle {
                         id: previewImage
                         anchors.fill: parent
                         anchors.margins: 4
-                        source: inspector.docData ? inspector.docData.thumbnailPath : ""
+                        source: (inspector.docData && inspector.docData.thumbnailPath) || ""
                         fillMode: Image.PreserveAspectFit
                         visible: source.toString() !== "" && status === Image.Ready
                     }
@@ -339,7 +339,7 @@ Rectangle {
 
                 // File Name
                 KaakaoLabel {
-                    text: inspector.docData ? inspector.docData.fileName : ""
+                    text: (inspector.docData && inspector.docData.fileName) || ""
                     font.pixelSize: 14
                     font.weight: Font.Bold
                     elide: Text.ElideMiddle
@@ -365,15 +365,15 @@ Rectangle {
                     Layout.fillWidth: true
 
                     KaakaoLabel { text: "Size:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
-                    KaakaoLabel { text: inspector.docData ? inspector.docData.fileSizeStr : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.fileSizeStr) || ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
 
                     KaakaoLabel { text: "Pages:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
-                    KaakaoLabel { text: inspector.docData ? inspector.docData.pageCount : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.pageCount !== undefined) ? inspector.docData.pageCount : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
 
                     KaakaoLabel { text: "Type:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
                     KaakaoLabel {
                         text: {
-                            if (!inspector.docData) return ""
+                            if (!inspector.docData || !inspector.docData.fileName) return ""
                             var ext = inspector.docData.fileName.substring(inspector.docData.fileName.lastIndexOf('.') + 1).toUpperCase()
                             return ext + " Document"
                         }

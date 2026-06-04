@@ -55,6 +55,7 @@ private slots:
     void testIngestionAndOfflineDetection();
     void testPdfAndOcr();
     void testLibraryControllerAPIs();
+    void testTextAndDocIngestion();
     void testMacBookmarksAndEdgeCases();
 
 private:
@@ -480,6 +481,132 @@ void TestWorkers::testLibraryControllerAPIs()
     QVERIFY(!m_controller->removeWatchedFolder(""));
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
     QVERIFY(!m_controller->watchedFolders().contains(tempPath));
+}
+
+void TestWorkers::testTextAndDocIngestion()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+
+    // Add folder path to DB
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO watched_folders (absolute_path) VALUES (:path);");
+    query.bindValue(":path", tempPath);
+    QVERIFY(query.exec());
+
+    // 1. Create a .txt file
+    QString txtPath = QDir(tempPath).filePath("notes.txt");
+    {
+        QFile file(txtPath);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream out(&file);
+        out << "Hello from NinjaLibrary plain text format. Secret code 98765.";
+        file.close();
+    }
+    txtPath = QFileInfo(txtPath).canonicalFilePath();
+
+    // 2. Create a .md file
+    QString mdPath = QDir(tempPath).filePath("readme.md");
+    {
+        QFile file(mdPath);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream out(&file);
+        out << "# Project README\nSupport markdown indexing.";
+        file.close();
+    }
+    mdPath = QFileInfo(mdPath).canonicalFilePath();
+
+    // 3. Create a .doc file containing RTF syntax (which NSAttributedString will parse)
+    QString docPath = QDir(tempPath).filePath("document.doc");
+    {
+        QFile file(docPath);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream out(&file);
+        out << "{\\rtf1\\ansi This is a test document in rich text format. Secret term: applepie.}";
+        file.close();
+    }
+    docPath = QFileInfo(docPath).canonicalFilePath();
+
+    // 4. Create dummy .xlsx and .pptx files (metadata-only)
+    QString xlsxPath = QDir(tempPath).filePath("spreadsheet.xlsx");
+    {
+        QFile file(xlsxPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("dummy spreadsheet content");
+        file.close();
+    }
+    xlsxPath = QFileInfo(xlsxPath).canonicalFilePath();
+
+    QString pptxPath = QDir(tempPath).filePath("slides.pptx");
+    {
+        QFile file(pptxPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("dummy presentation content");
+        file.close();
+    }
+    pptxPath = QFileInfo(pptxPath).canonicalFilePath();
+
+    // Run ScannerTask synchronously
+    ScannerTask scanner(m_dbMgr, tempPath);
+    
+    QSignalSpy spyFinished(&scanner, &ScannerTask::finished);
+    QSignalSpy spyOcr(&scanner, &ScannerTask::ocrRequested);
+    QSignalSpy spyThumb(&scanner, &ScannerTask::thumbnailRequested);
+
+    scanner.run();
+    
+    QCOMPARE(spyFinished.size(), 1);
+
+    // Verify that NO ocr or thumbnail tasks were requested for the txt, md, doc, xlsx, or pptx files
+    QCOMPARE(spyOcr.size(), 0);
+    QCOMPARE(spyThumb.size(), 0);
+
+    // Verify that the files were ingested correctly
+    {
+        QSqlQuery query(db);
+        query.prepare("SELECT d.file_name, s.text_snippet FROM documents d JOIN document_search s ON d.id = s.document_id WHERE d.folder_id = (SELECT id FROM watched_folders WHERE absolute_path = :path);");
+        query.bindValue(":path", tempPath);
+        QVERIFY(query.exec());
+
+        bool foundTxt = false;
+        bool foundMd = false;
+        bool foundDoc = false;
+        bool foundXlsx = false;
+        bool foundPptx = false;
+
+        while (query.next()) {
+            QString name = query.value(0).toString();
+            QString text = query.value(1).toString();
+
+            if (name == "notes.txt") {
+                foundTxt = true;
+                QVERIFY(text.contains("Secret code 98765"));
+            } else if (name == "readme.md") {
+                foundMd = true;
+                QVERIFY(text.contains("markdown indexing"));
+            } else if (name == "document.doc") {
+                foundDoc = true;
+#ifdef Q_OS_MAC
+                // On macOS, NSAttributedString should successfully parse the RTF text inside document.doc
+                QVERIFY(text.contains("applepie"));
+#endif
+            } else if (name == "spreadsheet.xlsx") {
+                foundXlsx = true;
+                QVERIFY(text.isEmpty()); // should have no extracted text
+            } else if (name == "slides.pptx") {
+                foundPptx = true;
+                QVERIFY(text.isEmpty()); // should have no extracted text
+            }
+        }
+
+        QVERIFY(foundTxt);
+        QVERIFY(foundMd);
+        QVERIFY(foundDoc);
+        QVERIFY(foundXlsx);
+        QVERIFY(foundPptx);
+    }
 }
 
 void TestWorkers::testMacBookmarksAndEdgeCases()

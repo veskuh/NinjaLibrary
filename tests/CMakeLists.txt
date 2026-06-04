@@ -64,7 +64,9 @@ if(APPLE)
         ../src/utils/HashUtils.h
         ../src/utils/HashUtils.cpp
         ../src/utils/PdfUtils.h
+        ../src/utils/DocUtils.h
         ../src/utils/MacPdfUtils.mm
+        ../src/utils/MacDocUtils.mm
         ../src/utils/MacBookmarks.h
         ../src/utils/MacBookmarks.mm
     )
@@ -85,7 +87,9 @@ else()
         ../src/utils/HashUtils.h
         ../src/utils/HashUtils.cpp
         ../src/utils/PdfUtils.h
+        ../src/utils/DocUtils.h
         ../src/utils/LinuxPdfUtils.cpp
+        ../src/utils/LinuxDocUtils.cpp
     )
     target_link_libraries(test_workers PRIVATE Poppler::Poppler)
 endif()

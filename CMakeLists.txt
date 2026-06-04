@@ -94,6 +94,7 @@ qt_add_qml_module(NinjaLibrary
         src/utils/HashUtils.h
         src/utils/HashUtils.cpp
         src/utils/PdfUtils.h
+        src/utils/DocUtils.h
     QML_FILES
         src/MainWindow.qml
         src/components/DocumentCard.qml
@@ -113,11 +114,13 @@ if(APPLE)
         src/utils/MacBookmarks.h
         src/utils/MacBookmarks.mm
         src/utils/MacPdfUtils.mm
+        src/utils/MacDocUtils.mm
     )
     target_link_libraries(NinjaLibrary PRIVATE "-framework Foundation")
 else()
     target_sources(NinjaLibrary PRIVATE
         src/utils/LinuxPdfUtils.cpp
+        src/utils/LinuxDocUtils.cpp
     )
 endif()
 

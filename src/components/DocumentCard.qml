@@ -76,7 +76,7 @@ Rectangle {
             Image {
                 id: thumbImage
                 anchors.fill: parent
-                source: card.thumbnailPath
+                source: card.thumbnailPath || ""
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 visible: source.toString() !== "" && status === Image.Ready
@@ -101,7 +101,8 @@ Rectangle {
                 }
                 
                 KaakaoLabel {
-                    text: card.isOffline ? "OFFLINE" : "LOADING..."
+                    text: card.isOffline ? "OFFLINE" : (card.thumbnailPath !== "" ? "LOADING..." : "")
+                    visible: text !== ""
                     font.pixelSize: 9
                     font.weight: Font.DemiBold
                     color: card.isOffline ? Theme.colorError : Theme.sidebarSectionText

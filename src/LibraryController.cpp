@@ -32,6 +32,7 @@
 #include "workers/ScannerTask.h"
 #include "workers/OcrTask.h"
 #include "workers/ThumbnailTask.h"
+#include "utils/DocUtils.h"
 #include <QDir>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -655,6 +656,9 @@ void LibraryController::onThumbnailRequested(int docId, const QString &filePath)
 
 void LibraryController::requestThumbnail(int docId, const QString &filePath, bool highPriority)
 {
+    if (DocUtils::isSupportedTextDocument(filePath)) {
+        return;
+    }
     ThumbnailTask *task = new ThumbnailTask(docId, filePath);
     connect(task, &ThumbnailTask::finished, this, &LibraryController::onThumbnailTaskFinished);
     task->setAutoDelete(true);
