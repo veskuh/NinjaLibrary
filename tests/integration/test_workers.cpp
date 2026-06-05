@@ -57,6 +57,7 @@ private slots:
     void testLibraryControllerAPIs();
     void testTextAndDocIngestion();
     void testMacBookmarksAndEdgeCases();
+    void testOcrNonsenseRejection();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -316,6 +317,10 @@ void TestWorkers::testLibraryControllerAPIs()
     QSignalSpy spyLibrary(m_controller, &LibraryController::libraryChanged);
     QVERIFY(spyLibrary.wait(5000));
 
+    // Process queued signals and wait for background OCR/Thumbnail tasks to complete
+    QCoreApplication::processEvents();
+    QThreadPool::globalInstance()->waitForDone();
+
     // Check DB for the document
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     QSqlQuery query(db);
@@ -489,6 +494,12 @@ void TestWorkers::testLibraryControllerAPIs()
     qint64 nowSecs = QDateTime::currentSecsSinceEpoch();
     QVERIFY(qAbs(nowSecs - lastOpenedVal) < 5); // within 5 seconds
 
+    query.finish();
+
+    // Wait for any pending thread pool tasks to complete before modifying tables
+    QCoreApplication::processEvents();
+    QThreadPool::globalInstance()->waitForDone();
+
     // Clean up watched folder for tempDir2
     QVERIFY(m_controller->removeWatchedFolder(newFolderPath));
 
@@ -641,6 +652,60 @@ void TestWorkers::testMacBookmarksAndEdgeCases()
 
     // Cover empty path bookmark creation
     MacBookmarks::getBookmarkForUrl("");
+}
+
+void TestWorkers::testOcrNonsenseRejection()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+    QString imgPath = QDir(tempPath).filePath("blank.jpg");
+
+    // Save a blank white image
+    QImage blankImg(200, 200, QImage::Format_RGB32);
+    blankImg.fill(Qt::white);
+    QVERIFY(blankImg.save(imgPath));
+    imgPath = QFileInfo(imgPath).canonicalFilePath();
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    
+    // Insert a mock document record
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+                       "VALUES (1, 'blank.jpg', :path, 100, 0);");
+    query.bindValue(":path", imgPath);
+    QVERIFY(query.exec());
+    int docId = query.lastInsertId().toInt();
+
+    // Insert empty search snippet
+    QSqlQuery insertSearch(db);
+    insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, 'blank.jpg', '');");
+    insertSearch.bindValue(":docId", docId);
+    QVERIFY(insertSearch.exec());
+
+    // Run OcrTask on the blank image
+    OcrTask ocrTask(m_dbMgr, docId, imgPath);
+    ocrTask.run();
+
+    // Verify search snippet remains empty or hasn't been populated with garbage
+    QSqlQuery checkQuery(db);
+    checkQuery.prepare("SELECT text_snippet FROM document_search WHERE document_id = :id;");
+    checkQuery.bindValue(":id", docId);
+    QVERIFY(checkQuery.exec());
+    QVERIFY(checkQuery.next());
+    QString snippet = checkQuery.value(0).toString().trimmed();
+    QVERIFY(snippet.isEmpty());
+
+    // Clean up
+    QSqlQuery cleanupQuery(db);
+    cleanupQuery.prepare("DELETE FROM document_search WHERE document_id = :id;");
+    cleanupQuery.bindValue(":id", docId);
+    QVERIFY(cleanupQuery.exec());
+
+    QSqlQuery cleanupDocQuery(db);
+    cleanupDocQuery.prepare("DELETE FROM documents WHERE id = :id;");
+    cleanupDocQuery.bindValue(":id", docId);
+    QVERIFY(cleanupDocQuery.exec());
 }
 
 QTEST_MAIN(TestWorkers)

@@ -79,8 +79,17 @@ QString extractText(const QString &filePath)
             }
         }
     }
-    
     return QString();
+}
+
+void copyToClipboard(const QString &text)
+{
+    @autoreleasepool {
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        [pasteboard clearContents];
+        [pasteboard declareTypes:[NSArray arrayWithObject:NSPasteboardTypeString] owner:nil];
+        [pasteboard setString:text.toNSString() forType:NSPasteboardTypeString];
+    }
 }
 
 } // namespace DocUtils

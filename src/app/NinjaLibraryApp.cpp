@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     QGuiApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QGuiApplication app(argc, argv);
 
-    app.setOrganizationName("NinjaLibrary");
+    app.setOrganizationName("net.veskuh");
     app.setApplicationName("NinjaLibrary");
 
     // Initialize Database

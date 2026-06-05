@@ -37,6 +37,8 @@
 #include <QSqlError>
 #include <QDebug>
 #include <QFileInfo>
+#include <QCoreApplication>
+#include <QFile>
 
 OcrTask::OcrTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
     : m_dbMgr(dbMgr)
@@ -74,15 +76,23 @@ void OcrTask::run()
     // Initialize Tesseract BaseAPI
     tesseract::TessBaseAPI *api = new tesseract::TessBaseAPI();
     
-    // Check standard Homebrew paths if the default Init fails
-    bool initialized = (api->Init(nullptr, "eng") == 0);
+    bool initialized = false;
+#ifdef Q_OS_MAC
+    // In a macOS bundle, the resources are located in Contents/Resources
+    QString bundleTessData = QCoreApplication::applicationDirPath() + "/../Resources/tessdata";
+    if (QFile::exists(bundleTessData + "/eng.traineddata")) {
+        QByteArray tessDataPathBytes = bundleTessData.toUtf8();
+        initialized = (api->Init(tessDataPathBytes.constData(), "eng") == 0);
+    }
     
     if (!initialized) {
-        // Try macOS Homebrew tessdata path specifically
-#ifdef Q_OS_MAC
+        // Fallback to standard Homebrew path
         initialized = (api->Init("/opt/homebrew/share/tessdata", "eng") == 0);
-#endif
     }
+#else
+    // Check standard paths if the default Init works
+    initialized = (api->Init(nullptr, "eng") == 0);
+#endif
 
     if (!initialized) {
         qWarning() << "OcrTask: Could not initialize Tesseract OCR engine.";
@@ -95,12 +105,29 @@ void OcrTask::run()
     
     char *outText = api->GetUTF8Text();
     QString ocrText = QString::fromUtf8(outText).trimmed();
+    int confidence = api->MeanTextConf();
     
     delete [] outText;
     api->End();
     delete api;
 
-    if (ocrText.isEmpty()) {
+    // Calculate alphanumeric ratio to detect noise/garbage characters
+    int alphaNumericCount = 0;
+    int totalNonSpaceCount = 0;
+    for (const QChar &ch : ocrText) {
+        if (ch.isSpace()) continue;
+        totalNonSpaceCount++;
+        if (ch.isLetterOrNumber()) {
+            alphaNumericCount++;
+        }
+    }
+    double alphanumericRatio = totalNonSpaceCount > 0 ? static_cast<double>(alphaNumericCount) / totalNonSpaceCount : 0.0;
+
+    if (ocrText.isEmpty() || confidence < 50 || (totalNonSpaceCount > 0 && alphanumericRatio < 0.35)) {
+        qDebug() << "OcrTask: Rejecting OCR text for" << m_filePath
+                 << "(text length:" << ocrText.length()
+                 << ", confidence:" << confidence
+                 << ", alpha-ratio:" << alphanumericRatio << ")";
         emit finished(m_docId);
         return;
     }
@@ -108,31 +135,53 @@ void OcrTask::run()
     // Write text to SQLite virtual FTS5 search table
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (db.isOpen()) {
-        db.transaction();
-        
-        QString existingText;
-        QSqlQuery fetchQuery(db);
-        fetchQuery.prepare("SELECT text_snippet FROM document_search WHERE document_id = :docId;");
-        fetchQuery.bindValue(":docId", m_docId);
-        if (fetchQuery.exec() && fetchQuery.next()) {
-            existingText = fetchQuery.value(0).toString().trimmed();
-        }
+        QSqlQuery beginQuery(db);
+        if (beginQuery.exec("BEGIN IMMEDIATE TRANSACTION")) {
+            bool success = true;
+            QString existingText;
+            QSqlQuery fetchQuery(db);
+            fetchQuery.prepare("SELECT text_snippet FROM document_search WHERE document_id = :docId;");
+            fetchQuery.bindValue(":docId", m_docId);
+            if (fetchQuery.exec()) {
+                if (fetchQuery.next()) {
+                    existingText = fetchQuery.value(0).toString().trimmed();
+                }
+            } else {
+                qWarning() << "OcrTask: Failed to fetch existing text snippet:" << fetchQuery.lastError().text();
+                success = false;
+            }
 
-        QString updatedText = existingText;
-        if (!updatedText.isEmpty()) {
-            updatedText += "\n";
-        }
-        updatedText += ocrText;
+            if (success) {
+                QString updatedText = existingText;
+                if (!updatedText.isEmpty()) {
+                    updatedText += "\n";
+                }
+                updatedText += ocrText;
 
-        QSqlQuery updateQuery(db);
-        updateQuery.prepare("UPDATE document_search SET text_snippet = :text WHERE document_id = :docId;");
-        updateQuery.bindValue(":text", updatedText);
-        updateQuery.bindValue(":docId", m_docId);
-        if (!updateQuery.exec()) {
-            qWarning() << "OcrTask: Failed to save OCR text to database:" << updateQuery.lastError().text();
+                QSqlQuery updateQuery(db);
+                updateQuery.prepare("UPDATE document_search SET text_snippet = :text WHERE document_id = :docId;");
+                updateQuery.bindValue(":text", updatedText);
+                updateQuery.bindValue(":docId", m_docId);
+                if (!updateQuery.exec()) {
+                    qWarning() << "OcrTask: Failed to save OCR text to database:" << updateQuery.lastError().text();
+                    success = false;
+                }
+            }
+
+            if (success) {
+                QSqlQuery commitQuery(db);
+                if (!commitQuery.exec("COMMIT")) {
+                    qWarning() << "OcrTask: Failed to commit transaction:" << commitQuery.lastError().text();
+                    QSqlQuery rollbackQuery(db);
+                    rollbackQuery.exec("ROLLBACK");
+                }
+            } else {
+                QSqlQuery rollbackQuery(db);
+                rollbackQuery.exec("ROLLBACK");
+            }
+        } else {
+            qWarning() << "OcrTask: Failed to begin immediate transaction:" << beginQuery.lastError().text();
         }
-        
-        db.commit();
     }
 
     emit finished(m_docId);

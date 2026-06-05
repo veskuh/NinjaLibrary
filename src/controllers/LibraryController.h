@@ -37,18 +37,25 @@
 #include <QTimer>
 #include <QThreadPool>
 #include <QVariantMap>
+#include <QMap>
 #include "../database/DatabaseManager.h"
 
 class LibraryController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QStringList watchedFolders READ watchedFolders NOTIFY watchedFoldersChanged)
+    Q_PROPERTY(bool isScanning READ isScanning NOTIFY isScanningChanged)
+    Q_PROPERTY(double scanProgress READ scanProgress NOTIFY scanProgressChanged)
+    Q_PROPERTY(QString scanStatusText READ scanStatusText NOTIFY scanStatusTextChanged)
 
 public:
     explicit LibraryController(DatabaseManager *dbMgr, QObject *parent = nullptr);
     ~LibraryController();
 
     QStringList watchedFolders() const;
+    bool isScanning() const;
+    double scanProgress() const;
+    QString scanStatusText() const;
 
 public slots:
     bool addWatchedFolder(const QString &folderPath);
@@ -63,6 +70,7 @@ public slots:
     QStringList getUniqueTags() const;
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &urlStr);
     Q_INVOKABLE void showInFinder(const QString &filePath);
+    Q_INVOKABLE void copyToClipboard(const QString &text);
     bool markDocumentOpened(int docId);
     
     // Centralized sidecar read/write APIs
@@ -74,6 +82,9 @@ public slots:
 
 signals:
     void watchedFoldersChanged();
+    void isScanningChanged();
+    void scanProgressChanged();
+    void scanStatusTextChanged();
     void scanRequested(const QString &folderPath);
     void libraryChanged();
     void thumbnailGenerated(int docId, const QString &thumbnailPath);
@@ -87,7 +98,8 @@ private slots:
     void onOcrRequested(int docId, const QString &filePath);
     void onThumbnailRequested(int docId, const QString &filePath);
     
-    void onScannerTaskFinished();
+    void onScannerTaskFinished(const QString &folderPath);
+    void onScanProgress(const QString &folderPath, int processed, int total);
     void onOcrTaskFinished(int docId);
     void onThumbnailTaskFinished(int docId, const QString &thumbnailPath);
 
@@ -100,6 +112,15 @@ private:
 
     void updateFoldersCache();
     QString getSidecarPath(const QString &documentPath) const;
+
+private:
+    bool m_isScanning = false;
+    double m_scanProgress = 0.0;
+    int m_activeOcrTasks = 0;
+    int m_totalOcrTasks = 0;
+    QMap<QString, QPair<int, int>> m_scanProgressMap;
+    QMap<QString, bool> m_pendingScanRequests;
+    void updateScanProgress();
 };
 
 #endif // LIBRARYCONTROLLER_H

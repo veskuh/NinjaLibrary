@@ -30,6 +30,7 @@
 
 #include "DatabaseManager.h"
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QSqlRecord>
 #include <QThreadStorage>
 #include <QCoreApplication>
@@ -55,7 +56,11 @@ DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent)
     : QObject(parent)
 {
     if (dbPath.isEmpty()) {
-        m_dbPath = QDir::homePath() + "/.config/NinjaLibrary/library.db";
+        QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        if (dataDir.isEmpty()) {
+            dataDir = QDir::homePath() + "/.config/NinjaLibrary";
+        }
+        m_dbPath = dataDir + "/library.db";
     } else {
         m_dbPath = dbPath;
     }

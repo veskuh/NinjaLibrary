@@ -30,6 +30,7 @@
 
 #include "LibraryController.h"
 #include "../workers/ScannerTask.h"
+#include <QStandardPaths>
 #include "../workers/OcrTask.h"
 #include "../workers/ThumbnailTask.h"
 #include "../utils/DocUtils.h"
@@ -45,6 +46,8 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <QDesktopServices>
+#include <QGuiApplication>
+#include <QClipboard>
 #include <thread>
 
 #ifdef Q_OS_MAC
@@ -64,7 +67,11 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     m_crawlTimer->start(30 * 60 * 1000); // 30 minutes in milliseconds
 
     // Initialize sidecar storage location
-    m_sidecarDir = QDir::homePath() + "/.local/share/NinjaLibrary/sidecars/";
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (dataDir.isEmpty()) {
+        dataDir = QDir::homePath() + "/.local/share/NinjaLibrary";
+    }
+    m_sidecarDir = dataDir + "/sidecars/";
     QDir().mkpath(m_sidecarDir);
 
     // Cap thread pool concurrency to hardware_concurrency / 2
@@ -83,6 +90,31 @@ LibraryController::~LibraryController()
 QStringList LibraryController::watchedFolders() const
 {
     return m_watchedFoldersCache;
+}
+
+bool LibraryController::isScanning() const
+{
+    return m_isScanning || m_activeOcrTasks > 0;
+}
+
+double LibraryController::scanProgress() const
+{
+    if (m_isScanning) {
+        return m_scanProgress;
+    } else if (m_totalOcrTasks > 0) {
+        return static_cast<double>(m_totalOcrTasks - m_activeOcrTasks) / m_totalOcrTasks;
+    }
+    return 0.0;
+}
+
+QString LibraryController::scanStatusText() const
+{
+    if (m_isScanning) {
+        return QString("Scanning: %1%").arg(qRound(m_scanProgress * 100));
+    } else if (m_activeOcrTasks > 0) {
+        return QString("Extracting Text: %1/%2").arg(m_totalOcrTasks - m_activeOcrTasks).arg(m_totalOcrTasks);
+    }
+    return "";
 }
 
 bool LibraryController::addWatchedFolder(const QString &folderPath)
@@ -129,17 +161,62 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return false;
 
+    db.transaction();
+
+    // 1. Get folder ID from database
+    int folderId = -1;
+    QSqlQuery idQuery(db);
+    idQuery.prepare("SELECT id FROM watched_folders WHERE absolute_path = :path;");
+    idQuery.bindValue(":path", absPath);
+    if (idQuery.exec() && idQuery.next()) {
+        folderId = idQuery.value(0).toInt();
+    }
+
+    if (folderId != -1) {
+        // 2. Delete search index entries first (since there is no foreign key constraint on virtual FTS5 table)
+        QSqlQuery deleteSearch(db);
+        deleteSearch.prepare("DELETE FROM document_search WHERE document_id IN (SELECT id FROM documents WHERE folder_id = :folderId);");
+        deleteSearch.bindValue(":folderId", folderId);
+        if (!deleteSearch.exec()) {
+            qWarning() << "Failed to clean up document search index on stopwatching:" << deleteSearch.lastError().text();
+        }
+
+        // 3. Delete document tags first
+        QSqlQuery deleteTags(db);
+        deleteTags.prepare("DELETE FROM document_tags WHERE document_id IN (SELECT id FROM documents WHERE folder_id = :folderId);");
+        deleteTags.bindValue(":folderId", folderId);
+        if (!deleteTags.exec()) {
+            qWarning() << "Failed to clean up document tags on stopwatching:" << deleteTags.lastError().text();
+        }
+
+        // 4. Delete documents
+        QSqlQuery deleteDocs(db);
+        deleteDocs.prepare("DELETE FROM documents WHERE folder_id = :folderId;");
+        deleteDocs.bindValue(":folderId", folderId);
+        if (!deleteDocs.exec()) {
+            qWarning() << "Failed to delete documents on stopwatching:" << deleteDocs.lastError().text();
+            db.rollback();
+            return false;
+        }
+    }
+
+    // 5. Delete the watched folder record
     QSqlQuery query(db);
     query.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
     query.bindValue(":path", absPath);
 
     if (!query.exec()) {
         qWarning() << "Failed to remove watched folder from database:" << query.lastError().text();
+        db.rollback();
         return false;
     }
 
+    db.commit();
+
     m_watcher->removePath(absPath);
     updateFoldersCache();
+
+    emit libraryChanged();
     return true;
 }
 
@@ -635,9 +712,23 @@ void LibraryController::onScanRequested(const QString &folderPath)
 {
     QString absPath = QDir(folderPath).canonicalPath();
     if (absPath.isEmpty()) absPath = QDir(folderPath).absolutePath();
+
+    if (m_scanProgressMap.contains(absPath)) {
+        m_pendingScanRequests[absPath] = true;
+        return;
+    }
+
+    m_scanProgressMap.insert(absPath, qMakePair(0, 0));
+    if (!m_isScanning) {
+        m_isScanning = true;
+        emit isScanningChanged();
+        emit scanStatusTextChanged();
+    }
+
     ScannerTask *task = new ScannerTask(m_dbMgr, absPath);
     connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
     connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
+    connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
     connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
     task->setAutoDelete(true);
     QThreadPool::globalInstance()->start(task);
@@ -645,10 +736,26 @@ void LibraryController::onScanRequested(const QString &folderPath)
 
 void LibraryController::onOcrRequested(int docId, const QString &filePath)
 {
+    if (m_activeOcrTasks == 0) {
+        m_totalOcrTasks = 0;
+        bool wasScanning = isScanning();
+        m_activeOcrTasks++;
+        m_totalOcrTasks++;
+        if (!wasScanning) {
+            emit isScanningChanged();
+        }
+    } else {
+        m_activeOcrTasks++;
+        m_totalOcrTasks++;
+    }
+
     OcrTask *task = new OcrTask(m_dbMgr, docId, filePath);
     connect(task, &OcrTask::finished, this, &LibraryController::onOcrTaskFinished);
     task->setAutoDelete(true);
     QThreadPool::globalInstance()->start(task);
+
+    emit scanProgressChanged();
+    emit scanStatusTextChanged();
 }
 
 void LibraryController::onThumbnailRequested(int docId, const QString &filePath)
@@ -667,14 +774,77 @@ void LibraryController::requestThumbnail(int docId, const QString &filePath, boo
     QThreadPool::globalInstance()->start(task, highPriority ? 10 : 0);
 }
 
-void LibraryController::onScannerTaskFinished()
+void LibraryController::onScanProgress(const QString &folderPath, int processed, int total)
 {
+    m_scanProgressMap[folderPath] = qMakePair(processed, total);
+    updateScanProgress();
+}
+
+void LibraryController::onScannerTaskFinished(const QString &folderPath)
+{
+    m_scanProgressMap.remove(folderPath);
+
+    if (m_scanProgressMap.isEmpty()) {
+        if (m_isScanning) {
+            m_isScanning = false;
+            if (m_activeOcrTasks == 0) {
+                emit isScanningChanged();
+            }
+        }
+        if (m_scanProgress != 0.0) {
+            m_scanProgress = 0.0;
+            emit scanProgressChanged();
+        }
+    } else {
+        updateScanProgress();
+    }
+
+    emit scanStatusTextChanged();
     emit libraryChanged();
+
+    // If there is a pending request for this folder, restart the scan
+    if (m_pendingScanRequests.value(folderPath, false)) {
+        m_pendingScanRequests.remove(folderPath);
+        onScanRequested(folderPath);
+    }
+}
+
+void LibraryController::updateScanProgress()
+{
+    int totalFiles = 0;
+    int totalProcessed = 0;
+
+    for (auto it = m_scanProgressMap.constBegin(); it != m_scanProgressMap.constEnd(); ++it) {
+        totalProcessed += it.value().first;
+        totalFiles += it.value().second;
+    }
+
+    double progress = 0.0;
+    if (totalFiles > 0) {
+        progress = static_cast<double>(totalProcessed) / totalFiles;
+    }
+
+    if (qAbs(m_scanProgress - progress) > 0.00001) {
+        m_scanProgress = progress;
+        emit scanProgressChanged();
+        emit scanStatusTextChanged();
+    }
 }
 
 void LibraryController::onOcrTaskFinished(int docId)
 {
     Q_UNUSED(docId);
+    
+    if (m_activeOcrTasks > 0) {
+        m_activeOcrTasks--;
+        if (m_activeOcrTasks == 0) {
+            m_totalOcrTasks = 0;
+            emit isScanningChanged();
+        }
+        emit scanProgressChanged();
+        emit scanStatusTextChanged();
+    }
+
     emit libraryChanged();
 }
 
@@ -693,6 +863,11 @@ void LibraryController::showInFinder(const QString &filePath)
     QFileInfo fi(filePath);
     QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absolutePath()));
 #endif
+}
+
+void LibraryController::copyToClipboard(const QString &text)
+{
+    DocUtils::copyToClipboard(text);
 }
 
 bool LibraryController::markDocumentOpened(int docId)

@@ -117,6 +117,7 @@ KaakaoWindow {
     }
 
     property alias mainMenuBar: mainMenuBar
+    property alias itemContextMenu: itemContextMenu
 
     menuBar: AppMenuBar {
         id: mainMenuBar
@@ -465,7 +466,6 @@ KaakaoWindow {
                     }
                 }
 
-                // Pinned status bar at the bottom of the content
                 KaakaoStatusBar {
                     id: statusBar
                     objectName: "statusBar"
@@ -474,36 +474,80 @@ KaakaoWindow {
                     leftPadding: 8
                     rightPadding: 8
 
-                    KaakaoLabel {
-                        objectName: "statusLabel"
-                        text: "Indexed: " + documentModel.totalCount + " items (" +
-                               documentModel.pdfCount + " PDFs, " +
-                               documentModel.imageCount + " Images, " +
-                               documentModel.textCount + " Text/Other)  |  " +
-                               documentModel.onlineCount + " Online, " +
-                               documentModel.offlineCount + " Offline  |  Selected: " +
-                               inspector.selectedIds.length
-                         role: KaakaoLabel.Role.Small
-                         color: Theme.sidebarSectionText
-                         opacity: 1.0
-                         Layout.alignment: Qt.AlignVCenter
-                     }
-
+                    // Left Area: holds status label (visible when not scanning)
                     Item {
+                        id: leftArea
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 1
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitHeight: 20
+
+                        KaakaoLabel {
+                            id: statusLabel
+                            objectName: "statusLabel"
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: !libraryController.isScanning
+                            text: "Indexed: " + documentModel.totalCount + " items (" +
+                                   documentModel.pdfCount + " PDFs, " +
+                                   documentModel.imageCount + " Images, " +
+                                   documentModel.textCount + " Text/Other)  |  " +
+                                   documentModel.onlineCount + " Online, " +
+                                   documentModel.offlineCount + " Offline  |  Selected: " +
+                                   inspector.selectedIds.length
+                            role: KaakaoLabel.Role.Small
+                            color: Theme.sidebarSectionText
+                            opacity: 1.0
+                        }
                     }
 
-                    // Scaling Zoom Slider for Grid Canvas
+                    // Center Area: holds progress bar layout (visible when scanning)
                     RowLayout {
+                        id: scanningProgressLayout
+                        objectName: "scanningProgressLayout"
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 1
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 8
+                        visible: libraryController.isScanning
+
+                        Item { Layout.fillWidth: true } // Left spacer for centering progress bar inside center area
+
+                        KaakaoLabel {
+                            text: libraryController.scanStatusText
+                            role: KaakaoLabel.Role.Small
+                            color: Theme.sidebarSectionText
+                            opacity: 1.0
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+
+                        KaakaoProgressBar {
+                            Layout.preferredWidth: 120
+                            Layout.preferredHeight: 8
+                            Layout.alignment: Qt.AlignVCenter
+                            value: libraryController.scanProgress
+                        }
+
+                        Item { Layout.fillWidth: true } // Right spacer for centering progress bar inside center area
+                    }
+
+                    // Right Area: holds the zoom slider (conditionally visible)
+                    RowLayout {
+                        id: zoomSliderLayout
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 1
+                        Layout.alignment: Qt.AlignVCenter
                         spacing: 4
                         visible: viewSegment.currentIndex === 0
-                        Layout.alignment: Qt.AlignVCenter
+
+                        Item { Layout.fillWidth: true } // Spacer to push slider to the right side of this area
 
                         KaakaoLabel {
                             text: "⚲"
                             font.pixelSize: 12
                             color: Theme.sidebarSectionText
                             opacity: 1.0
+                            Layout.alignment: Qt.AlignVCenter
                         }
 
                         KaakaoSlider {
@@ -512,6 +556,7 @@ KaakaoWindow {
                             to: 240
                             value: 150
                             implicitWidth: 100
+                            Layout.alignment: Qt.AlignVCenter
                         }
                     }
                 }

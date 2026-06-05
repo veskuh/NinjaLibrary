@@ -59,6 +59,15 @@ KaakaoMenu {
             }
         }
     }
+
+    KaakaoMenuItem {
+        text: "Copy File Path"
+        onTriggered: {
+            if (menu.targetPath !== "") {
+                libraryController.copyToClipboard(menu.targetPath)
+            }
+        }
+    }
     
     KaakaoMenuSeparator {}
     

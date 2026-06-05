@@ -55,11 +55,6 @@ endif()
 # Build the Kaakao component library submodule (source subdirectory only)
 add_subdirectory(3rdparty/Kaakao/src 3rdparty/Kaakao/src)
 
-# Define the NinjaLibrary application target
-qt_add_executable(NinjaLibraryApp
-    src/app/NinjaLibraryApp.cpp
-)
-
 # Set deployment targets for macOS
 if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
@@ -69,6 +64,40 @@ if(APPLE)
     else()
         message(STATUS "Building for native host architecture (BUILD_UNIVERSAL is OFF).")
     endif()
+endif()
+
+# Define the NinjaLibrary application target
+if(APPLE)
+    set(ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/NinjaLibrary.icns")
+    if(EXISTS "${ICON_FILE}")
+        qt_add_executable(NinjaLibraryApp MACOSX_BUNDLE
+            src/app/NinjaLibraryApp.cpp
+            ${ICON_FILE}
+        )
+        set_target_properties(NinjaLibraryApp PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in"
+            MACOSX_BUNDLE_ICON_FILE "NinjaLibrary.icns"
+            OUTPUT_NAME "NinjaLibrary"
+        )
+        set_source_files_properties(${ICON_FILE} PROPERTIES
+            MACOSX_BUNDLE_RESOURCE TRUE
+        )
+    else()
+        qt_add_executable(NinjaLibraryApp MACOSX_BUNDLE
+            src/app/NinjaLibraryApp.cpp
+        )
+        set_target_properties(NinjaLibraryApp PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in"
+            OUTPUT_NAME "NinjaLibrary"
+        )
+    endif()
+else()
+    qt_add_executable(NinjaLibraryApp
+        src/app/NinjaLibraryApp.cpp
+    )
+    set_target_properties(NinjaLibraryApp PROPERTIES
+        OUTPUT_NAME "NinjaLibrary"
+    )
 endif()
 
 # Set up the QML module for our application logic

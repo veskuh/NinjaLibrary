@@ -32,6 +32,8 @@
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QClipboard>
 
 namespace DocUtils {
 
@@ -56,6 +58,11 @@ QString extractText(const QString &filePath)
     
     // doc/docx not natively supported on Linux without external dependencies, return empty
     return QString();
+}
+
+void copyToClipboard(const QString &text)
+{
+    QGuiApplication::clipboard()->setText(text);
 }
 
 } // namespace DocUtils

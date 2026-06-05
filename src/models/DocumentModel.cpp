@@ -30,17 +30,23 @@
 
 #include "DocumentModel.h"
 #include <QSqlQuery>
+#include <QSqlRecord>
 #include <QSqlError>
 #include <QDir>
 #include <QFile>
 #include <QCryptographicHash>
 #include <QDebug>
+#include <QStandardPaths>
 
 DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     : QAbstractListModel(parent)
     , m_dbMgr(dbMgr)
 {
-    refresh();
+    m_refreshTimer = new QTimer(this);
+    m_refreshTimer->setSingleShot(true);
+    connect(m_refreshTimer, &QTimer::timeout, this, &DocumentModel::forceRefresh);
+
+    forceRefresh();
 }
 
 DocumentModel::~DocumentModel()
@@ -134,49 +140,66 @@ QHash<int, QByteArray> DocumentModel::roleNames() const
 
 void DocumentModel::refresh()
 {
+    m_refreshTimer->start(200); // Debounce by 200ms
+}
+
+void DocumentModel::forceRefresh()
+{
+    m_refreshTimer->stop();
+
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return;
+
+    QList<QSqlRecord> records;
+    {
+        QSqlQuery query(
+            "SELECT d.id, d.folder_id, d.file_name, d.absolute_path, d.file_size, d.file_hash, "
+            "       d.date_created, d.date_modified, d.date_added, d.page_count, d.star_rating, d.is_offline, "
+            "       d.last_opened, "
+            "       (SELECT group_concat(t.name, ',') FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = d.id) as tags_list, "
+            "       (SELECT text_snippet FROM document_search WHERE document_id = d.id) as text, "
+            "       (SELECT notes FROM document_search WHERE document_id = d.id) as notes "
+            "FROM documents d;", db
+        );
+        while (query.next()) {
+            records.append(query.record());
+        }
+    }
 
     beginResetModel();
     m_documents.clear();
 
-    QSqlQuery query(
-        "SELECT d.id, d.folder_id, d.file_name, d.absolute_path, d.file_size, d.file_hash, "
-        "       d.date_created, d.date_modified, d.date_added, d.page_count, d.star_rating, d.is_offline, "
-        "       d.last_opened, "
-        "       (SELECT group_concat(t.name, ',') FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = d.id) as tags_list, "
-        "       (SELECT text_snippet FROM document_search WHERE document_id = d.id) as text, "
-        "       (SELECT notes FROM document_search WHERE document_id = d.id) as notes "
-        "FROM documents d;", db
-    );
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (cacheDir.isEmpty()) {
+        cacheDir = QDir::homePath() + "/.cache/NinjaLibrary";
+    }
+    cacheDir += "/thumbnails/";
 
-    QString cacheDir = QDir::homePath() + "/.cache/NinjaLibrary/thumbnails/";
-
-    while (query.next()) {
+    for (const QSqlRecord &record : records) {
         DocumentInfo doc;
-        doc.id = query.value(0).toInt();
-        doc.folderId = query.value(1).toInt();
-        doc.fileName = query.value(2).toString();
-        doc.absolutePath = query.value(3).toString();
-        doc.fileSize = query.value(4).toLongLong();
-        doc.fileHash = query.value(5).toString();
-        doc.dateCreated = query.value(6).toDateTime();
-        doc.dateModified = query.value(7).toDateTime();
-        doc.dateAdded = query.value(8).toDateTime();
-        doc.pageCount = query.value(9).toInt();
-        doc.starRating = query.value(10).toInt();
-        doc.isOffline = query.value(11).toBool();
-        doc.lastOpened = query.value(12).toLongLong();
+        doc.id = record.value(0).toInt();
+        doc.folderId = record.value(1).toInt();
+        doc.fileName = record.value(2).toString();
+        doc.absolutePath = record.value(3).toString();
+        doc.fileSize = record.value(4).toLongLong();
+        doc.fileHash = record.value(5).toString();
+        doc.dateCreated = record.value(6).toDateTime();
+        doc.dateModified = record.value(7).toDateTime();
+        doc.dateAdded = record.value(8).toDateTime();
+        doc.pageCount = record.value(9).toInt();
+        doc.starRating = record.value(10).toInt();
+        doc.isOffline = record.value(11).toBool();
+        doc.lastOpened = record.value(12).toLongLong();
 
-        QString tagsStr = query.value(13).toString();
+        QString tagsStr = record.value(13).toString();
         if (!tagsStr.isEmpty()) {
             doc.tags = tagsStr.split(",", Qt::SkipEmptyParts);
         } else {
             doc.tags = QStringList();
         }
 
-        doc.textSnippet = query.value(14).toString();
-        doc.notes = query.value(15).toString();
+        doc.textSnippet = record.value(14).toString();
+        doc.notes = record.value(15).toString();
 
         // Calculate expected thumbnail location
         QCryptographicHash hasher(QCryptographicHash::Sha256);
@@ -187,7 +210,6 @@ void DocumentModel::refresh()
         if (QFile::exists(thumbFile)) {
             doc.thumbnailPath = "file://" + thumbFile;
         } else {
-            // default or empty (let UI handle fallback thumbnail)
             doc.thumbnailPath = "";
         }
 

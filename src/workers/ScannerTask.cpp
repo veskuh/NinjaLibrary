@@ -48,6 +48,7 @@
 #include <QCryptographicHash>
 #include <QSet>
 #include <QDebug>
+#include <QStandardPaths>
 
 ScannerTask::ScannerTask(DatabaseManager *dbMgr, const QString &folderPath)
     : m_dbMgr(dbMgr)
@@ -63,7 +64,7 @@ void ScannerTask::run()
 {
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) {
-        emit finished();
+        emit finished(m_folderPath);
         return;
     }
 
@@ -79,24 +80,27 @@ void ScannerTask::run()
     }
 
     if (folderId == -1) {
-        emit finished();
+        emit finished(m_folderPath);
         return;
     }
-
-    db.transaction();
 
     QList<QPair<int, QString>> pendingOcr;
     QList<QPair<int, QString>> pendingThumbnails;
 
     QSet<QString> filesOnDisk;
+    QList<QString> filesToProcess;
     QDirIterator it(m_folderPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-
     while (it.hasNext()) {
         QString filePath = it.next();
-        if (!isSupportedDocument(filePath)) {
-            continue;
+        if (isSupportedDocument(filePath)) {
+            filesToProcess.append(filePath);
         }
+    }
+    int totalFiles = filesToProcess.size();
+    int processedCount = 0;
+    emit progress(m_folderPath, 0, totalFiles);
 
+    for (const QString &filePath : filesToProcess) {
         filesOnDisk.insert(filePath);
         QFileInfo fileInfo(filePath);
         QString ext = fileInfo.suffix().toLower();
@@ -135,26 +139,15 @@ void ScannerTask::run()
                     pageCount = 1;
                 }
 
-                QSqlQuery updateQuery(db);
-                updateQuery.prepare("UPDATE documents SET file_size = :size, date_modified = :modified, file_hash = :hash, page_count = :pageCount, is_offline = 0 WHERE id = :id;");
-                updateQuery.bindValue(":size", currentSize);
-                updateQuery.bindValue(":modified", currentModified);
-                updateQuery.bindValue(":hash", fileHash);
-                updateQuery.bindValue(":pageCount", pageCount);
-                updateQuery.bindValue(":id", docId);
-                updateQuery.exec();
-
-                // Reset search entry
-                QSqlQuery deleteSearch(db);
-                deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
-                deleteSearch.bindValue(":docId", docId);
-                deleteSearch.exec();
-
                 // Read sidecar metadata if available
                 QStringList tags;
                 int rating = 0;
                 QString notes;
-                QString sidecarDir = QDir::homePath() + "/.local/share/NinjaLibrary/sidecars/";
+                QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+                if (dataDir.isEmpty()) {
+                    dataDir = QDir::homePath() + "/.local/share/NinjaLibrary";
+                }
+                QString sidecarDir = dataDir + "/sidecars/";
                 QCryptographicHash hasher(QCryptographicHash::Sha256);
                 hasher.addData(filePath.toUtf8());
                 QString hashStr = hasher.result().toHex();
@@ -176,40 +169,76 @@ void ScannerTask::run()
                     }
                 }
 
-                QSqlQuery insertSearch(db);
-                insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:docId, :fileName, :text, :notes);");
-                insertSearch.bindValue(":docId", docId);
-                insertSearch.bindValue(":fileName", fileInfo.fileName());
-                insertSearch.bindValue(":text", extractedText);
-                insertSearch.bindValue(":notes", notes);
-                insertSearch.exec();
+                QSqlQuery beginWrite(db);
+                if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                    bool ok = true;
+                    QSqlQuery updateQuery(db);
+                    updateQuery.prepare("UPDATE documents SET file_size = :size, date_modified = :modified, file_hash = :hash, page_count = :pageCount, is_offline = 0 WHERE id = :id;");
+                    updateQuery.bindValue(":size", currentSize);
+                    updateQuery.bindValue(":modified", currentModified);
+                    updateQuery.bindValue(":hash", fileHash);
+                    updateQuery.bindValue(":pageCount", pageCount);
+                    updateQuery.bindValue(":id", docId);
+                    ok &= updateQuery.exec();
 
-                // Apply sidecar attributes to document record
-                if (rating > 0) {
-                    QSqlQuery updateRating(db);
-                    updateRating.prepare("UPDATE documents SET star_rating = :rating WHERE id = :docId;");
-                    updateRating.bindValue(":rating", rating);
-                    updateRating.bindValue(":docId", docId);
-                    updateRating.exec();
-                }
+                    // Reset search entry
+                    QSqlQuery deleteSearch(db);
+                    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
+                    deleteSearch.bindValue(":docId", docId);
+                    ok &= deleteSearch.exec();
 
-                for (const QString &tagName : tags) {
-                    QSqlQuery insertTag(db);
-                    insertTag.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
-                    insertTag.bindValue(":name", tagName.trimmed());
-                    insertTag.exec();
+                    QSqlQuery insertSearch(db);
+                    insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:docId, :fileName, :text, :notes);");
+                    insertSearch.bindValue(":docId", docId);
+                    insertSearch.bindValue(":fileName", fileInfo.fileName());
+                    insertSearch.bindValue(":text", extractedText);
+                    insertSearch.bindValue(":notes", notes);
+                    ok &= insertSearch.exec();
 
-                    QSqlQuery getTagId(db);
-                    getTagId.prepare("SELECT id FROM tags WHERE name = :name;");
-                    getTagId.bindValue(":name", tagName.trimmed());
-                    if (getTagId.exec() && getTagId.next()) {
-                        int tagId = getTagId.value(0).toInt();
-                        QSqlQuery linkTag(db);
-                        linkTag.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
-                        linkTag.bindValue(":docId", docId);
-                        linkTag.bindValue(":tagId", tagId);
-                        linkTag.exec();
+                    // Apply sidecar attributes to document record
+                    if (rating > 0) {
+                        QSqlQuery updateRating(db);
+                        updateRating.prepare("UPDATE documents SET star_rating = :rating WHERE id = :docId;");
+                        updateRating.bindValue(":rating", rating);
+                        updateRating.bindValue(":docId", docId);
+                        ok &= updateRating.exec();
                     }
+
+                    for (const QString &tagName : tags) {
+                        QSqlQuery insertTag(db);
+                        insertTag.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
+                        insertTag.bindValue(":name", tagName.trimmed());
+                        ok &= insertTag.exec();
+
+                        QSqlQuery getTagId(db);
+                        getTagId.prepare("SELECT id FROM tags WHERE name = :name;");
+                        getTagId.bindValue(":name", tagName.trimmed());
+                        if (getTagId.exec() && getTagId.next()) {
+                            int tagId = getTagId.value(0).toInt();
+                            QSqlQuery linkTag(db);
+                            linkTag.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+                            linkTag.bindValue(":docId", docId);
+                            linkTag.bindValue(":tagId", tagId);
+                            ok &= linkTag.exec();
+                        } else {
+                            ok = false;
+                        }
+                    }
+
+                    if (ok) {
+                        QSqlQuery commitWrite(db);
+                        if (!commitWrite.exec("COMMIT")) {
+                            qWarning() << "ScannerTask: Commit failed on modified, rolling back:" << commitWrite.lastError().text();
+                            QSqlQuery rollbackWrite(db);
+                            rollbackWrite.exec("ROLLBACK");
+                        }
+                    } else {
+                        qWarning() << "ScannerTask: Modified document updates failed, rolling back:" << updateQuery.lastError().text();
+                        QSqlQuery rollbackWrite(db);
+                        rollbackWrite.exec("ROLLBACK");
+                    }
+                } else {
+                    qWarning() << "ScannerTask: Failed to begin immediate transaction for modified document:" << beginWrite.lastError().text();
                 }
 
                 bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
@@ -221,10 +250,23 @@ void ScannerTask::run()
                 }
             } else if (isOffline) {
                 // File came back online
-                QSqlQuery updateOffline(db);
-                updateOffline.prepare("UPDATE documents SET is_offline = 0 WHERE id = :id;");
-                updateOffline.bindValue(":id", docId);
-                updateOffline.exec();
+                QSqlQuery beginWrite(db);
+                if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                    QSqlQuery updateOffline(db);
+                    updateOffline.prepare("UPDATE documents SET is_offline = 0 WHERE id = :id;");
+                    updateOffline.bindValue(":id", docId);
+                    if (updateOffline.exec()) {
+                        QSqlQuery commitWrite(db);
+                        if (!commitWrite.exec("COMMIT")) {
+                            qWarning() << "ScannerTask: Commit failed on online, rolling back:" << commitWrite.lastError().text();
+                            QSqlQuery rollbackWrite(db);
+                            rollbackWrite.exec("ROLLBACK");
+                        }
+                    } else {
+                        QSqlQuery rollbackWrite(db);
+                        rollbackWrite.exec("ROLLBACK");
+                    }
+                }
                 bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
                 if (isImage || ext == "pdf") {
                     pendingThumbnails.append({docId, filePath});
@@ -253,92 +295,126 @@ void ScannerTask::run()
                 created = fileInfo.lastModified();
             }
 
-            QSqlQuery insertDoc(db);
-            insertDoc.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, date_created, date_modified, page_count, is_offline) "
-                              "VALUES (:folderId, :fileName, :absPath, :size, :hash, :created, :modified, :pageCount, 0);");
-            insertDoc.bindValue(":folderId", folderId);
-            insertDoc.bindValue(":fileName", fileInfo.fileName());
-            insertDoc.bindValue(":absPath", filePath);
-            insertDoc.bindValue(":size", currentSize);
-            insertDoc.bindValue(":hash", fileHash);
-            insertDoc.bindValue(":created", created);
-            insertDoc.bindValue(":modified", currentModified);
-            insertDoc.bindValue(":pageCount", pageCount);
+            // Read sidecar metadata if available
+            QStringList tags;
+            int rating = 0;
+            QString notes;
+            QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+            if (dataDir.isEmpty()) {
+                dataDir = QDir::homePath() + "/.local/share/NinjaLibrary";
+            }
+            QString sidecarDir = dataDir + "/sidecars/";
+            QCryptographicHash hasher(QCryptographicHash::Sha256);
+            hasher.addData(filePath.toUtf8());
+            QString hashStr = hasher.result().toHex();
+            QString sidecarPath = sidecarDir + hashStr + ".ninja";
 
-            if (insertDoc.exec()) {
-                int docId = insertDoc.lastInsertId().toInt();
-
-                // Read sidecar metadata if available
-                QStringList tags;
-                int rating = 0;
-                QString notes;
-                QString sidecarDir = QDir::homePath() + "/.local/share/NinjaLibrary/sidecars/";
-                QCryptographicHash hasher(QCryptographicHash::Sha256);
-                hasher.addData(filePath.toUtf8());
-                QString hashStr = hasher.result().toHex();
-                QString sidecarPath = sidecarDir + hashStr + ".ninja";
-
-                if (QFile::exists(sidecarPath)) {
-                    QFile file(sidecarPath);
-                    if (file.open(QIODevice::ReadOnly)) {
-                        QJsonDocument jsonDoc = QJsonDocument::fromJson(file.readAll());
-                        if (jsonDoc.isObject()) {
-                            QJsonObject obj = jsonDoc.object();
-                            rating = obj["star_rating"].toInt(0);
-                            notes = obj["notes"].toString();
-                            QJsonArray tagsArray = obj["tags"].toArray();
-                            for (int t = 0; t < tagsArray.size(); ++t) {
-                                tags.append(tagsArray.at(t).toString());
-                            }
+            if (QFile::exists(sidecarPath)) {
+                QFile file(sidecarPath);
+                if (file.open(QIODevice::ReadOnly)) {
+                    QJsonDocument jsonDoc = QJsonDocument::fromJson(file.readAll());
+                    if (jsonDoc.isObject()) {
+                        QJsonObject obj = jsonDoc.object();
+                        rating = obj["star_rating"].toInt(0);
+                        notes = obj["notes"].toString();
+                        QJsonArray tagsArray = obj["tags"].toArray();
+                        for (int t = 0; t < tagsArray.size(); ++t) {
+                            tags.append(tagsArray.at(t).toString());
                         }
                     }
                 }
+            }
 
-                QSqlQuery insertSearch(db);
-                insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:docId, :fileName, :text, :notes);");
-                insertSearch.bindValue(":docId", docId);
-                insertSearch.bindValue(":fileName", fileInfo.fileName());
-                insertSearch.bindValue(":text", extractedText);
-                insertSearch.bindValue(":notes", notes);
-                insertSearch.exec();
+            QSqlQuery beginWrite(db);
+            if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                bool ok = true;
 
-                if (rating > 0) {
-                    QSqlQuery updateRating(db);
-                    updateRating.prepare("UPDATE documents SET star_rating = :rating WHERE id = :docId;");
-                    updateRating.bindValue(":rating", rating);
-                    updateRating.bindValue(":docId", docId);
-                    updateRating.exec();
+                QSqlQuery insertDoc(db);
+                insertDoc.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, date_created, date_modified, page_count, is_offline) "
+                                  "VALUES (:folderId, :fileName, :absPath, :size, :hash, :created, :modified, :pageCount, 0);");
+                insertDoc.bindValue(":folderId", folderId);
+                insertDoc.bindValue(":fileName", fileInfo.fileName());
+                insertDoc.bindValue(":absPath", filePath);
+                insertDoc.bindValue(":size", currentSize);
+                insertDoc.bindValue(":hash", fileHash);
+                insertDoc.bindValue(":created", created);
+                insertDoc.bindValue(":modified", currentModified);
+                insertDoc.bindValue(":pageCount", pageCount);
+
+                ok &= insertDoc.exec();
+                int docId = -1;
+                if (ok) {
+                    docId = insertDoc.lastInsertId().toInt();
                 }
 
-                for (const QString &tagName : tags) {
-                    QSqlQuery insertTag(db);
-                    insertTag.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
-                    insertTag.bindValue(":name", tagName.trimmed());
-                    insertTag.exec();
+                if (ok && docId != -1) {
+                    QSqlQuery insertSearch(db);
+                    insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:docId, :fileName, :text, :notes);");
+                    insertSearch.bindValue(":docId", docId);
+                    insertSearch.bindValue(":fileName", fileInfo.fileName());
+                    insertSearch.bindValue(":text", extractedText);
+                    insertSearch.bindValue(":notes", notes);
+                    ok &= insertSearch.exec();
 
-                    QSqlQuery getTagId(db);
-                    getTagId.prepare("SELECT id FROM tags WHERE name = :name;");
-                    getTagId.bindValue(":name", tagName.trimmed());
-                    if (getTagId.exec() && getTagId.next()) {
-                        int tagId = getTagId.value(0).toInt();
-                        QSqlQuery linkTag(db);
-                        linkTag.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
-                        linkTag.bindValue(":docId", docId);
-                        linkTag.bindValue(":tagId", tagId);
-                        linkTag.exec();
+                    if (rating > 0) {
+                        QSqlQuery updateRating(db);
+                        updateRating.prepare("UPDATE documents SET star_rating = :rating WHERE id = :docId;");
+                        updateRating.bindValue(":rating", rating);
+                        updateRating.bindValue(":docId", docId);
+                        ok &= updateRating.exec();
                     }
+
+                    for (const QString &tagName : tags) {
+                        QSqlQuery insertTag(db);
+                        insertTag.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
+                        insertTag.bindValue(":name", tagName.trimmed());
+                        ok &= insertTag.exec();
+
+                        QSqlQuery getTagId(db);
+                        getTagId.prepare("SELECT id FROM tags WHERE name = :name;");
+                        getTagId.bindValue(":name", tagName.trimmed());
+                        if (getTagId.exec() && getTagId.next()) {
+                            int tagId = getTagId.value(0).toInt();
+                            QSqlQuery linkTag(db);
+                            linkTag.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+                            linkTag.bindValue(":docId", docId);
+                            linkTag.bindValue(":tagId", tagId);
+                            ok &= linkTag.exec();
+                        } else {
+                            ok = false;
+                        }
+                    }
+                } else {
+                    ok = false;
                 }
 
-                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
-                if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
-                    pendingOcr.append({docId, filePath});
-                }
-                if (isImage || ext == "pdf") {
-                    pendingThumbnails.append({docId, filePath});
+                if (ok && docId != -1) {
+                    QSqlQuery commitWrite(db);
+                    if (!commitWrite.exec("COMMIT")) {
+                        qWarning() << "ScannerTask: Commit failed on new, rolling back:" << commitWrite.lastError().text();
+                        QSqlQuery rollbackWrite(db);
+                        rollbackWrite.exec("ROLLBACK");
+                    } else {
+                        bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                        if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
+                            pendingOcr.append({docId, filePath});
+                        }
+                        if (isImage || ext == "pdf") {
+                            pendingThumbnails.append({docId, filePath});
+                        }
+                    }
+                } else {
+                    qWarning() << "Failed to insert document" << filePath << ":" << insertDoc.lastError().text();
+                    QSqlQuery rollbackWrite(db);
+                    rollbackWrite.exec("ROLLBACK");
                 }
             } else {
-                qWarning() << "Failed to insert document" << filePath << ":" << insertDoc.lastError().text();
+                qWarning() << "ScannerTask: Failed to begin immediate transaction for new document:" << beginWrite.lastError().text();
             }
+        }
+        processedCount++;
+        if (processedCount % 5 == 0 || processedCount == totalFiles) {
+            emit progress(m_folderPath, processedCount, totalFiles);
         }
     }
 
@@ -347,19 +423,39 @@ void ScannerTask::run()
     fetchDocs.prepare("SELECT id, absolute_path FROM documents WHERE folder_id = :folderId AND is_offline = 0;");
     fetchDocs.bindValue(":folderId", folderId);
     if (fetchDocs.exec()) {
+        QList<int> docsToMarkOffline;
         while (fetchDocs.next()) {
             int docId = fetchDocs.value(0).toInt();
             QString docPath = fetchDocs.value(1).toString();
             if (!filesOnDisk.contains(docPath)) {
-                QSqlQuery markOffline(db);
-                markOffline.prepare("UPDATE documents SET is_offline = 1 WHERE id = :id;");
-                markOffline.bindValue(":id", docId);
-                markOffline.exec();
+                docsToMarkOffline.append(docId);
+            }
+        }
+
+        if (!docsToMarkOffline.isEmpty()) {
+            QSqlQuery beginWrite(db);
+            if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                bool ok = true;
+                for (int docId : docsToMarkOffline) {
+                    QSqlQuery markOffline(db);
+                    markOffline.prepare("UPDATE documents SET is_offline = 1 WHERE id = :id;");
+                    markOffline.bindValue(":id", docId);
+                    ok &= markOffline.exec();
+                }
+                if (ok) {
+                    QSqlQuery commitWrite(db);
+                    if (!commitWrite.exec("COMMIT")) {
+                        qWarning() << "ScannerTask: Commit failed on deleted, rolling back:" << commitWrite.lastError().text();
+                        QSqlQuery rollbackWrite(db);
+                        rollbackWrite.exec("ROLLBACK");
+                    }
+                } else {
+                    QSqlQuery rollbackWrite(db);
+                    rollbackWrite.exec("ROLLBACK");
+                }
             }
         }
     }
-
-    db.commit();
 
     for (const auto &pair : pendingOcr) {
         emit ocrRequested(pair.first, pair.second);
@@ -368,7 +464,7 @@ void ScannerTask::run()
         emit thumbnailRequested(pair.first, pair.second);
     }
 
-    emit finished();
+    emit finished(m_folderPath);
 }
 
 bool ScannerTask::isSupportedDocument(const QString &filePath) const

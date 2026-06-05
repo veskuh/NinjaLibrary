@@ -10,9 +10,47 @@ class MockController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QStringList watchedFolders READ watchedFolders NOTIFY watchedFoldersChanged)
+    Q_PROPERTY(bool isScanning READ isScanning WRITE setIsScanning NOTIFY isScanningChanged)
+    Q_PROPERTY(double scanProgress READ scanProgress WRITE setScanProgress NOTIFY scanProgressChanged)
+    Q_PROPERTY(QString scanStatusText READ scanStatusText WRITE setScanStatusText NOTIFY scanStatusTextChanged)
 public:
     explicit MockController(QObject *parent = nullptr) : QObject(parent) {}
     QStringList watchedFolders() const { return QStringList(); }
+    bool isScanning() const { return m_isScanning; }
+    void setIsScanning(bool s) {
+        if (m_isScanning != s) {
+            m_isScanning = s;
+            emit isScanningChanged();
+            updateMockStatusText();
+        }
+    }
+    double scanProgress() const { return m_scanProgress; }
+    void setScanProgress(double p) {
+        if (m_scanProgress != p) {
+            m_scanProgress = p;
+            emit scanProgressChanged();
+            updateMockStatusText();
+        }
+    }
+    QString scanStatusText() const { return m_scanStatusText; }
+    void setScanStatusText(const QString &t) {
+        if (m_scanStatusText != t) {
+            m_scanStatusText = t;
+            emit scanStatusTextChanged();
+        }
+    }
+    void updateMockStatusText() {
+        QString text;
+        if (m_isScanning) {
+            text = QString("Scanning: %1%").arg(qRound(m_scanProgress * 100));
+        } else {
+            text = "";
+        }
+        if (m_scanStatusText != text) {
+            m_scanStatusText = text;
+            emit scanStatusTextChanged();
+        }
+    }
     Q_INVOKABLE void requestThumbnail(int, const QString &, bool = false) {}
     Q_INVOKABLE void batchUpdateTags(const QVariantList &, const QStringList &) {}
     Q_INVOKABLE void updateNotes(int docId, const QString &notes) {
@@ -28,10 +66,21 @@ public:
     Q_INVOKABLE void markDocumentOpened(int docId) {
         emit documentOpened(docId);
     }
+    Q_INVOKABLE void copyToClipboard(const QString &text) {
+        emit pathCopied(text);
+    }
 signals:
     void watchedFoldersChanged();
     void notesUpdated(int docId, const QString &notes);
     void documentOpened(int docId);
+    void pathCopied(const QString &text);
+    void isScanningChanged();
+    void scanProgressChanged();
+    void scanStatusTextChanged();
+private:
+    bool m_isScanning = false;
+    double m_scanProgress = 0.0;
+    QString m_scanStatusText;
 };
 
 #include <QHash>
@@ -151,6 +200,18 @@ public:
         if (!name.isEmpty() && rowMap.contains(name)) {
             return rowMap.value(name);
         }
+        if (role == 261 || role == 267 || role == 266 || role == 278 || role == 257 || role == 258) {
+            return 0;
+        }
+        if (role == 268) {
+            return false;
+        }
+        if (role == 269) {
+            return QStringList();
+        }
+        if (role == 259 || role == 260 || role == 270 || role == 271 || role == 272 || role == 273 || role == 274 || role == 275 || role == 276 || role == 277) {
+            return QString("");
+        }
         return QVariant();
     }
 
@@ -265,6 +326,18 @@ public:
         QString name = roleNameMap.value(role);
         if (!name.isEmpty() && rowMap.contains(name)) {
             return rowMap.value(name);
+        }
+        if (role == 261 || role == 267 || role == 266 || role == 278 || role == 257 || role == 258) {
+            return 0;
+        }
+        if (role == 268) {
+            return false;
+        }
+        if (role == 269) {
+            return QStringList();
+        }
+        if (role == 259 || role == 260 || role == 270 || role == 271 || role == 272 || role == 273 || role == 274 || role == 275 || role == 276 || role == 277) {
+            return QString("");
         }
         return QVariant();
     }

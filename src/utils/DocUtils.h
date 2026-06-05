@@ -39,6 +39,9 @@ namespace DocUtils {
 
     // Extracts plain text from the document at filePath
     QString extractText(const QString &filePath);
+
+    // Copies plain text to the system clipboard
+    void copyToClipboard(const QString &text);
 }
 
 #endif // DOCUTILS_H

@@ -37,6 +37,7 @@
 #include <QCryptographicHash>
 #include <QFileInfo>
 #include <QDebug>
+#include <QStandardPaths>
 
 ThumbnailTask::ThumbnailTask(int docId, const QString &filePath)
     : m_docId(docId)
@@ -50,7 +51,11 @@ ThumbnailTask::~ThumbnailTask()
 
 void ThumbnailTask::run()
 {
-    QString cacheDir = QDir::homePath() + "/.cache/NinjaLibrary/thumbnails/";
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (cacheDir.isEmpty()) {
+        cacheDir = QDir::homePath() + "/.cache/NinjaLibrary";
+    }
+    cacheDir += "/thumbnails/";
     QDir().mkpath(cacheDir);
 
     QCryptographicHash hasher(QCryptographicHash::Sha256);

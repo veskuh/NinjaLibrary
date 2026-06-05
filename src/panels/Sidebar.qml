@@ -154,6 +154,14 @@ KaakaoSidebar {
         }
     }
 
+    onDoubleClicked: (index) => {
+        if (index < 0 || index >= sidebarModel.count) return
+        var item = sidebarModel.get(index)
+        if (item.type === "folder" && item.target !== "") {
+            Qt.openUrlExternally("file://" + item.target)
+        }
+    }
+
     KaakaoMenu {
         id: folderContextMenu
         property string targetPath: ""

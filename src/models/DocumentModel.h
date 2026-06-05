@@ -37,6 +37,8 @@
 #include <QList>
 #include "../database/DatabaseManager.h"
 
+#include <QTimer>
+
 struct DocumentInfo {
     int id;
     int folderId;
@@ -111,11 +113,13 @@ signals:
 
 public slots:
     void refresh();
+    void forceRefresh();
     void updateThumbnail(int docId, const QString &thumbnailPath);
 
 private:
     DatabaseManager *m_dbMgr;
     QList<DocumentInfo> m_documents;
+    QTimer *m_refreshTimer;
     int m_pdfCount = 0;
     int m_imageCount = 0;
     int m_textCount = 0;

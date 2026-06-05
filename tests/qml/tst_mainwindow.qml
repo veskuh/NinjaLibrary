@@ -551,4 +551,90 @@ TestCase {
         openSpy.destroy();
         win.destroy();
     }
+
+    function test_copy_path_and_folder_double_click() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+
+        // Set up doubleClicked verification on sidebar
+        let sidebarSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        sidebarSpy.target = sidebar;
+        sidebarSpy.signalName = "doubleClicked";
+
+        // Manually trigger doubleClicked signal in sidebar to verify it propagates
+        sidebar.doubleClicked(0);
+        compare(sidebarSpy.count, 1, "doubleClicked signal should be emitted by sidebar");
+        sidebarSpy.destroy();
+
+        // 2. Context Menu "Copy File Path" action verification
+        let contextMenu = win.itemContextMenu;
+        verify(contextMenu !== null, "itemContextMenu should exist");
+        
+        // Setup spy for pathCopied
+        let copySpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        copySpy.target = libraryController;
+        copySpy.signalName = "pathCopied";
+
+        contextMenu.targetPath = "/some/test/file.pdf";
+        contextMenu.targetDocId = 123;
+        
+        let copyItem = null;
+        for (var i = 0; i < contextMenu.count; i++) {
+            var item = contextMenu.itemAt(i);
+            if (item && item.text === "Copy File Path") {
+                copyItem = item;
+                break;
+            }
+        }
+        verify(copyItem !== null, "Copy File Path menu item should be found");
+        copyItem.triggered();
+        wait(50);
+
+        compare(copySpy.count, 1, "Copy File Path trigger should copy path to clipboard");
+        compare(copySpy.signalArguments[0][0], "/some/test/file.pdf", "Copied path should match target path");
+        
+        copySpy.destroy();
+        win.destroy();
+    }
+
+    function test_scanning_progress_indicator() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let statusBar = findChildByName(win, "statusBar");
+        verify(statusBar !== null, "statusBar should exist");
+
+        let scanningProgressLayout = findChildByName(statusBar, "scanningProgressLayout");
+        verify(scanningProgressLayout !== null, "scanningProgressLayout should exist");
+
+        // 1. Verify initially not scanning and not visible
+        compare(libraryController.isScanning, false, "Should not be scanning initially");
+        compare(scanningProgressLayout.visible, false, "scanningProgressLayout should be hidden initially");
+
+        // 2. Set isScanning to true and verify it is visible
+        libraryController.isScanning = true;
+        libraryController.scanProgress = 0.35;
+        wait(100);
+
+        compare(scanningProgressLayout.visible, true, "scanningProgressLayout should be visible when isScanning is true");
+
+        // Find child label inside scanningProgressLayout to verify percentage text
+        let progressLabel = findChildByType(scanningProgressLayout, "KaakaoLabel");
+        verify(progressLabel !== null, "Progress label should be found");
+        compare(progressLabel.text, "Scanning: 35%", "Progress label text should match percentage");
+
+        // 3. Reset isScanning to false
+        libraryController.isScanning = false;
+        libraryController.scanProgress = 0.0;
+        wait(100);
+
+        compare(scanningProgressLayout.visible, false, "scanningProgressLayout should be hidden after scanning finishes");
+
+        win.destroy();
+    }
 }

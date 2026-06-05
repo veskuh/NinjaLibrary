@@ -425,19 +425,16 @@ void TestModels::testRecentCategory()
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     QSqlQuery query(db);
 
-    // Clear last_opened first to make sure test starts with clean state
     QVERIFY(query.exec("UPDATE documents SET last_opened = 0;"));
-    sourceModel.refresh();
+    sourceModel.forceRefresh();
 
     // By default, category filter "Recent" should show nothing because last_opened is 0 for all
     proxyFilter.setCategoryFilter("Recent");
     QCOMPARE(proxyFilter.rowCount(), 0);
 
-    // Now set last_opened for fileA.pdf to 100, and fileB.png to 200
-    // fileB.png is opened more recently (larger timestamp)
     QVERIFY(query.exec("UPDATE documents SET last_opened = 100 WHERE file_name = 'fileA.pdf';"));
     QVERIFY(query.exec("UPDATE documents SET last_opened = 200 WHERE file_name = 'fileB.png';"));
-    sourceModel.refresh();
+    sourceModel.forceRefresh();
 
     // Should show 2 documents (File A and File B, but not File C)
     QCOMPARE(proxyFilter.rowCount(), 2);
