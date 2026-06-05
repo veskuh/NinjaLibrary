@@ -30,15 +30,13 @@
 
 #include "OcrTask.h"
 #include "../utils/PdfUtils.h"
+#include "../utils/OcrUtils.h"
 
-#include <tesseract/baseapi.h>
 #include <QImage>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
 #include <QFileInfo>
-#include <QCoreApplication>
-#include <QFile>
 
 OcrTask::OcrTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
     : m_dbMgr(dbMgr)
@@ -47,12 +45,33 @@ OcrTask::OcrTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
 {
 }
 
+#include <QColorSpace>
+
+#include "../utils/MacBookmarks.h"
+
 OcrTask::~OcrTask()
 {
 }
 
 void OcrTask::run()
 {
+#ifdef Q_OS_MAC
+    QByteArray bookmark;
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || '%' ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
+        q.bindValue(":filePath", m_filePath);
+        if (q.exec() && q.next()) {
+            bookmark = q.value(0).toByteArray();
+        }
+    }
+    MacBookmarks::SandboxAccess sandboxAccess(bookmark);
+    if (!sandboxAccess.isValid() && !bookmark.isEmpty()) {
+        qWarning() << "OcrTask: Failed to acquire security-scoped sandbox access for file:" << m_filePath;
+    }
+#endif
+
     QImage img;
     QFileInfo fileInfo(m_filePath);
     QString ext = fileInfo.suffix().toLower();
@@ -70,46 +89,17 @@ void OcrTask::run()
         return;
     }
 
+    // Workaround: Clear color space metadata to prevent non-thread-safe color space conversions
+    // in background threads that can crash inside QColorTrcLut/QColorTransform.
+    img.setColorSpace(QColorSpace());
+
     // Convert to grayscale
     QImage grayImg = img.convertToFormat(QImage::Format_Grayscale8);
 
-    // Initialize Tesseract BaseAPI
-    tesseract::TessBaseAPI *api = new tesseract::TessBaseAPI();
-    
-    bool initialized = false;
-#ifdef Q_OS_MAC
-    // In a macOS bundle, the resources are located in Contents/Resources
-    QString bundleTessData = QCoreApplication::applicationDirPath() + "/../Resources/tessdata";
-    if (QFile::exists(bundleTessData + "/eng.traineddata")) {
-        QByteArray tessDataPathBytes = bundleTessData.toUtf8();
-        initialized = (api->Init(tessDataPathBytes.constData(), "eng") == 0);
-    }
-    
-    if (!initialized) {
-        // Fallback to standard Homebrew path
-        initialized = (api->Init("/opt/homebrew/share/tessdata", "eng") == 0);
-    }
-#else
-    // Check standard paths if the default Init works
-    initialized = (api->Init(nullptr, "eng") == 0);
-#endif
-
-    if (!initialized) {
-        qWarning() << "OcrTask: Could not initialize Tesseract OCR engine.";
-        delete api;
-        emit finished(m_docId);
-        return;
-    }
-
-    api->SetImage(grayImg.bits(), grayImg.width(), grayImg.height(), 1, grayImg.bytesPerLine());
-    
-    char *outText = api->GetUTF8Text();
-    QString ocrText = QString::fromUtf8(outText).trimmed();
-    int confidence = api->MeanTextConf();
-    
-    delete [] outText;
-    api->End();
-    delete api;
+    // Perform OCR using platform-specific backend (Vision on macOS, Tesseract on Linux)
+    OcrUtils::OcrResult ocrResult = OcrUtils::recognizeText(grayImg);
+    QString ocrText = ocrResult.text;
+    int confidence = ocrResult.confidence;
 
     // Calculate alphanumeric ratio to detect noise/garbage characters
     int alphaNumericCount = 0;
@@ -133,7 +123,6 @@ void OcrTask::run()
     }
 
     // Write text to SQLite virtual FTS5 search table
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (db.isOpen()) {
         QSqlQuery beginQuery(db);
         if (beginQuery.exec("BEGIN IMMEDIATE TRANSACTION")) {

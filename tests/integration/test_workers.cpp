@@ -58,6 +58,7 @@ private slots:
     void testTextAndDocIngestion();
     void testMacBookmarksAndEdgeCases();
     void testOcrNonsenseRejection();
+    void testPackageDirectorySkipping();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -259,7 +260,7 @@ void TestWorkers::testPdfAndOcr()
     QCOMPARE(thumbReqPath, pdfPath);
 
     // Run ThumbnailTask synchronously
-    ThumbnailTask thumbTask(docId, pdfPath);
+    ThumbnailTask thumbTask(m_dbMgr, docId, pdfPath);
     thumbTask.run();
 
     // Run OcrTask synchronously
@@ -503,10 +504,19 @@ void TestWorkers::testLibraryControllerAPIs()
     // Clean up watched folder for tempDir2
     QVERIFY(m_controller->removeWatchedFolder(newFolderPath));
 
+    // Verify sidecar exists before removing watched folder
+    QStringList checkTags;
+    int checkRating = 0;
+    QString checkNotes;
+    QVERIFY(m_controller->readSidecar(imgPath, checkTags, checkRating, checkNotes));
+
     // Test removeWatchedFolder with empty/invalid inputs
     QVERIFY(!m_controller->removeWatchedFolder(""));
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
     QVERIFY(!m_controller->watchedFolders().contains(tempPath));
+
+    // Verify sidecar was deleted (garbage collected) because the document was deleted
+    QVERIFY(!m_controller->readSidecar(imgPath, checkTags, checkRating, checkNotes));
 }
 
 void TestWorkers::testTextAndDocIngestion()
@@ -696,7 +706,7 @@ void TestWorkers::testOcrNonsenseRejection()
     QString snippet = checkQuery.value(0).toString().trimmed();
     QVERIFY(snippet.isEmpty());
 
-    // Clean up
+    // Clean up blank image DB entries
     QSqlQuery cleanupQuery(db);
     cleanupQuery.prepare("DELETE FROM document_search WHERE document_id = :id;");
     cleanupQuery.bindValue(":id", docId);
@@ -706,6 +716,139 @@ void TestWorkers::testOcrNonsenseRejection()
     cleanupDocQuery.prepare("DELETE FROM documents WHERE id = :id;");
     cleanupDocQuery.bindValue(":id", docId);
     QVERIFY(cleanupDocQuery.exec());
+
+    // Test 2: Image with actual text to verify the OCR engine works
+    QString textImgPath = QDir(tempPath).filePath("text_image.png");
+    QImage textImg(400, 100, QImage::Format_RGB32);
+    textImg.fill(Qt::white);
+    {
+        QPainter painter(&textImg);
+        painter.setPen(Qt::black);
+        QFont font = painter.font();
+        font.setPointSize(24);
+        font.setBold(true);
+        painter.setFont(font);
+        painter.drawText(textImg.rect(), Qt::AlignCenter, "NINJA OCR WORKED");
+        painter.end();
+    }
+    QVERIFY(textImg.save(textImgPath));
+    textImgPath = QFileInfo(textImgPath).canonicalFilePath();
+
+    // Insert mock document record for text image
+    QSqlQuery query2(db);
+    query2.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+                        "VALUES (1, 'text_image.png', :path, 100, 0);");
+    query2.bindValue(":path", textImgPath);
+    QVERIFY(query2.exec());
+    int docId2 = query2.lastInsertId().toInt();
+
+    // Insert empty search snippet
+    QSqlQuery insertSearch2(db);
+    insertSearch2.prepare("INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, 'text_image.png', '');");
+    insertSearch2.bindValue(":docId", docId2);
+    QVERIFY(insertSearch2.exec());
+
+    // Run OcrTask on the text image
+    OcrTask ocrTask2(m_dbMgr, docId2, textImgPath);
+    ocrTask2.run();
+
+    // Verify search snippet contains our text
+    QSqlQuery checkQuery2(db);
+    checkQuery2.prepare("SELECT text_snippet FROM document_search WHERE document_id = :id;");
+    checkQuery2.bindValue(":id", docId2);
+    QVERIFY(checkQuery2.exec());
+    QVERIFY(checkQuery2.next());
+    QString snippet2 = checkQuery2.value(0).toString().trimmed();
+    qDebug() << "Extracted OCR text from image:" << snippet2;
+    QVERIFY(snippet2.contains("NINJA", Qt::CaseInsensitive));
+    QVERIFY(snippet2.contains("OCR", Qt::CaseInsensitive));
+    QVERIFY(snippet2.contains("WORKED", Qt::CaseInsensitive));
+
+    // Clean up text image DB entries
+    QSqlQuery cleanupQuery2(db);
+    cleanupQuery2.prepare("DELETE FROM document_search WHERE document_id = :id;");
+    cleanupQuery2.bindValue(":id", docId2);
+    QVERIFY(cleanupQuery2.exec());
+
+    QSqlQuery cleanupDocQuery2(db);
+    cleanupDocQuery2.prepare("DELETE FROM documents WHERE id = :id;");
+    cleanupDocQuery2.bindValue(":id", docId2);
+    QVERIFY(cleanupDocQuery2.exec());
+}
+
+void TestWorkers::testPackageDirectorySkipping()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+
+    // Create a normal directory with a valid document
+    QString normalDir = tempPath + "/normal_folder";
+    QDir().mkpath(normalDir);
+    QString normalFile = normalDir + "/valid_doc.txt";
+    QFile file1(normalFile);
+    QVERIFY(file1.open(QIODevice::WriteOnly | QIODevice::Text));
+    QTextStream stream1(&file1);
+    stream1 << "Some text content for valid document.";
+    file1.close();
+
+    // Create an app package folder structure with a document inside it
+    QString appDir = tempPath + "/MyApp.app/Contents/Resources";
+    QDir().mkpath(appDir);
+    QString appFile = appDir + "/packaged_doc.txt";
+    QFile file2(appFile);
+    QVERIFY(file2.open(QIODevice::WriteOnly | QIODevice::Text));
+    QTextStream stream2(&file2);
+    stream2 << "Some text content for packaged document.";
+    file2.close();
+
+    // Create a Photos library package folder structure with a document inside it
+    QString photosDir = tempPath + "/MyPhotos.photoslibrary/Masters/2026";
+    QDir().mkpath(photosDir);
+    QString photosFile = photosDir + "/photo_doc.png";
+    QFile file3(photosFile);
+    QVERIFY(file3.open(QIODevice::WriteOnly));
+    file3.write("fake png data");
+    file3.close();
+
+    // Clear documents table before running task
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery clearQuery(db);
+    QVERIFY(clearQuery.exec("DELETE FROM documents;"));
+    QVERIFY(clearQuery.exec("DELETE FROM document_search;"));
+
+    // Insert tempPath into watched_folders table so ScannerTask doesn't skip it
+    QSqlQuery insertFolderQuery(db);
+    insertFolderQuery.prepare("INSERT OR IGNORE INTO watched_folders (absolute_path) VALUES (:path);");
+    insertFolderQuery.bindValue(":path", tempPath);
+    QVERIFY(insertFolderQuery.exec());
+
+    // Run ScannerTask synchronously
+    ScannerTask scanner(m_dbMgr, tempPath);
+    scanner.run();
+
+    // Check DB to verify only valid_doc.txt was ingested, and the others were skipped
+    QSqlQuery query(db);
+    QVERIFY(query.exec("SELECT file_name FROM documents;"));
+    
+    QStringList filenames;
+    while (query.next()) {
+        filenames << query.value(0).toString();
+    }
+    
+    qDebug() << "Ingested filenames:" << filenames;
+    
+    QVERIFY(filenames.contains("valid_doc.txt"));
+    QVERIFY(!filenames.contains("packaged_doc.txt"));
+    QVERIFY(!filenames.contains("photo_doc.png"));
+
+    // Clean up DB entries
+    QSqlQuery cleanupFolderQuery(db);
+    cleanupFolderQuery.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
+    cleanupFolderQuery.bindValue(":path", tempPath);
+    QVERIFY(cleanupFolderQuery.exec());
+    QVERIFY(clearQuery.exec("DELETE FROM documents;"));
+    QVERIFY(clearQuery.exec("DELETE FROM document_search;"));
 }
 
 QTEST_MAIN(TestWorkers)

@@ -89,16 +89,8 @@ namespace PdfUtils {
             PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
             if (!pdfDoc) return QString();
 
-            NSString *allText = @"";
-            NSInteger pages = [pdfDoc pageCount];
-            for (NSInteger i = 0; i < pages; i++) {
-                PDFPage *page = [pdfDoc pageAtIndex:i];
-                NSString *pageText = [page string];
-                if (pageText) {
-                    allText = [allText stringByAppendingString:pageText];
-                    allText = [allText stringByAppendingString:@"\n"];
-                }
-            }
+            NSString *allText = [pdfDoc string];
+            if (!allText) return QString();
 
             return QString::fromNSString(allText);
         }

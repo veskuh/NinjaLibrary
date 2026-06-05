@@ -50,6 +50,8 @@
 #include <QDebug>
 #include <QStandardPaths>
 
+#include "../utils/MacBookmarks.h"
+
 ScannerTask::ScannerTask(DatabaseManager *dbMgr, const QString &folderPath)
     : m_dbMgr(dbMgr)
     , m_folderPath(folderPath)
@@ -68,14 +70,16 @@ void ScannerTask::run()
         return;
     }
 
-    // 1. Get folder ID from database
+    // 1. Get folder ID and macOS bookmark from database
     int folderId = -1;
+    QByteArray bookmark;
     {
         QSqlQuery query(db);
-        query.prepare("SELECT id FROM watched_folders WHERE absolute_path = :path;");
+        query.prepare("SELECT id, macos_bookmark FROM watched_folders WHERE absolute_path = :path;");
         query.bindValue(":path", m_folderPath);
         if (query.exec() && query.next()) {
             folderId = query.value(0).toInt();
+            bookmark = query.value(1).toByteArray();
         }
     }
 
@@ -83,6 +87,14 @@ void ScannerTask::run()
         emit finished(m_folderPath);
         return;
     }
+
+#ifdef Q_OS_MAC
+    // Access security-scoped resources on the current background thread
+    MacBookmarks::SandboxAccess sandboxAccess(bookmark);
+    if (!sandboxAccess.isValid() && !bookmark.isEmpty()) {
+        qWarning() << "ScannerTask: Failed to acquire security-scoped sandbox access for folder:" << m_folderPath;
+    }
+#endif
 
     QList<QPair<int, QString>> pendingOcr;
     QList<QPair<int, QString>> pendingThumbnails;
@@ -469,7 +481,34 @@ void ScannerTask::run()
 
 bool ScannerTask::isSupportedDocument(const QString &filePath) const
 {
-    QString ext = QFileInfo(filePath).suffix().toLower();
+    // Filter out files inside macOS package directory structures and other ignore-listed directories
+    QFileInfo fileInfo(filePath);
+    QString dirPath = fileInfo.absolutePath();
+    QStringList segments = dirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
+    for (const QString &segment : segments) {
+        if (segment.endsWith(".app", Qt::CaseInsensitive) ||
+            segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||
+            segment.endsWith(".photolibrary", Qt::CaseInsensitive) ||
+            segment.endsWith(".migratedphotolibrary", Qt::CaseInsensitive) ||
+            segment.endsWith(".framework", Qt::CaseInsensitive) ||
+            segment.endsWith(".bundle", Qt::CaseInsensitive) ||
+            segment.endsWith(".xcodeproj", Qt::CaseInsensitive) ||
+            segment.endsWith(".pages", Qt::CaseInsensitive) ||
+            segment.endsWith(".numbers", Qt::CaseInsensitive) ||
+            segment.endsWith(".key", Qt::CaseInsensitive) ||
+            segment.endsWith(".wdgt", Qt::CaseInsensitive) ||
+            segment.endsWith(".plugin", Qt::CaseInsensitive) ||
+            segment.endsWith(".appex", Qt::CaseInsensitive) ||
+            segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
+            segment.endsWith(".xcassets", Qt::CaseInsensitive) ||
+            segment == ".git" ||
+            segment == ".svn" ||
+            segment.toLower() == ".trash") {
+            return false;
+        }
+    }
+
+    QString ext = fileInfo.suffix().toLower();
     return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp" || DocUtils::isSupportedTextDocument(filePath);
 }
 

@@ -37,6 +37,23 @@
 namespace MacBookmarks {
     QByteArray getBookmarkForUrl(const QString &urlPath);
     bool resolveBookmark(const QByteArray &bookmarkData, QString &resolvedPath);
+
+    // Sandbox persistence management
+    bool resolveAndAccessBookmark(const QByteArray &bookmarkData, QString &resolvedPath);
+    void releaseBookmarkAccess(const QString &path);
+    void releaseAllBookmarkAccesses();
+
+    // RAII wrapper to manage security-scoped resource access on background threads
+    class SandboxAccess {
+    public:
+        SandboxAccess(const QByteArray &bookmarkData);
+        ~SandboxAccess();
+        bool isValid() const;
+        QString resolvedPath() const;
+    private:
+        void *m_url;
+        QString m_resolvedPath;
+    };
 }
 
 #endif // MACBOOKMARKS_H

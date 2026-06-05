@@ -42,6 +42,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFile>
+#include <QSaveFile>
 #include <QUrl>
 #include <QFileInfo>
 #include <QProcess>
@@ -215,6 +216,7 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
 
     m_watcher->removePath(absPath);
     updateFoldersCache();
+    cleanupSidecars();
 
     emit libraryChanged();
     return true;
@@ -631,13 +633,12 @@ bool LibraryController::writeSidecar(const QString &documentPath, const QStringL
     obj["tags"] = tagsArray;
 
     QJsonDocument doc(obj);
-    QFile file(sidecarPath);
+    QSaveFile file(sidecarPath);
     if (!file.open(QIODevice::WriteOnly)) {
         return false;
     }
     file.write(doc.toJson());
-    file.close();
-    return true;
+    return file.commit();
 }
 
 bool LibraryController::readSidecar(const QString &documentPath, QStringList &tags, int &rating, QString &notes)
@@ -684,16 +685,31 @@ void LibraryController::triggerBackgroundCrawl()
 
 void LibraryController::updateFoldersCache()
 {
+#ifdef Q_OS_MAC
+    MacBookmarks::releaseAllBookmarkAccesses();
+#endif
+
     m_watchedFoldersCache.clear();
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return;
 
-    QSqlQuery query("SELECT absolute_path FROM watched_folders;", db);
+    QSqlQuery query("SELECT absolute_path, macos_bookmark FROM watched_folders;", db);
     while (query.next()) {
         QString path = query.value(0).toString();
-        m_watchedFoldersCache.append(path);
+        QByteArray bookmark = query.value(1).toByteArray();
+        
+        QString resolvedPath = path;
+#ifdef Q_OS_MAC
+        if (!bookmark.isEmpty()) {
+            QString tmpResolved;
+            if (MacBookmarks::resolveAndAccessBookmark(bookmark, tmpResolved)) {
+                resolvedPath = tmpResolved;
+            }
+        }
+#endif
+        m_watchedFoldersCache.append(resolvedPath);
         // Ensure path is watched (safe to call addPath multiple times, it won't duplicate)
-        m_watcher->addPath(path);
+        m_watcher->addPath(resolvedPath);
     }
 
     emit watchedFoldersChanged();
@@ -768,7 +784,7 @@ void LibraryController::requestThumbnail(int docId, const QString &filePath, boo
     if (DocUtils::isSupportedTextDocument(filePath)) {
         return;
     }
-    ThumbnailTask *task = new ThumbnailTask(docId, filePath);
+    ThumbnailTask *task = new ThumbnailTask(m_dbMgr, docId, filePath);
     connect(task, &ThumbnailTask::finished, this, &LibraryController::onThumbnailTaskFinished);
     task->setAutoDelete(true);
     QThreadPool::globalInstance()->start(task, highPriority ? 10 : 0);
@@ -795,6 +811,7 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
             m_scanProgress = 0.0;
             emit scanProgressChanged();
         }
+        cleanupSidecars();
     } else {
         updateScanProgress();
     }
@@ -886,6 +903,32 @@ bool LibraryController::markDocumentOpened(int docId)
 
     emit libraryChanged();
     return true;
+}
+
+void LibraryController::cleanupSidecars()
+{
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return;
+
+    QSet<QString> activeHashes;
+    QSqlQuery query("SELECT absolute_path FROM documents;", db);
+    while (query.next()) {
+        QString docPath = query.value(0).toString();
+        QCryptographicHash hasher(QCryptographicHash::Sha256);
+        hasher.addData(docPath.toUtf8());
+        activeHashes.insert(hasher.result().toHex());
+    }
+
+    QDir dir(m_sidecarDir);
+    QStringList filters;
+    filters << "*.ninja";
+    QStringList files = dir.entryList(filters, QDir::Files);
+    for (const QString &filename : files) {
+        QString baseName = QFileInfo(filename).baseName();
+        if (!activeHashes.contains(baseName)) {
+            dir.remove(filename);
+        }
+    }
 }
 
 

@@ -65,12 +65,14 @@ if(APPLE)
         ../src/utils/HashUtils.cpp
         ../src/utils/PdfUtils.h
         ../src/utils/DocUtils.h
+        ../src/utils/OcrUtils.h
         ../src/utils/MacPdfUtils.mm
         ../src/utils/MacDocUtils.mm
+        ../src/utils/MacOcrUtils.mm
         ../src/utils/MacBookmarks.h
         ../src/utils/MacBookmarks.mm
     )
-    target_link_libraries(test_workers PRIVATE "-framework PDFKit" "-framework AppKit" "-framework Foundation")
+    target_link_libraries(test_workers PRIVATE "-framework PDFKit" "-framework AppKit" "-framework Foundation" "-framework Vision")
 else()
     qt_add_executable(test_workers
         integration/test_workers.cpp
@@ -88,10 +90,12 @@ else()
         ../src/utils/HashUtils.cpp
         ../src/utils/PdfUtils.h
         ../src/utils/DocUtils.h
+        ../src/utils/OcrUtils.h
         ../src/utils/LinuxPdfUtils.cpp
         ../src/utils/LinuxDocUtils.cpp
+        ../src/utils/LinuxOcrUtils.cpp
     )
-    target_link_libraries(test_workers PRIVATE Poppler::Poppler)
+    target_link_libraries(test_workers PRIVATE Poppler::Poppler Tesseract::Tesseract)
 endif()
 
 target_link_libraries(test_workers PRIVATE
@@ -99,7 +103,6 @@ target_link_libraries(test_workers PRIVATE
     Qt6::Gui
     Qt6::Sql
     Qt6::Test
-    Tesseract::Tesseract
 )
 
 add_test(NAME test_workers COMMAND test_workers)

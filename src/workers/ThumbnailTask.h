@@ -34,12 +34,13 @@
 #include <QObject>
 #include <QRunnable>
 #include <QString>
+#include "../database/DatabaseManager.h"
 
 class ThumbnailTask : public QObject, public QRunnable
 {
     Q_OBJECT
 public:
-    ThumbnailTask(int docId, const QString &filePath);
+    ThumbnailTask(DatabaseManager *dbMgr, int docId, const QString &filePath);
     ~ThumbnailTask();
 
     void run() override;
@@ -48,6 +49,7 @@ signals:
     void finished(int docId, const QString &thumbnailPath);
 
 private:
+    DatabaseManager *m_dbMgr;
     int m_docId;
     QString m_filePath;
 };

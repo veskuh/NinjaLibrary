@@ -30,21 +30,24 @@ for tool in cmake codesign hdiutil; do
     fi
 done
 
-# Locate macdeployqt
-MACDEPLOYQT_BIN="macdeployqt"
-if ! command -v macdeployqt &> /dev/null; then
-    # Check common Homebrew paths or standard Qt locations
-    if [ -f "/opt/homebrew/bin/macdeployqt" ]; then
-        MACDEPLOYQT_BIN="/opt/homebrew/bin/macdeployqt"
-    elif [ -f "/usr/local/bin/macdeployqt" ]; then
-        MACDEPLOYQT_BIN="/usr/local/bin/macdeployqt"
-    elif [ -d "/opt/homebrew/opt/qt/bin" ] && [ -f "/opt/homebrew/opt/qt/bin/macdeployqt" ]; then
-        MACDEPLOYQT_BIN="/opt/homebrew/opt/qt/bin/macdeployqt"
-    else
-        echo "Error: 'macdeployqt' could not be found. Please ensure Qt is installed and in your PATH."
-        exit 1
-    fi
+# 2a. Locate official Qt installation from ~/Qt
+QT_VERSION="6.8.3"
+QT_DIR="$HOME/Qt/${QT_VERSION}/macos"
+if [ ! -d "$QT_DIR" ]; then
+    echo "Error: Official Qt installation not found at $QT_DIR"
+    echo "Please install Qt ${QT_VERSION} via the Qt Online Installer to ~/Qt"
+    exit 1
 fi
+
+QT_CMAKE_PREFIX="${QT_DIR}/lib/cmake"
+MACDEPLOYQT_BIN="${QT_DIR}/bin/macdeployqt"
+
+if [ ! -f "$MACDEPLOYQT_BIN" ]; then
+    echo "Error: macdeployqt not found at $MACDEPLOYQT_BIN"
+    exit 1
+fi
+
+echo "Using Qt from: $QT_DIR"
 echo "Using macdeployqt: $MACDEPLOYQT_BIN"
 
 # 2b. Generate Apple Icon Image (.icns) file from base PNG
@@ -86,12 +89,21 @@ echo "=== Cleaning build directory ($BUILD_DIR) ==="
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# 4. Configure project in Release mode
-echo "=== Configuring project with CMake in Release mode ==="
-cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=OFF
+# 4. Configure project in Release mode with Universal Binary support
+echo "=== Configuring project with CMake in Release mode (Universal Binary: x86_64 + arm64) ==="
+# Workaround: AGL framework is missing in modern macOS SDKs but referenced by Qt 6.8's FindWrapOpenGL.
+# We redirect it to OpenGL framework which is still present.
+cmake -B "$BUILD_DIR" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH="$QT_CMAKE_PREFIX" \
+    -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="12.0" \
+    -DWrapOpenGL_AGL="-framework OpenGL" \
+    -DBUILD_UNIVERSAL=ON \
+    -DENABLE_TESTING=OFF
 
 # 5. Build application target
-echo "=== Building application target ==="
+echo "=== Building Universal Binary application target ==="
 cmake --build "$BUILD_DIR" --target NinjaLibraryApp --parallel
 
 # 6. Verify App Bundle creation
@@ -101,28 +113,9 @@ if [ ! -d "$APP_BUNDLE" ]; then
     exit 1
 fi
 
-# 7. Package Tesseract OCR Trained Data files
-echo "=== Packaging Tesseract traineddata files ==="
-TESSDATA_SRC=""
-if [ -d "/opt/homebrew/share/tessdata" ]; then
-    TESSDATA_SRC="/opt/homebrew/share/tessdata"
-elif [ -d "/usr/local/share/tessdata" ]; then
-    TESSDATA_SRC="/usr/local/share/tessdata"
-fi
-
-if [ -n "$TESSDATA_SRC" ]; then
-    mkdir -p "$APP_BUNDLE/Contents/Resources/tessdata"
-    for lang in eng osd; do
-        if [ -f "$TESSDATA_SRC/${lang}.traineddata" ]; then
-            cp "$TESSDATA_SRC/${lang}.traineddata" "$APP_BUNDLE/Contents/Resources/tessdata/"
-            echo "  Copied ${lang}.traineddata to bundle Resources/tessdata/"
-        else
-            echo "  Warning: ${lang}.traineddata not found in $TESSDATA_SRC"
-        fi
-    done
-else
-    echo "Warning: System tessdata directory not found. Standing release may fail to run OCR."
-fi
+# 7. Tesseract OCR data files are no longer needed on macOS.
+#    OCR is handled natively by the macOS Vision framework.
+echo "=== Skipping Tesseract tessdata (macOS uses native Vision framework for OCR) ==="
 
 # 7b. Copy macOS application icon
 if [ -f "$ICNS_OUT" ]; then

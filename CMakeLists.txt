@@ -20,12 +20,16 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Sql Core5Compat Test QuickTest ShaderTools)
 
 # Find third party libraries
-find_package(Tesseract REQUIRED)
+# Tesseract is only needed on Linux; macOS uses native Vision framework for OCR
+if(NOT APPLE)
+    find_package(Tesseract REQUIRED)
+endif()
 
 if(APPLE)
-    # macOS build uses native PDFKit and AppKit frameworks for PDF thumbnail/text handling
-    message(STATUS "macOS build: Using native PDFKit and AppKit frameworks. No Poppler dependency needed.")
+    # macOS build uses native frameworks: PDFKit/AppKit for PDF, Vision for OCR
+    message(STATUS "macOS build: Using native PDFKit, AppKit, and Vision frameworks.")
     set(HAVE_PDFKIT 1)
+    set(HAVE_VISION 1)
 else()
     # Linux build uses standard Poppler-Qt6
     message(STATUS "Linux build: Using Poppler-Qt6 package.")
@@ -124,6 +128,7 @@ qt_add_qml_module(NinjaLibrary
         src/utils/HashUtils.cpp
         src/utils/PdfUtils.h
         src/utils/DocUtils.h
+        src/utils/OcrUtils.h
     QML_FILES
         src/views/MainWindow.qml
         src/views/AppMenuBar.qml
@@ -147,12 +152,14 @@ if(APPLE)
         src/utils/MacBookmarks.mm
         src/utils/MacPdfUtils.mm
         src/utils/MacDocUtils.mm
+        src/utils/MacOcrUtils.mm
     )
     target_link_libraries(NinjaLibrary PRIVATE "-framework Foundation")
 else()
     target_sources(NinjaLibrary PRIVATE
         src/utils/LinuxPdfUtils.cpp
         src/utils/LinuxDocUtils.cpp
+        src/utils/LinuxOcrUtils.cpp
     )
 endif()
 
@@ -164,7 +171,6 @@ target_link_libraries(NinjaLibrary PRIVATE
     Qt6::Quick
     Qt6::Sql
     Qt6::Core5Compat
-    Tesseract::Tesseract
     Kaakao
 )
 
@@ -176,9 +182,14 @@ target_link_libraries(NinjaLibraryApp PRIVATE
     Qt6::Quick
     Qt6::Sql
     Qt6::Core5Compat
-    Tesseract::Tesseract
     Kaakao
 )
+
+# Tesseract is Linux-only; macOS uses Vision framework
+if(NOT APPLE)
+    target_link_libraries(NinjaLibrary PRIVATE Tesseract::Tesseract)
+    target_link_libraries(NinjaLibraryApp PRIVATE Tesseract::Tesseract)
+endif()
 
 if(HAVE_POPPLER)
     target_link_libraries(NinjaLibrary PRIVATE Poppler::Poppler)
@@ -192,6 +203,13 @@ if(HAVE_PDFKIT)
     target_link_libraries(NinjaLibraryApp PRIVATE "-framework PDFKit" "-framework AppKit")
     target_compile_definitions(NinjaLibrary PRIVATE HAVE_PDFKIT)
     target_compile_definitions(NinjaLibraryApp PRIVATE HAVE_PDFKIT)
+endif()
+
+if(HAVE_VISION)
+    target_link_libraries(NinjaLibrary PRIVATE "-framework Vision")
+    target_link_libraries(NinjaLibraryApp PRIVATE "-framework Vision")
+    target_compile_definitions(NinjaLibrary PRIVATE HAVE_VISION)
+    target_compile_definitions(NinjaLibraryApp PRIVATE HAVE_VISION)
 endif()
 
 # Add standard compile options

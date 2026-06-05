@@ -31,6 +31,7 @@
 #include "ThumbnailTask.h"
 #include "../utils/PdfUtils.h"
 
+#include <QColorSpace>
 #include <QDir>
 #include <QFile>
 #include <QImage>
@@ -39,8 +40,13 @@
 #include <QDebug>
 #include <QStandardPaths>
 
-ThumbnailTask::ThumbnailTask(int docId, const QString &filePath)
-    : m_docId(docId)
+#include <QSqlQuery>
+#include <QSqlDatabase>
+#include "../utils/MacBookmarks.h"
+
+ThumbnailTask::ThumbnailTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
+    : m_dbMgr(dbMgr)
+    , m_docId(docId)
     , m_filePath(filePath)
 {
 }
@@ -51,6 +57,25 @@ ThumbnailTask::~ThumbnailTask()
 
 void ThumbnailTask::run()
 {
+#ifdef Q_OS_MAC
+    QByteArray bookmark;
+    if (m_dbMgr) {
+        QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+        if (db.isOpen()) {
+            QSqlQuery q(db);
+            q.prepare("SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || '%' ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
+            q.bindValue(":filePath", m_filePath);
+            if (q.exec() && q.next()) {
+                bookmark = q.value(0).toByteArray();
+            }
+        }
+    }
+    MacBookmarks::SandboxAccess sandboxAccess(bookmark);
+    if (!sandboxAccess.isValid() && !bookmark.isEmpty()) {
+        qWarning() << "ThumbnailTask: Failed to acquire security-scoped sandbox access for file:" << m_filePath;
+    }
+#endif
+
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     if (cacheDir.isEmpty()) {
         cacheDir = QDir::homePath() + "/.cache/NinjaLibrary";
@@ -78,6 +103,8 @@ void ThumbnailTask::run()
     } else {
         QImage srcImg;
         if (srcImg.load(m_filePath)) {
+            // Workaround: Clear color space metadata to prevent non-thread-safe color space conversions
+            srcImg.setColorSpace(QColorSpace());
             img = srcImg.scaled(256, 256, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }
     }

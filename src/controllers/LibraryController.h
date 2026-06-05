@@ -38,6 +38,7 @@
 #include <QThreadPool>
 #include <QVariantMap>
 #include <QMap>
+#include <QSet>
 #include "../database/DatabaseManager.h"
 
 class LibraryController : public QObject
@@ -76,6 +77,7 @@ public slots:
     // Centralized sidecar read/write APIs
     bool writeSidecar(const QString &documentPath, const QStringList &tags, int rating, const QString &notes);
     bool readSidecar(const QString &documentPath, QStringList &tags, int &rating, QString &notes);
+    void cleanupSidecars();
 
     // QML-facing thumbnail request
     void requestThumbnail(int docId, const QString &filePath, bool highPriority = false);
