@@ -47,10 +47,22 @@ Rectangle {
     implicitHeight: 20
     radius: 4
     
-    opacity: isMixed ? 0.7 : 1.0
+    opacity: 0.0
     color: isSelected ? Theme.primaryAccent : (hoverArea.containsMouse ? Theme.toolButtonHovered : Theme.contentBackground)
     border.color: isSelected ? Theme.accentBorder : (isMixed ? Theme.sidebarSectionText : Theme.buttonBorder)
     border.width: 1
+
+    scale: 0.0
+
+    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+    Behavior on opacity { NumberAnimation { duration: 150 } }
+    Behavior on color { ColorAnimation { duration: 120 } }
+    Behavior on border.color { ColorAnimation { duration: 120 } }
+
+    Component.onCompleted: {
+        scale = 1.0
+        opacity = Qt.binding(function() { return isMixed ? 0.7 : 1.0 })
+    }
 
     MouseArea {
         id: hoverArea
@@ -89,13 +101,17 @@ Rectangle {
             color: pill.isSelected ? Theme.selectionTextActive : Theme.sidebarSectionText
             font.pixelSize: 13
             font.weight: Font.Bold
-            opacity: 1.0
+            opacity: deleteMouse.containsMouse ? 1.0 : 0.6
             visible: pill.showDelete
             anchors.verticalCenter: parent.verticalCenter
+            
+            Behavior on opacity { NumberAnimation { duration: 100 } }
 
             MouseArea {
+                id: deleteMouse
                 anchors.fill: parent
                 anchors.margins: -4
+                hoverEnabled: true
                 onClicked: {
                     pill.removeRequested()
                 }

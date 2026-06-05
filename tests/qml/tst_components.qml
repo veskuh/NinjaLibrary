@@ -66,6 +66,7 @@ TestCase {
         card.starRating = 3
         card.isOffline = false
         card.isSelected = true
+        wait(500)
 
         // Verify Theme colors are applied (e.g. selection/highlight state)
         compare(card.color, Theme.isDarkMode ? "#2d3748" : "#e1f0ff", "Card background color should match selection theme color")

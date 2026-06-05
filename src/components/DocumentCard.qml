@@ -50,9 +50,19 @@ Rectangle {
     implicitWidth: 160
     implicitHeight: 200
     radius: 6
-    color: isSelected ? (Theme.isDarkMode ? "#2d3748" : "#e1f0ff") : Theme.contentBackground
-    border.color: isSelected ? Theme.primaryAccent : Theme.buttonBorder
+    color: isSelected ? (Theme.isDarkMode ? "#2d3748" : "#e1f0ff") 
+                      : (cardMouseArea.containsMouse ? (Theme.isDarkMode ? "#2d2d2d" : "#f3f8fe") : Theme.contentBackground)
+    border.color: isSelected ? Theme.primaryAccent 
+                            : (cardMouseArea.containsMouse ? (Theme.isDarkMode ? "#666666" : "#a8cbf7") : Theme.buttonBorder)
     border.width: isSelected ? 2 : 1
+
+    scale: cardMouseArea.containsMouse ? 1.025 : 1.0
+
+    Behavior on scale {
+        NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+    }
+    Behavior on color { ColorAnimation { duration: 120 } }
+    Behavior on border.color { ColorAnimation { duration: 120 } }
 
     // Soft drop shadow (standard Yosemite card look)
     layer.enabled: !isSelected
@@ -182,7 +192,9 @@ Rectangle {
     }
 
     MouseArea {
+        id: cardMouseArea
         anchors.fill: parent
+        hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: (mouse) => {
             card.clicked(mouse)

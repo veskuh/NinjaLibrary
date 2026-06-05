@@ -44,6 +44,14 @@ Rectangle {
     property var docData: null
     property var multiDocData: []
 
+    property bool showSavedIndicator: false
+
+    Timer {
+        id: savedTimer
+        interval: 1000
+        onTriggered: inspector.showSavedIndicator = false
+    }
+
     property var allSelectedTags: {
         var tagsSet = {}
         for (var i = 0; i < multiDocData.length; i++) {
@@ -69,6 +77,8 @@ Rectangle {
     function saveNotes() {
         if (notesArea && docData && notesArea.text !== docData.notes) {
             libraryController.updateNotes(docData.docId, notesArea.text)
+            inspector.showSavedIndicator = true
+            savedTimer.restart()
         }
     }
 
@@ -609,12 +619,32 @@ Rectangle {
                 KaakaoSeparator { Layout.fillWidth: true }
 
                 // Notes Section
-                KaakaoLabel {
-                    text: "Notes"
-                    role: KaakaoLabel.Role.Small
-                    font.weight: Font.DemiBold
-                    color: Theme.sidebarSectionText
-                    opacity: 1.0
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+                    
+                    KaakaoLabel {
+                        text: "Notes"
+                        role: KaakaoLabel.Role.Small
+                        font.weight: Font.DemiBold
+                        color: Theme.sidebarSectionText
+                        opacity: 1.0
+                    }
+
+                    Item { Layout.fillWidth: true } // Spacer
+
+                    KaakaoLabel {
+                        text: "Saved"
+                        role: KaakaoLabel.Role.Small
+                        font.pixelSize: 10
+                        font.italic: true
+                        color: Theme.isDarkMode ? "#2ecc71" : "#27ae60"
+                        opacity: inspector.showSavedIndicator ? 1.0 : 0.0
+                        
+                        Behavior on opacity {
+                            NumberAnimation { duration: 200 }
+                        }
+                    }
                 }
 
                 ScrollView {

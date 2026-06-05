@@ -250,7 +250,10 @@ KaakaoWindow {
                 id: searchField
                 objectName: "searchField"
                 placeholderText: "Search documents..."
-                implicitWidth: 260
+                implicitWidth: activeFocus ? 260 : 160
+                Behavior on implicitWidth {
+                    NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+                }
                 onTextChanged: {
                     proxyFilter.filterString = text
                 }
@@ -621,6 +624,19 @@ KaakaoWindow {
                             value: 150
                             implicitWidth: 100
                             Layout.alignment: Qt.AlignVCenter
+                        }
+
+                        KaakaoLabel {
+                            text: Math.round(zoomSlider.value) + "%"
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                            color: Theme.primaryText
+                            opacity: (zoomSlider.hovered || zoomSlider.pressed) ? 1.0 : 0.6
+                            Layout.alignment: Qt.AlignVCenter
+                            Layout.preferredWidth: 48
+                            horizontalAlignment: Text.AlignRight
+                            
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
                         }
                     }
                 }
