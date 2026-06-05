@@ -42,7 +42,7 @@ class ProxyFilter : public QSortFilterProxyModel
     Q_PROPERTY(QString filterString READ filterString WRITE setFilterString NOTIFY filterStringChanged)
     Q_PROPERTY(QStringList selectedTags READ selectedTags WRITE setSelectedTags NOTIFY selectedTagsChanged)
     Q_PROPERTY(int minRating READ minRating WRITE setMinRating NOTIFY minRatingChanged)
-    Q_PROPERTY(bool showOffline READ showOffline WRITE setShowOffline NOTIFY showOfflineChanged)
+    Q_PROPERTY(bool showUnavailable READ showUnavailable WRITE setShowUnavailable NOTIFY showUnavailableChanged)
     Q_PROPERTY(bool duplicatesOnly READ duplicatesOnly WRITE setDuplicatesOnly NOTIFY duplicatesOnlyChanged)
     Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
     Q_PROPERTY(QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
@@ -56,7 +56,7 @@ public:
     QString filterString() const { return m_filterString; }
     QStringList selectedTags() const { return m_selectedTags; }
     int minRating() const { return m_minRating; }
-    bool showOffline() const { return m_showOffline; }
+    bool showUnavailable() const { return m_showUnavailable; }
     bool duplicatesOnly() const { return m_duplicatesOnly; }
     QString categoryFilter() const { return m_categoryFilter; }
     QString folderFilter() const { return m_folderFilter; }
@@ -71,7 +71,7 @@ public slots:
     void setFilterString(const QString &filter);
     void setSelectedTags(const QStringList &tags);
     void setMinRating(int rating);
-    void setShowOffline(bool show);
+    void setShowUnavailable(bool show);
     void setDuplicatesOnly(bool only);
     void setCategoryFilter(const QString &category);
     void setFolderFilter(const QString &folder); // "All", "Recent", "Favorites" etc.
@@ -86,7 +86,7 @@ signals:
     void filterStringChanged();
     void selectedTagsChanged();
     void minRatingChanged();
-    void showOfflineChanged();
+    void showUnavailableChanged();
     void duplicatesOnlyChanged();
     void categoryFilterChanged();
     void folderFilterChanged();
@@ -102,7 +102,7 @@ private:
     QString m_filterString;
     QStringList m_selectedTags;
     int m_minRating;
-    bool m_showOffline;
+    bool m_showUnavailable;
     bool m_duplicatesOnly;
     QString m_categoryFilter;
     QString m_folderFilter;

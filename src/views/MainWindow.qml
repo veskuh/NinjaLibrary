@@ -217,6 +217,7 @@ KaakaoWindow {
             id: viewSegment
             objectName: "viewSegment"
             model: ["Grid", "Table"]
+            currentIndex: 1 // Table view by default
             implicitWidth: 120
             anchors.centerIn: parent
             z: 1 // Ensure it sits on top of layout if needed
@@ -492,8 +493,8 @@ KaakaoWindow {
                                    documentModel.pdfCount + " PDFs, " +
                                    documentModel.imageCount + " Images, " +
                                    documentModel.textCount + " Text/Other)  |  " +
-                                   documentModel.onlineCount + " Online, " +
-                                   documentModel.offlineCount + " Offline  |  Selected: " +
+                                   documentModel.localCount + " Local, " +
+                                   documentModel.unavailableCount + " Unavailable  |  Selected: " +
                                    inspector.selectedIds.length
                             role: KaakaoLabel.Role.Small
                             color: Theme.sidebarSectionText

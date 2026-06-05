@@ -341,6 +341,11 @@ TestCase {
         win.height = 768;
         wait(200);
 
+        let viewSegment = findChildByName(win, "viewSegment");
+        verify(viewSegment !== null, "viewSegment should be found");
+        viewSegment.currentIndex = 0; // Grid
+        wait(200);
+
         // Find GridCanvas
         let gridCanvas = findChildByType(win, "GridCanvas");
         verify(gridCanvas !== null, "GridCanvas should be found");
@@ -449,11 +454,11 @@ TestCase {
         compare(documentModel.pdfCount, 1, "pdfCount should be 1");
         compare(documentModel.imageCount, 1, "imageCount should be 1");
         compare(documentModel.textCount, 1, "textCount should be 1");
-        compare(documentModel.onlineCount, 2, "onlineCount should be 2");
-        compare(documentModel.offlineCount, 1, "offlineCount should be 1");
-
+        compare(documentModel.localCount, 2, "localCount should be 2");
+        compare(documentModel.unavailableCount, 1, "unavailableCount should be 1");
+ 
         // Verify status bar text reflects these counts
-        let expectedText = "Indexed: 3 items (1 PDFs, 1 Images, 1 Text/Other)  |  2 Online, 1 Offline  |  Selected: 0";
+        let expectedText = "Indexed: 3 items (1 PDFs, 1 Images, 1 Text/Other)  |  2 Local, 1 Unavailable  |  Selected: 0";
         compare(statusLabel.text, expectedText, "Status bar text should match expected breakdown");
 
         // 2. Verify Escape shortcut clears selection and search text

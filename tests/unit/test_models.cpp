@@ -116,15 +116,15 @@ void TestModels::testModelFiltering()
     // Test ProxyFilter
     ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
     // Initial count with showOffline = true
     QCOMPARE(proxyFilter.rowCount(), 3);
 
     // Test offline hiding
-    proxyFilter.setShowOffline(false);
+    proxyFilter.setShowUnavailable(false);
     QCOMPARE(proxyFilter.rowCount(), 2); // File A & B are online
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
     // Test tag intersection (AND filtering)
     // Filter tag "work" (matches File A, File B)
@@ -173,13 +173,13 @@ void TestModels::testProxyFilterGet()
     DocumentModel sourceModel(m_dbMgr);
     ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
     // Call header getters to ensure code coverage
     QCOMPARE(proxyFilter.filterString(), QString(""));
     QCOMPARE(proxyFilter.selectedTags(), QStringList());
     QCOMPARE(proxyFilter.minRating(), 0);
-    QCOMPARE(proxyFilter.showOffline(), true);
+    QCOMPARE(proxyFilter.showUnavailable(), true);
     QCOMPARE(proxyFilter.duplicatesOnly(), false);
     QCOMPARE(proxyFilter.categoryFilter(), QString("All"));
     QCOMPARE(proxyFilter.folderFilter(), QString(""));
@@ -239,7 +239,7 @@ void TestModels::testProxyFilterGetBounds()
     DocumentModel sourceModel(m_dbMgr);
     ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
     QCOMPARE(proxyFilter.rowCount(), 3);
 
@@ -261,7 +261,7 @@ void TestModels::testMultiTermSearch()
     DocumentModel sourceModel(m_dbMgr);
     ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
     // Initial count
     QCOMPARE(proxyFilter.rowCount(), 3);
@@ -311,17 +311,17 @@ void TestModels::testScopeFiltering()
     DocumentModel sourceModel(m_dbMgr);
     ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
-    // Initial check: activeScopes should contain All, Today, This Week, This Month, current year, Online, Offline, PDF, PNG
+    // Initial check: activeScopes should contain All, Today, This Week, This Month, current year, Local, Unavailable, PDF, PNG
     QStringList active = proxyFilter.activeScopes();
     QVERIFY(active.contains("All"));
     QVERIFY(active.contains("Today"));
     QVERIFY(active.contains("This Week"));
     QVERIFY(active.contains("This Month"));
     QVERIFY(active.contains(QString::number(QDate::currentDate().year())));
-    QVERIFY(active.contains("Online"));
-    QVERIFY(active.contains("Offline"));
+    QVERIFY(active.contains("Local"));
+    QVERIFY(active.contains("Unavailable"));
     QVERIFY(active.contains("PDF"));
     QVERIFY(active.contains("PNG"));
 
@@ -339,14 +339,14 @@ void TestModels::testScopeFiltering()
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileB.png");
 
     // Test Online filtering
-    proxyFilter.setScopeFilter("Online");
+    proxyFilter.setScopeFilter("Local");
     QCOMPARE(proxyFilter.rowCount(), 2); // fileA.pdf and fileB.png
     for (int i = 0; i < proxyFilter.rowCount(); ++i) {
         QVERIFY(!proxyFilter.get(i, "isOffline").toBool());
     }
 
     // Test Offline filtering
-    proxyFilter.setScopeFilter("Offline");
+    proxyFilter.setScopeFilter("Unavailable");
     QCOMPARE(proxyFilter.rowCount(), 1); // fileC.pdf
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileC.pdf");
     QVERIFY(proxyFilter.get(0, "isOffline").toBool());
@@ -356,23 +356,23 @@ void TestModels::testScopeFiltering()
     QCOMPARE(proxyFilter.rowCount(), 3);
 
     // Now test that scopes are updated when other filters change.
-    // Set min rating to 4. Only fileA.pdf (PDF, Online, Rating 5) matches.
+    // Set min rating to 4. Only fileA.pdf (PDF, Local, Rating 5) matches.
     // fileB.png (rating 3) and fileC.pdf (rating 2) are filtered out by rating.
     proxyFilter.setMinRating(4);
     
-    // Active scopes should now NOT contain Offline or PNG
+    // Active scopes should now NOT contain Unavailable or PNG
     QStringList active2 = proxyFilter.activeScopes();
     QVERIFY(active2.contains("All"));
     QVERIFY(active2.contains("PDF"));
     QVERIFY(!active2.contains("PNG"));
-    QVERIFY(active2.contains("Online"));
-    QVERIFY(!active2.contains("Offline"));
+    QVERIFY(active2.contains("Local"));
+    QVERIFY(!active2.contains("Unavailable"));
 
     // Reset rating filter
     proxyFilter.setMinRating(0);
     QStringList active3 = proxyFilter.activeScopes();
     QVERIFY(active3.contains("PNG"));
-    QVERIFY(active3.contains("Offline"));
+    QVERIFY(active3.contains("Unavailable"));
 }
 
 void TestModels::testSorting()
@@ -380,7 +380,7 @@ void TestModels::testSorting()
     DocumentModel sourceModel(m_dbMgr);
     ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
-    proxyFilter.setShowOffline(true);
+    proxyFilter.setShowUnavailable(true);
 
     // 1. Sort by FileNameRole (259) Ascending
     proxyFilter.setSortRole(259);

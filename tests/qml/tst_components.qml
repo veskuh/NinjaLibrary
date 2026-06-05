@@ -100,7 +100,7 @@ TestCase {
 
         // Set card offline
         card.isOffline = true
-        compare(statusLabel.text, "OFFLINE", "Status label text should be OFFLINE when offline")
+        compare(statusLabel.text, "UNAVAILABLE", "Status label text should be UNAVAILABLE when offline")
         compare(statusLabel.visible, true, "Status label should be visible when offline")
 
         // Set card online but with a thumbnail path (simulating loading a PDF thumbnail)

@@ -67,7 +67,7 @@ KaakaoSidebar {
         sidebarModel.append({ "name": "Recent", "icon": "🕒", "category": "Library", "type": "section", "target": "Recent" })
         sidebarModel.append({ "name": "Favorites", "icon": "⭐", "category": "Library", "type": "section", "target": "Favorites" })
         sidebarModel.append({ "name": "Duplicates", "icon": "👥", "category": "Library", "type": "section", "target": "Duplicates" })
-        sidebarModel.append({ "name": "Offline", "icon": "⚠️", "category": "Library", "type": "section", "target": "Offline" })
+        sidebarModel.append({ "name": "Unavailable", "icon": "⚠️", "category": "Library", "type": "section", "target": "Unavailable" })
         
         // Add Watched Folders
         var folders = libraryController.watchedFolders

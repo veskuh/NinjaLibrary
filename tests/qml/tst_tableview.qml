@@ -191,28 +191,28 @@ TestCase {
         let contentItem = listView.contentItem
         verify(contentItem !== null, "contentItem should exist")
 
-        let offlineRowChecked = false
-        let onlineRowChecked = false
+        let unavailableRowChecked = false
+        let localRowChecked = false
 
         for (let i = 0; i < contentItem.children.length; ++i) {
             let delegate = contentItem.children[i];
             if (delegate.toString().indexOf("TableRowDelegate") >= 0) {
                 let label = findLabelByText(delegate, "fileB.png") // This is offline: true
                 if (label) {
-                    compare(label.color, Qt.color("#8e8e93"), "Offline row text should be styled as #8e8e93")
-                    offlineRowChecked = true
+                    compare(label.color, Qt.color("#8e8e93"), "Unavailable row text should be styled as #8e8e93")
+                    unavailableRowChecked = true
                 }
                 
                 label = findLabelByText(delegate, "fileA.pdf") // This is offline: false
                 if (label) {
-                    verify(label.color !== Qt.color("#8e8e93"), "Online row text should not be styled as #8e8e93")
-                    onlineRowChecked = true
+                    verify(label.color !== Qt.color("#8e8e93"), "Local row text should not be styled as #8e8e93")
+                    localRowChecked = true
                 }
             }
         }
 
-        verify(offlineRowChecked, "Should have verified the offline row color")
-        verify(onlineRowChecked, "Should have verified the online row color")
+        verify(unavailableRowChecked, "Should have verified the unavailable row color")
+        verify(localRowChecked, "Should have verified the local row color")
 
         tableView.destroy()
     }

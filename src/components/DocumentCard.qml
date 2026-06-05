@@ -102,7 +102,7 @@ Rectangle {
                 }
                 
                 KaakaoLabel {
-                    text: card.isOffline ? "OFFLINE" : (card.thumbnailPath !== "" ? "LOADING..." : "")
+                    text: card.isOffline ? "UNAVAILABLE" : (card.thumbnailPath !== "" ? "LOADING..." : "")
                     visible: text !== ""
                     font.pixelSize: 9
                     font.weight: Font.DemiBold

@@ -219,14 +219,14 @@ void DocumentModel::forceRefresh()
     int tempPdf = 0;
     int tempImage = 0;
     int tempText = 0;
-    int tempOnline = 0;
-    int tempOffline = 0;
+    int tempLocal = 0;
+    int tempUnavailable = 0;
 
     for (const auto &doc : m_documents) {
         if (doc.isOffline) {
-            tempOffline++;
+            tempUnavailable++;
         } else {
-            tempOnline++;
+            tempLocal++;
         }
 
         QString ext = doc.fileName.split('.').last().toLower();
@@ -240,14 +240,14 @@ void DocumentModel::forceRefresh()
     }
 
     bool changed = (m_pdfCount != tempPdf || m_imageCount != tempImage ||
-                    m_textCount != tempText || m_onlineCount != tempOnline ||
-                    m_offlineCount != tempOffline);
+                    m_textCount != tempText || m_localCount != tempLocal ||
+                    m_unavailableCount != tempUnavailable);
 
     m_pdfCount = tempPdf;
     m_imageCount = tempImage;
     m_textCount = tempText;
-    m_onlineCount = tempOnline;
-    m_offlineCount = tempOffline;
+    m_localCount = tempLocal;
+    m_unavailableCount = tempUnavailable;
 
     endResetModel();
 

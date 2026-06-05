@@ -42,7 +42,7 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     : QSortFilterProxyModel(parent)
     , m_dbMgr(dbMgr)
     , m_minRating(0)
-    , m_showOffline(true)
+    , m_showUnavailable(true)
     , m_duplicatesOnly(false)
     , m_categoryFilter("All")
     , m_scopeFilter("All")
@@ -106,12 +106,12 @@ void ProxyFilter::setMinRating(int rating)
     emit minRatingChanged();
 }
 
-void ProxyFilter::setShowOffline(bool show)
+void ProxyFilter::setShowUnavailable(bool show)
 {
-    if (m_showOffline == show) return;
-    m_showOffline = show;
+    if (m_showUnavailable == show) return;
+    m_showUnavailable = show;
     invalidateAndRecalculate();
-    emit showOfflineChanged();
+    emit showUnavailableChanged();
 }
 
 void ProxyFilter::setDuplicatesOnly(bool only)
@@ -247,7 +247,7 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex
     
     // 1. Offline filter
     bool isOffline = sourceModel()->data(idx, DocumentModel::IsOfflineRole).toBool();
-    if (isOffline && !m_showOffline && m_categoryFilter != "Offline") {
+    if (isOffline && !m_showUnavailable && m_categoryFilter != "Unavailable") {
         return false;
     }
 
@@ -298,7 +298,7 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex
         if (starRating < 4) {
             return false;
         }
-    } else if (m_categoryFilter == "Offline") {
+    } else if (m_categoryFilter == "Unavailable") {
         if (!isOffline) {
             return false;
         }
@@ -339,9 +339,9 @@ bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_par
     } else if (m_scopeFilter == "This Month") {
         QDate today = QDate::currentDate();
         return dateModified.date().year() == today.year() && dateModified.date().month() == today.month();
-    } else if (m_scopeFilter == "Online") {
+    } else if (m_scopeFilter == "Local") {
         return !isOffline;
-    } else if (m_scopeFilter == "Offline") {
+    } else if (m_scopeFilter == "Unavailable") {
         return isOffline;
     } else {
         bool isYear = false;
@@ -370,8 +370,8 @@ void ProxyFilter::recalculateScopes()
     bool hasToday = false;
     bool hasThisWeek = false;
     bool hasThisMonth = false;
-    bool hasOnline = false;
-    bool hasOffline = false;
+    bool hasLocal = false;
+    bool hasUnavailable = false;
     QSet<int> yearsSet;
     QSet<QString> docTypesSet;
 
@@ -400,9 +400,9 @@ void ProxyFilter::recalculateScopes()
                 yearsSet.insert(docDate.year());
             }
             if (isOffline) {
-                hasOffline = true;
+                hasUnavailable = true;
             } else {
-                hasOnline = true;
+                hasLocal = true;
             }
             QString ext = QFileInfo(fileName).suffix().toUpper();
             if (!ext.isEmpty()) {
@@ -429,11 +429,11 @@ void ProxyFilter::recalculateScopes()
         newScopes.append(QString::number(y));
     }
 
-    if (hasOnline) {
-        newScopes.append("Online");
+    if (hasLocal) {
+        newScopes.append("Local");
     }
-    if (hasOffline) {
-        newScopes.append("Offline");
+    if (hasUnavailable) {
+        newScopes.append("Unavailable");
     }
 
     QList<QString> sortedDocTypes = docTypesSet.values();

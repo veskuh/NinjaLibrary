@@ -368,7 +368,7 @@ Rectangle {
                     }
 
                     KaakaoLabel {
-                        text: inspector.docData && inspector.docData.isOffline ? "OFFLINE" : "NO PREVIEW"
+                        text: inspector.docData && inspector.docData.isOffline ? "UNAVAILABLE" : "NO PREVIEW"
                         role: KaakaoLabel.Role.Small
                         font.weight: Font.Bold
                         color: inspector.docData && inspector.docData.isOffline ? Theme.colorError : Theme.sidebarSectionText
@@ -399,7 +399,7 @@ Rectangle {
                 }
 
                 KaakaoLabel {
-                    text: "Offline"
+                    text: "Unavailable"
                     visible: !!(inspector.docData && inspector.docData.isOffline)
                     role: KaakaoLabel.Role.Small
                     color: Theme.colorError

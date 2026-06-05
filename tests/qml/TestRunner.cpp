@@ -96,8 +96,8 @@ class MockDocumentModel : public QAbstractListModel
     Q_PROPERTY(int pdfCount READ pdfCount NOTIFY countsChanged)
     Q_PROPERTY(int imageCount READ imageCount NOTIFY countsChanged)
     Q_PROPERTY(int textCount READ textCount NOTIFY countsChanged)
-    Q_PROPERTY(int onlineCount READ onlineCount NOTIFY countsChanged)
-    Q_PROPERTY(int offlineCount READ offlineCount NOTIFY countsChanged)
+    Q_PROPERTY(int localCount READ localCount NOTIFY countsChanged)
+    Q_PROPERTY(int unavailableCount READ unavailableCount NOTIFY countsChanged)
     QList<QVariantMap> m_rows;
 public:
     explicit MockDocumentModel(QObject *parent = nullptr) : QAbstractListModel(parent) {}
@@ -144,7 +144,7 @@ public:
         return count;
     }
 
-    int onlineCount() const {
+    int localCount() const {
         int count = 0;
         for (const auto &row : m_rows) {
             bool isOffline = row.value("isOffline").toBool() || row.value("268").toBool();
@@ -155,7 +155,7 @@ public:
         return count;
     }
 
-    int offlineCount() const {
+    int unavailableCount() const {
         int count = 0;
         for (const auto &row : m_rows) {
             bool isOffline = row.value("isOffline").toBool() || row.value("268").toBool();
