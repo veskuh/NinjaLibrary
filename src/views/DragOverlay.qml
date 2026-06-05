@@ -42,10 +42,17 @@ Rectangle {
     color: Theme.isDarkMode ? Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.15) : Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.04)
     border.color: Theme.primaryAccent
     border.width: 3
-    visible: containsDrag
     z: 9999
 
+    // Smooth opacity fade-in / fade-out
+    opacity: containsDrag ? 1.0 : 0.0
+    visible: opacity > 0.0
+    Behavior on opacity {
+        NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+    }
+
     Rectangle {
+        id: dropCard
         anchors.centerIn: parent
         width: 300
         height: 180
@@ -53,6 +60,18 @@ Rectangle {
         radius: 12
         border.color: Theme.buttonBorder
         border.width: 1
+
+        // Smooth scale and subtle bounce transition for the drop card
+        transform: Scale {
+            id: cardScale
+            origin.x: dropCard.width / 2
+            origin.y: dropCard.height / 2
+            xScale: overlay.containsDrag ? 1.0 : 0.9
+            yScale: overlay.containsDrag ? 1.0 : 0.9
+            
+            Behavior on xScale { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
+            Behavior on yScale { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
+        }
 
         ColumnLayout {
             anchors.centerIn: parent

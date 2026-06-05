@@ -299,10 +299,30 @@ KaakaoWindow {
         // Left Navigation Sidebar Column
         Item {
             id: sidebarContainer
-            visible: !sidebar.collapsed
-            SplitView.minimumWidth: sidebar.collapsed ? 0 : 150
-            SplitView.preferredWidth: 200
-            SplitView.maximumWidth: 300
+            visible: !sidebar.collapsed || width > 0
+            
+            states: [
+                State {
+                    name: "collapsed"
+                    when: sidebar.collapsed
+                    PropertyChanges { target: sidebarContainer; SplitView.minimumWidth: 0; SplitView.preferredWidth: 0; SplitView.maximumWidth: 0 }
+                },
+                State {
+                    name: "expanded"
+                    when: !sidebar.collapsed
+                    PropertyChanges { target: sidebarContainer; SplitView.minimumWidth: 150; SplitView.preferredWidth: 200; SplitView.maximumWidth: 300 }
+                }
+            ]
+            transitions: [
+                Transition {
+                    from: "expanded"; to: "collapsed"
+                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                },
+                Transition {
+                    from: "collapsed"; to: "expanded"
+                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                }
+            ]
 
             ColumnLayout {
                 anchors.fill: parent
@@ -460,9 +480,8 @@ KaakaoWindow {
                     }
                 }
 
-                StackLayout {
+                Item {
                     id: canvasStack
-                    currentIndex: viewSegment.currentIndex
                     Layout.fillWidth: true
                     Layout.fillHeight: true
 
@@ -473,6 +492,7 @@ KaakaoWindow {
 
                     GridCanvas {
                         id: gridCanvas
+                        anchors.fill: parent
                         scaleFactor: zoomSlider.value
                         onSelectionChanged: (ids) => inspector.selectedIds = ids
                         onDoubleClicked: (path) => {
@@ -482,10 +502,17 @@ KaakaoWindow {
                                 libraryController.markDocumentOpened(docId)
                             }
                         }
+
+                        opacity: viewSegment.currentIndex === 0 ? 1.0 : 0.0
+                        visible: opacity > 0.0
+                        Behavior on opacity {
+                            NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                        }
                     }
 
                     TableCanvas {
                         id: tableCanvas
+                        anchors.fill: parent
                         onSelectionChanged: (ids) => inspector.selectedIds = ids
                         onDoubleClicked: (path) => {
                             Qt.openUrlExternally("file://" + path)
@@ -493,6 +520,12 @@ KaakaoWindow {
                             if (docId !== -1) {
                                 libraryController.markDocumentOpened(docId)
                             }
+                        }
+
+                        opacity: viewSegment.currentIndex === 1 ? 1.0 : 0.0
+                        visible: opacity > 0.0
+                        Behavior on opacity {
+                            NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
                         }
                     }
                 }
@@ -597,11 +630,31 @@ KaakaoWindow {
         // Right Collage Inspector
         Inspector {
             id: inspector
-            visible: !collapsed
+            visible: !collapsed || width > 0
             selectedIds: []
-            SplitView.minimumWidth: collapsed ? 0 : 220
-            SplitView.preferredWidth: 260
-            SplitView.maximumWidth: 350
+            
+            states: [
+                State {
+                    name: "collapsed"
+                    when: inspector.collapsed
+                    PropertyChanges { target: inspector; SplitView.minimumWidth: 0; SplitView.preferredWidth: 0; SplitView.maximumWidth: 0 }
+                },
+                State {
+                    name: "expanded"
+                    when: !inspector.collapsed
+                    PropertyChanges { target: inspector; SplitView.minimumWidth: 220; SplitView.preferredWidth: 260; SplitView.maximumWidth: 350 }
+                }
+            ]
+            transitions: [
+                Transition {
+                    from: "expanded"; to: "collapsed"
+                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                },
+                Transition {
+                    from: "collapsed"; to: "expanded"
+                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                }
+            ]
         }
     }
 
