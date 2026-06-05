@@ -598,6 +598,36 @@ TestCase {
         compare(copySpy.signalArguments[0][0], "/some/test/file.pdf", "Copied path should match target path");
         
         copySpy.destroy();
+
+        // 3. Context Menu "Rate" action verification
+        let rateSubMenu = null;
+        for (var j = 0; j < contextMenu.count; j++) {
+            var mItem = contextMenu.itemAt(j);
+            if (mItem && mItem.text === "Rate") {
+                rateSubMenu = mItem;
+                break;
+            }
+        }
+        verify(rateSubMenu !== null, "Rate submenu item should be found");
+
+        let subMenu = rateSubMenu.subMenu;
+        verify(subMenu !== null, "Rate submenu should exist");
+
+        // Set up spy for libraryChanged
+        let librarySpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        librarySpy.target = libraryController;
+        librarySpy.signalName = "libraryChanged";
+
+        // Find the rating item for 4 stars (index 3)
+        let rateItem = subMenu.itemAt(3);
+        verify(rateItem !== null, "4-star rating menu item should exist");
+        compare(rateItem.text, "★★★★☆", "4-star text should match");
+        rateItem.triggered();
+        wait(50);
+
+        compare(librarySpy.count, 1, "Triggering rate item should emit libraryChanged");
+        librarySpy.destroy();
+
         win.destroy();
     }
 

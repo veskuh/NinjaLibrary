@@ -60,7 +60,9 @@ public:
     Q_INVOKABLE void removeWatchedFolder(const QString &) {}
     Q_INVOKABLE QStringList getUniqueTags() const { return QStringList(); }
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &) { return QVariantMap(); }
-    Q_INVOKABLE void batchUpdateRating(const QVariantList &, int) {}
+    Q_INVOKABLE void batchUpdateRating(const QVariantList &, int) {
+        emit libraryChanged();
+    }
     Q_INVOKABLE void batchRemoveTags(const QVariantList &, const QStringList &) {}
     Q_INVOKABLE void batchAddTags(const QVariantList &, const QStringList &) {}
     Q_INVOKABLE void markDocumentOpened(int docId) {
@@ -70,6 +72,7 @@ public:
         emit pathCopied(text);
     }
 signals:
+    void libraryChanged();
     void watchedFoldersChanged();
     void notesUpdated(int docId, const QString &notes);
     void documentOpened(int docId);

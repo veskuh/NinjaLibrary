@@ -75,31 +75,35 @@ KaakaoMenu {
         id: rateMenu
         title: "Rate"
         
-        onAboutToShow: {
-            for (var i = 0; i < 5; i++) {
-                var item = rateRepeater.itemAt(i)
-                if (item) {
-                    item.checked = (i + 1) === menu.targetRating
-                }
-            }
+        KaakaoMenuItem {
+            text: "★☆☆☆☆"
+            checkable: true
+            checked: menu.targetRating === 1
+            onTriggered: libraryController.batchUpdateRating([menu.targetDocId], 1)
         }
-        
-        Repeater {
-            id: rateRepeater
-            model: 5
-            KaakaoMenuItem {
-                text: {
-                    var stars = ""
-                    for (var i = 0; i <= index; i++) stars += "★"
-                    for (var j = index + 1; j < 5; j++) stars += "☆"
-                    return stars
-                }
-                checkable: true
-                checked: (index + 1) === menu.targetRating
-                onTriggered: {
-                    libraryController.batchUpdateRating([menu.targetDocId], index + 1)
-                }
-            }
+        KaakaoMenuItem {
+            text: "★★☆☆☆"
+            checkable: true
+            checked: menu.targetRating === 2
+            onTriggered: libraryController.batchUpdateRating([menu.targetDocId], 2)
+        }
+        KaakaoMenuItem {
+            text: "★★★☆☆"
+            checkable: true
+            checked: menu.targetRating === 3
+            onTriggered: libraryController.batchUpdateRating([menu.targetDocId], 3)
+        }
+        KaakaoMenuItem {
+            text: "★★★★☆"
+            checkable: true
+            checked: menu.targetRating === 4
+            onTriggered: libraryController.batchUpdateRating([menu.targetDocId], 4)
+        }
+        KaakaoMenuItem {
+            text: "★★★★★"
+            checkable: true
+            checked: menu.targetRating === 5
+            onTriggered: libraryController.batchUpdateRating([menu.targetDocId], 5)
         }
     }
 }
