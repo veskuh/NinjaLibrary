@@ -33,6 +33,7 @@
 #include "../utils/OcrUtils.h"
 
 #include <QImage>
+#include <QImageReader>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
@@ -80,7 +81,9 @@ void OcrTask::run()
         // Render page 1 at high DPI for OCR accuracy (1024 width)
         img = PdfUtils::renderPdfThumbnail(m_filePath, 1024);
     } else {
-        img.load(m_filePath);
+        QImageReader reader(m_filePath);
+        reader.setAutoTransform(true);
+        reader.read(&img);
     }
 
     if (img.isNull()) {

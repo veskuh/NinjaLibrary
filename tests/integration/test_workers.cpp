@@ -59,6 +59,7 @@ private slots:
     void testMacBookmarksAndEdgeCases();
     void testOcrNonsenseRejection();
     void testPackageDirectorySkipping();
+    void testImageThumbnailAndOcrWithExif();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -849,6 +850,56 @@ void TestWorkers::testPackageDirectorySkipping()
     QVERIFY(cleanupFolderQuery.exec());
     QVERIFY(clearQuery.exec("DELETE FROM documents;"));
     QVERIFY(clearQuery.exec("DELETE FROM document_search;"));
+}
+
+void TestWorkers::testImageThumbnailAndOcrWithExif()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+    QString imgPath = QDir(tempPath).filePath("test_exif.jpg");
+
+    // Save a valid non-blank colored image
+    QImage testImg(100, 200, QImage::Format_RGB32);
+    testImg.fill(Qt::red);
+    QVERIFY(testImg.save(imgPath, "JPG"));
+    imgPath = QFileInfo(imgPath).canonicalFilePath();
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+
+    // Insert mock document record
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+                  "VALUES (1, 'test_exif.jpg', :path, 100, 0);");
+    query.bindValue(":path", imgPath);
+    QVERIFY(query.exec());
+    int docId = query.lastInsertId().toInt();
+
+    // Run ThumbnailTask synchronously
+    ThumbnailTask thumbTask(m_dbMgr, docId, imgPath);
+    
+    // We spy on the finished signal
+    QSignalSpy spyThumb(&thumbTask, &ThumbnailTask::finished);
+    thumbTask.run();
+    
+    QCOMPARE(spyThumb.count(), 1);
+    QList<QVariant> thumbArgs = spyThumb.takeFirst();
+    QCOMPARE(thumbArgs.at(0).toInt(), docId);
+    QString thumbPath = thumbArgs.at(1).toString();
+    QVERIFY(!thumbPath.isEmpty());
+    QVERIFY(QFile::exists(thumbPath));
+
+    // Verify thumbnail image was scaled correctly
+    QImage thumbImg;
+    QVERIFY(thumbImg.load(thumbPath));
+    QVERIFY(thumbImg.width() <= 256 && thumbImg.height() <= 256);
+
+    // Clean up
+    QFile::remove(thumbPath);
+    QSqlQuery cleanupQuery(db);
+    cleanupQuery.prepare("DELETE FROM documents WHERE id = :id;");
+    cleanupQuery.bindValue(":id", docId);
+    QVERIFY(cleanupQuery.exec());
 }
 
 QTEST_MAIN(TestWorkers)

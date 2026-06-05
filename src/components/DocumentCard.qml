@@ -79,6 +79,7 @@ Rectangle {
                 source: card.thumbnailPath || ""
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
+                autoTransform: true
                 visible: source.toString() !== "" && status === Image.Ready
             }
 

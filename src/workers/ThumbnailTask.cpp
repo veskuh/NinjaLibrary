@@ -35,6 +35,7 @@
 #include <QDir>
 #include <QFile>
 #include <QImage>
+#include <QImageReader>
 #include <QCryptographicHash>
 #include <QFileInfo>
 #include <QDebug>
@@ -101,8 +102,10 @@ void ThumbnailTask::run()
     if (ext == "pdf") {
         img = PdfUtils::renderPdfThumbnail(m_filePath, 256);
     } else {
+        QImageReader reader(m_filePath);
+        reader.setAutoTransform(true);
         QImage srcImg;
-        if (srcImg.load(m_filePath)) {
+        if (reader.read(&srcImg)) {
             // Workaround: Clear color space metadata to prevent non-thread-safe color space conversions
             srcImg.setColorSpace(QColorSpace());
             img = srcImg.scaled(256, 256, Qt::KeepAspectRatio, Qt::SmoothTransformation);

@@ -363,6 +363,7 @@ Rectangle {
                         anchors.margins: 4
                         source: (inspector.docData && inspector.docData.thumbnailPath) || ""
                         fillMode: Image.PreserveAspectFit
+                        autoTransform: true
                         visible: source.toString() !== "" && status === Image.Ready
                     }
 
