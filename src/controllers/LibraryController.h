@@ -84,6 +84,7 @@ public slots:
 
 signals:
     void watchedFoldersChanged();
+    void folderAdded(const QString &folderPath);
     void isScanningChanged();
     void scanProgressChanged();
     void scanStatusTextChanged();

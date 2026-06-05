@@ -95,6 +95,17 @@ KaakaoWindow {
         function onRowsInserted(parent, first, last) { window.checkPendingSelection() }
     }
 
+    Connections {
+        target: libraryController
+        ignoreUnknownSignals: true
+        function onFolderAdded(folderPath) {
+            if (searchField.text !== "") {
+                searchField.text = ""
+            }
+            proxyFilter.scopeFilter = "All"
+        }
+    }
+
     onXChanged: {
         if (window.visibility === Window.Windowed) {
             winSettings.x = window.x
@@ -306,18 +317,24 @@ KaakaoWindow {
                         proxyFilter.folderFilter = ""
                         proxyFilter.selectedTags = []
                         proxyFilter.categoryFilter = section
+                        proxyFilter.scopeFilter = "All"
+                        searchField.text = ""
                         canvasStack.clearSelections()
                     }
                     onFolderSelected: (path) => {
                         proxyFilter.categoryFilter = "All"
                         proxyFilter.selectedTags = []
                         proxyFilter.folderFilter = path
+                        proxyFilter.scopeFilter = "All"
+                        searchField.text = ""
                         canvasStack.clearSelections()
                     }
                     onTagSelected: (tag) => {
                         proxyFilter.categoryFilter = "All"
                         proxyFilter.folderFilter = ""
                         proxyFilter.selectedTags = [tag]
+                        proxyFilter.scopeFilter = "All"
+                        searchField.text = ""
                         canvasStack.clearSelections()
                     }
                 }
@@ -427,6 +444,19 @@ KaakaoWindow {
                     }
                     onFilterSelected: (index, name) => {
                         proxyFilter.scopeFilter = name
+                    }
+
+                    Connections {
+                        target: proxyFilter
+                        ignoreUnknownSignals: true
+                        function onScopeFilterChanged() {
+                            var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
+                            scopeBar.currentIndex = idx >= 0 ? idx : 0
+                        }
+                        function onActiveScopesChanged() {
+                            var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
+                            scopeBar.currentIndex = idx >= 0 ? idx : 0
+                        }
                     }
                 }
 

@@ -151,6 +151,7 @@ bool LibraryController::addWatchedFolder(const QString &folderPath)
 
     // Trigger initial scan
     emit scanRequested(absPath);
+    emit folderAdded(absPath);
     return true;
 }
 

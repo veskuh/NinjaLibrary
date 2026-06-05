@@ -47,6 +47,7 @@ private slots:
     void testScopeFiltering();
     void testSorting();
     void testRecentCategory();
+    void testTagSelectionAndClearing();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -445,6 +446,25 @@ void TestModels::testRecentCategory()
 
     // Clean up category filter
     proxyFilter.setCategoryFilter("All");
+}
+
+void TestModels::testTagSelectionAndClearing()
+{
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+    proxyFilter.setShowUnavailable(true);
+
+    // Initial count
+    QCOMPARE(proxyFilter.rowCount(), 3);
+
+    // Filter by tag "work"
+    proxyFilter.setSelectedTags(QStringList{"work"});
+    QCOMPARE(proxyFilter.rowCount(), 2);
+
+    // Clear tag selection
+    proxyFilter.setSelectedTags(QStringList{});
+    QCOMPARE(proxyFilter.rowCount(), 3);
 }
 
 QTEST_MAIN(TestModels)

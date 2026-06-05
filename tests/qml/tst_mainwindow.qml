@@ -672,4 +672,142 @@ TestCase {
 
         win.destroy();
     }
+
+    function test_folder_addition_clears_search_and_resets_scope() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let searchField = findChildByName(win, "searchField");
+        verify(searchField !== null, "searchField should exist");
+
+        // 1. Set search text and a custom scope filter
+        searchField.text = "test query";
+        proxyFilter.scopeFilter = "PDF";
+        compare(searchField.text, "test query", "Search text should be set");
+        compare(proxyFilter.scopeFilter, "PDF", "Scope filter should be set");
+
+        // 2. Add watched folder, which emits folderAdded signal
+        libraryController.addWatchedFolder("/path/to/added/folder");
+        wait(50);
+
+        // 3. Verify search is cleared and scope is reset to "All"
+        compare(searchField.text, "", "Search should be cleared after folder is added");
+        compare(proxyFilter.scopeFilter, "All", "Scope filter should be reset to All");
+
+        win.destroy();
+    }
+
+    function test_sidebar_selection_resets_state() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        proxyFilter.activeScopes = ["All", "PDF", "PNG", "Today"];
+        wait(50);
+
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+
+        let searchField = findChildByName(win, "searchField");
+        verify(searchField !== null, "searchField should exist");
+
+        let scopeBar = findChildByType(win, "KaakaoScopeBar");
+        verify(scopeBar !== null, "scopeBar should exist");
+
+        // 1. Set some state
+        searchField.text = "query text";
+        // Set scopeFilter and simulate user selecting it by setting currentIndex
+        proxyFilter.scopeFilter = "PDF";
+        scopeBar.currentIndex = proxyFilter.activeScopes.indexOf("PDF");
+        compare(searchField.text, "query text", "Search text should be set");
+        compare(proxyFilter.scopeFilter, "PDF", "Scope filter should be set");
+        verify(scopeBar.currentIndex > 0, "scopeBar index should be non-zero");
+
+        // 2. Trigger onSectionSelected signal from sidebar
+        sidebar.sectionSelected("Favorites");
+        wait(50);
+
+        // 3. Verify they are reset
+        compare(searchField.text, "", "Search text should be reset on sidebar section selection");
+        compare(proxyFilter.scopeFilter, "All", "Scope filter should be reset to All on sidebar section selection");
+        compare(scopeBar.currentIndex, 0, "ScopeBar index should be reset to All (0)");
+
+        // Set state again
+        searchField.text = "query text 2";
+        proxyFilter.scopeFilter = "PNG";
+        scopeBar.currentIndex = proxyFilter.activeScopes.indexOf("PNG");
+
+        // 4. Trigger onFolderSelected signal
+        sidebar.folderSelected("/some/folder");
+        wait(50);
+        compare(searchField.text, "", "Search text should be reset on sidebar folder selection");
+        compare(proxyFilter.scopeFilter, "All", "Scope filter should be reset to All on sidebar folder selection");
+        compare(scopeBar.currentIndex, 0, "ScopeBar index should be reset to All (0)");
+
+        // Set state again
+        searchField.text = "query text 3";
+        proxyFilter.scopeFilter = "Today";
+        scopeBar.currentIndex = proxyFilter.activeScopes.indexOf("Today");
+
+        // 5. Trigger onTagSelected signal
+        sidebar.tagSelected("work");
+        wait(50);
+        compare(searchField.text, "", "Search text should be reset on sidebar tag selection");
+        compare(proxyFilter.scopeFilter, "All", "Scope filter should be reset to All on sidebar tag selection");
+        compare(scopeBar.currentIndex, 0, "ScopeBar index should be reset to All (0)");
+        compare(proxyFilter.selectedTags, ["work"], "Selected tags should be ['work']");
+
+        // 6. Select folder and verify selected tags is reset
+        sidebar.folderSelected("/some/folder");
+        wait(50);
+        compare(proxyFilter.selectedTags, [], "Selected tags should be cleared on folder selection");
+
+        // Set state again and select tag
+        sidebar.tagSelected("work");
+        wait(50);
+        compare(proxyFilter.selectedTags, ["work"], "Selected tags should be ['work']");
+
+        // 7. Select section and verify selected tags is reset
+        sidebar.sectionSelected("Favorites");
+        wait(50);
+        compare(proxyFilter.selectedTags, [], "Selected tags should be cleared on section selection");
+
+        win.destroy();
+    }
+
+    function test_sidebar_click_tag_and_folder() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+
+        // The model should be populated with tags "work", "2026"
+        let sidebarModel = sidebar.model;
+        verify(sidebarModel.count > 0, "Sidebar model should be populated");
+
+        // Find the index of "2026"
+        let tagIndex = -1;
+        for (let i = 0; i < sidebarModel.count; i++) {
+            if (sidebarModel.get(i).type === "tag" && sidebarModel.get(i).target === "2026") {
+                tagIndex = i;
+                break;
+            }
+        }
+        verify(tagIndex !== -1, "Tag '2026' should be in the sidebar");
+
+        // 1. Select tag 2026 by setting currentIndex
+        sidebar.currentIndex = tagIndex;
+        wait(50);
+        compare(proxyFilter.selectedTags, ["2026"], "selectedTags should be ['2026'] after selecting tag");
+
+        // 2. Select folder/section by setting currentIndex to 0 (All Documents)
+        sidebar.currentIndex = 0;
+        wait(50);
+        compare(proxyFilter.selectedTags, [], "selectedTags should be cleared when section is selected");
+
+        win.destroy();
+    }
 }

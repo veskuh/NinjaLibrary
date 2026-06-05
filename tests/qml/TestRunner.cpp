@@ -56,9 +56,11 @@ public:
     Q_INVOKABLE void updateNotes(int docId, const QString &notes) {
         emit notesUpdated(docId, notes);
     }
-    Q_INVOKABLE void addWatchedFolder(const QString &) {}
+    Q_INVOKABLE void addWatchedFolder(const QString &path) {
+        emit folderAdded(path);
+    }
     Q_INVOKABLE void removeWatchedFolder(const QString &) {}
-    Q_INVOKABLE QStringList getUniqueTags() const { return QStringList(); }
+    Q_INVOKABLE QStringList getUniqueTags() const { return QStringList{"work", "2026"}; }
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &) { return QVariantMap(); }
     Q_INVOKABLE void batchUpdateRating(const QVariantList &, int) {
         emit libraryChanged();
@@ -74,6 +76,7 @@ public:
 signals:
     void libraryChanged();
     void watchedFoldersChanged();
+    void folderAdded(const QString &folderPath);
     void notesUpdated(int docId, const QString &notes);
     void documentOpened(int docId);
     void pathCopied(const QString &text);
@@ -277,6 +280,7 @@ class MockProxyFilter : public QAbstractListModel
 {
     Q_OBJECT
     Q_PROPERTY(QString filterString READ filterString WRITE setFilterString NOTIFY filterStringChanged)
+    Q_PROPERTY(QStringList selectedTags READ selectedTags WRITE setSelectedTags NOTIFY selectedTagsChanged)
     Q_PROPERTY(QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
     Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
     Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
@@ -397,6 +401,8 @@ public:
 
     QString filterString() const { return m_filterString; }
     void setFilterString(const QString &s) { if (m_filterString != s) { m_filterString = s; emit filterStringChanged(); } }
+    QStringList selectedTags() const { return m_selectedTags; }
+    void setSelectedTags(const QStringList &tags) { if (m_selectedTags != tags) { m_selectedTags = tags; emit selectedTagsChanged(); } }
     QString folderFilter() const { return m_folderFilter; }
     void setFolderFilter(const QString &s) { if (m_folderFilter != s) { m_folderFilter = s; emit folderFilterChanged(); } }
     QString categoryFilter() const { return m_categoryFilter; }
@@ -409,12 +415,14 @@ public:
     Q_INVOKABLE void sort(int, int) {}
 signals:
     void filterStringChanged();
+    void selectedTagsChanged();
     void folderFilterChanged();
     void categoryFilterChanged();
     void scopeFilterChanged();
     void activeScopesChanged();
 private:
     QString m_filterString;
+    QStringList m_selectedTags;
     QString m_folderFilter;
     QString m_categoryFilter;
     QString m_scopeFilter;
