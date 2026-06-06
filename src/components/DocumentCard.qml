@@ -86,6 +86,7 @@ Rectangle {
             DocumentPreview {
                 anchors.fill: parent
                 thumbnailPath: card.thumbnailPath
+                absolutePath: card.absolutePath
                 fileName: card.fileName
                 isOffline: card.isOffline
                 fontPixelSize: 24

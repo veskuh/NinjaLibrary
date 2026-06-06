@@ -371,6 +371,7 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 4
                         thumbnailPath: (inspector.docData && inspector.docData.thumbnailPath) || ""
+                        absolutePath: (inspector.docData && inspector.docData.absolutePath) || ""
                         fileName: (inspector.docData && inspector.docData.fileName) || ""
                         isOffline: !!(inspector.docData && inspector.docData.isOffline)
                         fontPixelSize: 32
@@ -414,18 +415,45 @@ Rectangle {
                     Layout.fillWidth: true
                 }
 
-                ScrollView {
+                Item {
+                    id: previewContainer
                     Layout.fillWidth: true
-                    height: 100
+                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "") ? 110 : 0
                     clip: true
-                    visible: inspector.docData && inspector.docData.textSnippet !== "" && previewDisclosure.expanded
-                    
-                    KaakaoTextArea {
-                        text: inspector.docData ? inspector.docData.textSnippet : ""
-                        readOnly: true
-                        placeholderText: "No text content extracted."
-                        placeholderTextColor: Theme.sidebarSectionText
-                        font.pixelSize: 11
+                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "")
+
+                    Behavior on Layout.preferredHeight {
+                        NumberAnimation {
+                            duration: 250
+                            easing.type: Easing.InOutQuad
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.bottomMargin: 8
+                        color: Theme.isDarkMode ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)"
+                        border.color: Theme.isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"
+                        border.width: 1
+                        radius: 6
+
+                        ScrollView {
+                            id: previewScroll
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            clip: true
+
+                            KaakaoTextArea {
+                                width: previewScroll.width - 8
+                                text: inspector.docData ? inspector.docData.textSnippet : ""
+                                readOnly: true
+                                placeholderText: "No text content extracted."
+                                placeholderTextColor: Theme.sidebarSectionText
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                background: null
+                            }
+                        }
                     }
                 }
 
