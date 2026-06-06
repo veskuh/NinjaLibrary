@@ -426,24 +426,95 @@ void ScannerTask::run()
         }
         processedCount++;
         if (processedCount % 5 == 0 || processedCount == totalFiles) {
-            emit progress(m_folderPath, processedCount, totalFiles);
+                            emit progress(m_folderPath, processedCount, totalFiles);
         }
     }
 
     // 2. Detect deleted files (present in DB but missing on disk)
+    bool folderExists = QDir(m_folderPath).exists();
+
     QSqlQuery fetchDocs(db);
-    fetchDocs.prepare("SELECT id, absolute_path FROM documents WHERE folder_id = :folderId AND is_offline = 0;");
+    fetchDocs.prepare("SELECT id, absolute_path, is_offline FROM documents WHERE folder_id = :folderId;");
     fetchDocs.bindValue(":folderId", folderId);
     if (fetchDocs.exec()) {
         QList<int> docsToMarkOffline;
+        QList<QPair<int, QString>> docsToDelete;
+
         while (fetchDocs.next()) {
             int docId = fetchDocs.value(0).toInt();
             QString docPath = fetchDocs.value(1).toString();
+            bool isOffline = fetchDocs.value(2).toBool();
             if (!filesOnDisk.contains(docPath)) {
-                docsToMarkOffline.append(docId);
+                if (folderExists) {
+                    docsToDelete.append(qMakePair(docId, docPath));
+                } else if (!isOffline) {
+                    docsToMarkOffline.append(docId);
+                }
             }
         }
 
+        // Process physical deletions (parent folder/volume is available)
+        if (!docsToDelete.isEmpty()) {
+            QSqlQuery beginWrite(db);
+            if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                bool ok = true;
+                for (const auto &pair : docsToDelete) {
+                    int docId = pair.first;
+                    QString docPath = pair.second;
+
+                    // A. Delete search index entries
+                    QSqlQuery deleteSearch(db);
+                    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
+                    deleteSearch.bindValue(":docId", docId);
+                    ok &= deleteSearch.exec();
+
+                    // B. Delete document tags
+                    QSqlQuery deleteTags(db);
+                    deleteTags.prepare("DELETE FROM document_tags WHERE document_id = :docId;");
+                    deleteTags.bindValue(":docId", docId);
+                    ok &= deleteTags.exec();
+
+                    // C. Delete document
+                    QSqlQuery deleteDoc(db);
+                    deleteDoc.prepare("DELETE FROM documents WHERE id = :docId;");
+                    deleteDoc.bindValue(":docId", docId);
+                    ok &= deleteDoc.exec();
+
+                    if (ok) {
+                        // D. Clean up sidecar file if exists
+                        QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+                        QString sidecarDir = dataDir + "/sidecars/";
+                        QCryptographicHash hash(QCryptographicHash::Sha256);
+                        hash.addData(docPath.toUtf8());
+                        QString hashStr = hash.result().toHex();
+                        QString sidecarPath = sidecarDir + hashStr + ".ninja";
+                        if (QFile::exists(sidecarPath)) {
+                            QFile::remove(sidecarPath);
+                        }
+
+                        // E. Clean up cached thumbnail
+                        QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbnails/";
+                        QString thumbPath = cacheDir + hashStr + ".png";
+                        if (QFile::exists(thumbPath)) {
+                            QFile::remove(thumbPath);
+                        }
+                    }
+                }
+                if (ok) {
+                    QSqlQuery commitWrite(db);
+                    if (!commitWrite.exec("COMMIT")) {
+                        qWarning() << "ScannerTask: Commit failed on deleting docs, rolling back:" << commitWrite.lastError().text();
+                        QSqlQuery rollbackWrite(db);
+                        rollbackWrite.exec("ROLLBACK");
+                    }
+                } else {
+                    QSqlQuery rollbackWrite(db);
+                    rollbackWrite.exec("ROLLBACK");
+                }
+            }
+        }
+
+        // Process offline markings (parent folder/volume is missing)
         if (!docsToMarkOffline.isEmpty()) {
             QSqlQuery beginWrite(db);
             if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
@@ -457,7 +528,7 @@ void ScannerTask::run()
                 if (ok) {
                     QSqlQuery commitWrite(db);
                     if (!commitWrite.exec("COMMIT")) {
-                        qWarning() << "ScannerTask: Commit failed on deleted, rolling back:" << commitWrite.lastError().text();
+                        qWarning() << "ScannerTask: Commit failed on marking offline, rolling back:" << commitWrite.lastError().text();
                         QSqlQuery rollbackWrite(db);
                         rollbackWrite.exec("ROLLBACK");
                     }

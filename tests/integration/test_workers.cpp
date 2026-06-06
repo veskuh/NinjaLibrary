@@ -60,6 +60,7 @@ private slots:
     void testOcrNonsenseRejection();
     void testPackageDirectorySkipping();
     void testImageThumbnailAndOcrWithExif();
+    void testSubdirectoryDeletionDetection();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -85,7 +86,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     // Create temporary directory
     QTemporaryDir tempDir;
     QVERIFY(tempDir.isValid());
-    QString tempPath = tempDir.path();
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+    QVERIFY(!tempPath.isEmpty());
 
     // Create a supported file (PNG)
     QString filePath = QDir(tempPath).filePath("documentA.png");
@@ -126,8 +128,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
         QCOMPARE(query.value(2).toString(), QString("documentA.png"));
     }
 
-    // Verify thumbnail generated signal is emitted or cached
-    // Delete file to test offline detection
+    // Delete file to test physical deletion from index (volume/folder still exists)
     QVERIFY(QFile::remove(filePath));
 
     // Request scanner again
@@ -135,35 +136,119 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
 
-    // Check if marked offline
+    // Check if document was deleted from database
     {
         QSqlDatabase db = m_dbMgr->getDatabaseConnection();
         QSqlQuery query(db);
-        QVERIFY(query.exec("SELECT absolute_path, is_offline FROM documents;"));
+        QVERIFY(query.exec("SELECT COUNT(*) FROM documents;"));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toString(), filePath);
-        QCOMPARE(query.value(1).toInt(), 1); // should be offline
+        QCOMPARE(query.value(0).toInt(), 0); // Should be removed from database/index
     }
 
-    // Re-create the file to test recovery
+    // Re-create the file to ingest it again
     QFile file2(filePath);
     QVERIFY(file2.open(QIODevice::WriteOnly));
     QCOMPARE(file2.write(reinterpret_cast<const char*>(pngData), sizeof(pngData)), (qint64)sizeof(pngData));
     file2.close();
 
-    // Run scanner again
+    // Run scanner again to ingest
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
+
+    // Check that it's back in DB online
+    int newDocId = -1;
+    {
+        QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+        QSqlQuery query(db);
+        QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
+        QVERIFY(query.next());
+        newDocId = query.value(0).toInt();
+        QCOMPARE(query.value(1).toInt(), 0);
+    }
+
+    // Now simulate volume disconnect by renaming the temp directory
+    QString offlineTempPath = tempPath + "_offline";
+    QVERIFY(QDir().rename(tempPath, offlineTempPath));
+
+    // Run scanner again (on the original path, which is now missing)
+    spyLibrary.clear();
+    emit m_controller->scanRequested(tempPath);
+    spyLibrary.wait(1000);
+    QCoreApplication::processEvents();
+    QThreadPool::globalInstance()->waitForDone();
+
+    // Check if marked offline (not deleted, because folder was missing)
+    {
+        QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+        QSqlQuery query(db);
+        QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), newDocId);
+        QCOMPARE(query.value(1).toInt(), 1); // should be offline
+    }
+
+    // Rename back to simulate volume reconnect
+    QVERIFY(QDir().rename(offlineTempPath, tempPath));
+
+    // Run scanner again
+    spyLibrary.clear();
+    emit m_controller->scanRequested(tempPath);
+    spyLibrary.wait(1000);
+    QCoreApplication::processEvents();
+    QThreadPool::globalInstance()->waitForDone();
 
     // Check if back online
     {
         QSqlDatabase db = m_dbMgr->getDatabaseConnection();
         QSqlQuery query(db);
-        QVERIFY(query.exec("SELECT absolute_path, is_offline FROM documents;"));
+        QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toString(), filePath);
+        QCOMPARE(query.value(0).toInt(), newDocId);
         QCOMPARE(query.value(1).toInt(), 0); // should be online again
+    }
+
+    // Now simulate volume disconnect again
+    QVERIFY(QDir().rename(tempPath, offlineTempPath));
+
+    // Scan to mark it offline
+    spyLibrary.clear();
+    emit m_controller->scanRequested(tempPath);
+    spyLibrary.wait(1000);
+    QCoreApplication::processEvents();
+    QThreadPool::globalInstance()->waitForDone();
+
+    // Confirm it's offline again
+    {
+        QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+        QSqlQuery query(db);
+        QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(1).toInt(), 1); // should be offline
+    }
+
+    // Now remove the file while volume is offline
+    QString offlineFilePath = offlineTempPath + "/documentA.png";
+    QVERIFY(QFile::remove(offlineFilePath));
+
+    // Reconnect the volume (so tempPath exists, but documentA.png is missing)
+    QVERIFY(QDir().rename(offlineTempPath, tempPath));
+
+    // Scan. Since the volume/folder is now online, but the file is missing on disk,
+    // the scanner should treat it as deleted (not offline) and remove it from database.
+    spyLibrary.clear();
+    emit m_controller->scanRequested(tempPath);
+    spyLibrary.wait(1000);
+    QCoreApplication::processEvents();
+    QThreadPool::globalInstance()->waitForDone();
+
+    // Check if document was deleted from database
+    {
+        QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+        QSqlQuery query(db);
+        QVERIFY(query.exec("SELECT COUNT(*) FROM documents;"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 0); // Should be completely removed from database/index
     }
 }
 
@@ -967,6 +1052,94 @@ void TestWorkers::testImageThumbnailAndOcrWithExif()
     cleanupQuery.prepare("DELETE FROM documents WHERE id = :id;");
     cleanupQuery.bindValue(":id", docId);
     QVERIFY(cleanupQuery.exec());
+}
+
+void TestWorkers::testSubdirectoryDeletionDetection()
+{
+    // Ensure thread pool is completely idle from previous tests
+    QThreadPool::globalInstance()->waitForDone();
+
+    // Clear database to ensure a completely clean state
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery clearQuery(db);
+    QVERIFY(clearQuery.exec("DELETE FROM watched_folders;"));
+    QVERIFY(clearQuery.exec("DELETE FROM documents;"));
+    QVERIFY(clearQuery.exec("DELETE FROM document_search;"));
+
+    // Create temporary directory
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+    QVERIFY(!tempPath.isEmpty());
+
+    // Create a subdirectory
+    QString subDirPath = tempPath + "/Subdir";
+    QVERIFY(QDir().mkpath(subDirPath));
+
+    // Create a supported file in the subdirectory
+    QString filePath = QDir(subDirPath).filePath("subdocument.png");
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    
+    // Write tiny PNG data
+    static const unsigned char pngData[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+        0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+    };
+    QCOMPARE(file.write(reinterpret_cast<const char*>(pngData), sizeof(pngData)), (qint64)sizeof(pngData));
+    file.close();
+
+    // Canonicalize paths
+    filePath = QFileInfo(filePath).canonicalFilePath();
+    QVERIFY(!filePath.isEmpty());
+    subDirPath = QFileInfo(subDirPath).canonicalFilePath();
+    QVERIFY(!subDirPath.isEmpty());
+
+    // Add watched folder (top-level)
+    QVERIFY(m_controller->addWatchedFolder(tempPath));
+
+    // Wait for the scanner and all background tasks to finish completely
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
+
+    // Verify it is in database
+    {
+        QSqlQuery query(db);
+        QVERIFY(query.exec("SELECT absolute_path, is_offline FROM documents;"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), filePath);
+        QCOMPARE(query.value(1).toInt(), 0);
+    }
+
+    // Now delete the file inside the subdirectory
+    QVERIFY(QFile::remove(filePath));
+
+    // Manually trigger the event handler to simulate filesystem watcher event
+    QMetaObject::invokeMethod(m_controller, "onDirectoryChanged", Q_ARG(QString, subDirPath));
+
+    // Wait for the second scan to finish completely
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
+
+    // Check if document was deleted from database
+    {
+        QSqlQuery query(db);
+        QVERIFY(query.exec("SELECT COUNT(*) FROM documents;"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 0); // Should be removed from database
+    }
+
+    // Clean up watched folder
+    QVERIFY(m_controller->removeWatchedFolder(tempPath));
+    QThreadPool::globalInstance()->waitForDone();
 }
 
 QTEST_MAIN(TestWorkers)

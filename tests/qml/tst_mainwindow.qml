@@ -45,6 +45,12 @@ TestCase {
                 if (found) return found;
             }
         }
+        if (parent.resources) {
+            for (let i = 0; i < parent.resources.length; ++i) {
+                let found = findChildByName(parent.resources[i], name);
+                if (found) return found;
+            }
+        }
         if (parent.contentItem) {
             let found = findChildByName(parent.contentItem, name);
             if (found) return found;
@@ -865,6 +871,53 @@ TestCase {
         wait(100);
         verify(!trashDialog.visible, "Trash dialog should close on rejection");
 
+        win.destroy();
+    }
+
+    function test_sidebar_folder_context_menu_rescan() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+
+        // Find the folderContextMenu from sidebar's resources
+        let contextMenu = null;
+        if (sidebar.resources) {
+            for (let i = 0; i < sidebar.resources.length; i++) {
+                if (sidebar.resources[i].toString().indexOf("KaakaoMenu") >= 0) {
+                    contextMenu = sidebar.resources[i];
+                    break;
+                }
+            }
+        }
+        verify(contextMenu !== null, "folderContextMenu should be found in Sidebar resources");
+
+        // Verify structure
+        compare(contextMenu.count, 2, "folderContextMenu should have exactly 2 menu items");
+        compare(contextMenu.itemAt(0).text, "Rescan", "First item should be Rescan");
+        compare(contextMenu.itemAt(1).text, "Stop Watching Folder", "Second item should be Stop Watching Folder");
+
+        // Set target path
+        let testPath = "/some/mock/path";
+        contextMenu.targetPath = testPath;
+
+        // Spy scanRequested signal on libraryController
+        let scanSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        scanSpy.target = libraryController;
+        scanSpy.signalName = "scanRequested";
+
+        // Trigger Rescan item action
+        let rescanItem = contextMenu.itemAt(0);
+        rescanItem.triggered();
+        wait(100);
+
+        // Verify scan was requested with correct path
+        compare(scanSpy.count, 1, "scanRequested should be emitted once");
+        compare(scanSpy.signalArguments[0][0], testPath, "Requested scan path should match targetPath");
+
+        scanSpy.destroy();
         win.destroy();
     }
 }

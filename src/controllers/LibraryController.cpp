@@ -35,6 +35,7 @@
 #include "../workers/ThumbnailTask.h"
 #include "../utils/DocUtils.h"
 #include <QDir>
+#include <QDirIterator>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QCryptographicHash>
@@ -740,8 +741,21 @@ bool LibraryController::readSidecar(const QString &documentPath, QStringList &ta
 
 void LibraryController::onDirectoryChanged(const QString &path)
 {
-    // A nested change occurred or directory was modified. Trigger a scanner task update.
-    emit scanRequested(path);
+    // Find the top-level watched folder containing this path
+    QString topLevelPath;
+    for (const QString &watchedFolder : m_watchedFoldersCache) {
+        if (path == watchedFolder || path.startsWith(watchedFolder + "/")) {
+            if (topLevelPath.isEmpty() || watchedFolder.length() > topLevelPath.length()) {
+                topLevelPath = watchedFolder;
+            }
+        }
+    }
+
+    if (!topLevelPath.isEmpty()) {
+        emit scanRequested(topLevelPath);
+    } else {
+        emit scanRequested(path);
+    }
 }
 
 void LibraryController::triggerBackgroundCrawl()
@@ -757,6 +771,12 @@ void LibraryController::updateFoldersCache()
 #ifdef Q_OS_MAC
     MacBookmarks::releaseAllBookmarkAccesses();
 #endif
+
+    // Clear all watched directories first to avoid orphaned watches
+    QStringList currentDirs = m_watcher->directories();
+    if (!currentDirs.isEmpty()) {
+        m_watcher->removePaths(currentDirs);
+    }
 
     m_watchedFoldersCache.clear();
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -777,11 +797,61 @@ void LibraryController::updateFoldersCache()
         }
 #endif
         m_watchedFoldersCache.append(resolvedPath);
-        // Ensure path is watched (safe to call addPath multiple times, it won't duplicate)
-        m_watcher->addPath(resolvedPath);
+        // Ensure path and its subdirectories are watched
+        watchFolderRecursively(resolvedPath);
     }
 
     emit watchedFoldersChanged();
+}
+
+void LibraryController::watchFolderRecursively(const QString &folderPath)
+{
+    if (folderPath.isEmpty() || !QDir(folderPath).exists()) {
+        return;
+    }
+
+    m_watcher->addPath(folderPath);
+
+    QDirIterator it(folderPath, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString subDirPath = it.next();
+        QFileInfo dirInfo(subDirPath);
+        QString absSubDirPath = dirInfo.canonicalFilePath();
+        if (absSubDirPath.isEmpty()) {
+            absSubDirPath = dirInfo.absoluteFilePath();
+        }
+
+        // Filter out unwanted directories (same logic as in ScannerTask)
+        bool ok = true;
+        QStringList segments = absSubDirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
+        for (const QString &segment : segments) {
+            if (segment.endsWith(".app", Qt::CaseInsensitive) ||
+                segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||
+                segment.endsWith(".photolibrary", Qt::CaseInsensitive) ||
+                segment.endsWith(".migratedphotolibrary", Qt::CaseInsensitive) ||
+                segment.endsWith(".framework", Qt::CaseInsensitive) ||
+                segment.endsWith(".bundle", Qt::CaseInsensitive) ||
+                segment.endsWith(".xcodeproj", Qt::CaseInsensitive) ||
+                segment.endsWith(".pages", Qt::CaseInsensitive) ||
+                segment.endsWith(".numbers", Qt::CaseInsensitive) ||
+                segment.endsWith(".key", Qt::CaseInsensitive) ||
+                segment.endsWith(".wdgt", Qt::CaseInsensitive) ||
+                segment.endsWith(".plugin", Qt::CaseInsensitive) ||
+                segment.endsWith(".appex", Qt::CaseInsensitive) ||
+                segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
+                segment.endsWith(".xcassets", Qt::CaseInsensitive) ||
+                segment == ".git" ||
+                segment == ".svn" ||
+                segment.toLower() == ".trash") {
+                ok = false;
+                break;
+            }
+        }
+
+        if (ok) {
+            m_watcher->addPath(absSubDirPath);
+        }
+    }
 }
 
 QString LibraryController::getSidecarPath(const QString &documentPath) const
@@ -884,6 +954,16 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
     } else {
         updateScanProgress();
     }
+
+    // Clean up watched subdirectories that no longer exist on disk
+    QStringList watchedPaths = m_watcher->directories();
+    for (const QString &path : watchedPaths) {
+        if (path.startsWith(folderPath + "/") && !QDir(path).exists()) {
+            m_watcher->removePath(path);
+        }
+    }
+    // Watch any new subdirectories recursively
+    watchFolderRecursively(folderPath);
 
     emit scanStatusTextChanged();
     emit libraryChanged();

@@ -83,6 +83,7 @@ signals:
     void isScanningChanged();
     void scanProgressChanged();
     void scanStatusTextChanged();
+    void scanRequested(const QString &folderPath);
 private:
     bool m_isScanning = false;
     double m_scanProgress = 0.0;

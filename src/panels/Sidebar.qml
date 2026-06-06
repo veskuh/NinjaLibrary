@@ -164,8 +164,16 @@ KaakaoSidebar {
 
     KaakaoMenu {
         id: folderContextMenu
+        objectName: "folderContextMenu"
         property string targetPath: ""
         
+        KaakaoMenuItem {
+            text: "Rescan"
+            onTriggered: {
+                libraryController.scanRequested(folderContextMenu.targetPath)
+            }
+        }
+
         KaakaoMenuItem {
             text: "Stop Watching Folder"
             onTriggered: {

@@ -115,6 +115,7 @@ private:
     QString m_sidecarDir;
 
     void updateFoldersCache();
+    void watchFolderRecursively(const QString &folderPath);
     QString getSidecarPath(const QString &documentPath) const;
 
 private:
