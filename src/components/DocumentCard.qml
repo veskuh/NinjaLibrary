@@ -83,43 +83,12 @@ Rectangle {
             radius: 4
             clip: true
 
-            Image {
-                id: thumbImage
+            DocumentPreview {
                 anchors.fill: parent
-                source: card.thumbnailPath || ""
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-                autoTransform: true
-                visible: source.toString() !== "" && status === Image.Ready
-            }
-
-            // Fallback preview showing document type
-            ColumnLayout {
-                anchors.centerIn: parent
-                visible: thumbImage.source.toString() === "" || thumbImage.status !== Image.Ready
-                spacing: 4
-                
-                KaakaoLabel {
-                    text: {
-                        var ext = card.fileName.substring(card.fileName.lastIndexOf('.') + 1).toUpperCase();
-                        return ext === "" ? "DOC" : ext;
-                    }
-                    font.pixelSize: 24
-                    font.weight: Font.Bold
-                    color: Theme.sidebarSectionText
-                    opacity: 1.0
-                    Layout.alignment: Qt.AlignHCenter
-                }
-                
-                KaakaoLabel {
-                    text: card.isOffline ? "UNAVAILABLE" : (card.thumbnailPath !== "" ? "LOADING..." : "")
-                    visible: text !== ""
-                    font.pixelSize: 9
-                    font.weight: Font.DemiBold
-                    color: card.isOffline ? Theme.colorError : Theme.sidebarSectionText
-                    opacity: 1.0
-                    Layout.alignment: Qt.AlignHCenter
-                }
+                thumbnailPath: card.thumbnailPath
+                fileName: card.fileName
+                isOffline: card.isOffline
+                fontPixelSize: 24
             }
 
             // Offline indicator badge

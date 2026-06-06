@@ -315,6 +315,7 @@ ItemDelegate {
                     itemContextMenu.targetDocId = control.docIdValue
                     itemContextMenu.targetPath = control.absolutePathValue
                     itemContextMenu.targetRating = control.starRatingValue
+                    itemContextMenu.targetIsOffline = control.isOffline
                     itemContextMenu.popup(globalPos.x, globalPos.y)
                 }
             }

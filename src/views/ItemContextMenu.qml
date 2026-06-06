@@ -38,6 +38,9 @@ KaakaoMenu {
     property int targetDocId: -1
     property string targetPath: ""
     property int targetRating: 0
+    property bool targetIsOffline: false
+
+    signal moveToTrashRequested(int docId, string filePath)
     
     KaakaoMenuItem {
         text: "Open"
@@ -66,6 +69,18 @@ KaakaoMenu {
             if (menu.targetPath !== "") {
                 libraryController.copyToClipboard(menu.targetPath)
             }
+        }
+    }
+    
+    KaakaoMenuSeparator {
+        visible: menu.targetPath !== "" && !menu.targetIsOffline
+    }
+
+    KaakaoMenuItem {
+        text: "Move to Trash"
+        visible: menu.targetPath !== "" && !menu.targetIsOffline
+        onTriggered: {
+            menu.moveToTrashRequested(menu.targetDocId, menu.targetPath)
         }
     }
     

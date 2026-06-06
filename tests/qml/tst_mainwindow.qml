@@ -467,6 +467,23 @@ TestCase {
         let searchField = findChildByName(win, "searchField");
         verify(searchField !== null, "searchField should be found by name");
 
+        // Verify clear button functionality
+        searchField.text = "clear test";
+        compare(searchField.text, "clear test", "Search text should be set for clear button test");
+
+        let clearBtn = findChildByName(searchField, "clearButton");
+        verify(clearBtn !== null, "Clear button should exist inside search field");
+        wait(150); // wait for fade-in animation/visible change
+        verify(clearBtn.visible, "Clear button should be visible when text is set");
+
+        let clearMouseArea = findChildByType(clearBtn, "MouseArea");
+        verify(clearMouseArea !== null, "MouseArea inside clear button should exist");
+        mouseClick(clearMouseArea);
+        wait(200); // wait for fade-out animation
+
+        compare(searchField.text, "", "Search text should be empty after clicking clear button");
+        verify(!clearBtn.visible, "Clear button should be hidden after being cleared");
+
         // Set search text and selection
         searchField.text = "test query";
         let inspector = findChildByType(win, "Inspector");
@@ -809,6 +826,44 @@ TestCase {
         sidebar.currentIndex = 0;
         wait(50);
         compare(proxyFilter.selectedTags, [], "selectedTags should be cleared when section is selected");
+
+        win.destroy();
+    }
+
+    function test_move_to_trash_context_menu_and_dialog() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        // Access via property aliases
+        let contextMenu = win.itemContextMenu;
+        verify(contextMenu !== null, "ItemContextMenu should exist");
+
+        let trashDialog = win.trashDialog;
+        verify(trashDialog !== null, "trashDialog should exist");
+
+        // Simulate opening the context menu for a mock file
+        contextMenu.targetDocId = 999;
+        contextMenu.targetPath = "/path/to/mock_trash_file.pdf";
+        contextMenu.targetIsOffline = false;
+
+        // Check that trashDialog is initially closed
+        verify(!trashDialog.visible, "Trash dialog should be closed initially");
+
+        // Trigger moveToTrashRequested signal from context menu
+        contextMenu.moveToTrashRequested(999, "/path/to/mock_trash_file.pdf");
+        wait(100);
+
+        // Verify that the trashDialog is now open
+        verify(trashDialog.visible, "Trash dialog should open after request");
+        compare(trashDialog.docId, 999, "Dialog docId should match");
+        compare(trashDialog.filePath, "/path/to/mock_trash_file.pdf", "Dialog filePath should match");
+        verify(trashDialog.text.indexOf("mock_trash_file.pdf") >= 0, "Dialog text should contain filename");
+
+        // Close the dialog by rejecting it
+        trashDialog.reject();
+        wait(100);
+        verify(!trashDialog.visible, "Trash dialog should close on rejection");
 
         win.destroy();
     }

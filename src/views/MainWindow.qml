@@ -129,6 +129,7 @@ KaakaoWindow {
 
     property alias mainMenuBar: mainMenuBar
     property alias itemContextMenu: itemContextMenu
+    property alias trashDialog: trashDialog
 
     menuBar: AppMenuBar {
         id: mainMenuBar
@@ -166,6 +167,27 @@ KaakaoWindow {
 
     PreferencesDialog {
         id: prefsDialog
+    }
+
+    KaakaoDialog {
+        id: trashDialog
+        objectName: "trashDialog"
+        title: "Move to Trash"
+        symbol: "🗑️"
+        width: 380
+        standardButtons: Dialog.Yes | Dialog.No
+        
+        x: parent ? (parent.width - width) / 2 : 100
+        y: parent ? (parent.height - implicitHeight) / 2 : 100
+        
+        property int docId: -1
+        property string filePath: ""
+        
+        text: "Are you sure you want to move '" + (filePath ? filePath.substring(filePath.lastIndexOf('/') + 1) : "") + "' to the Trash?"
+        
+        onAccepted: {
+            libraryController.moveToTrash(docId, filePath)
+        }
     }
 
     Shortcut {
@@ -217,6 +239,12 @@ KaakaoWindow {
 
     ItemContextMenu {
         id: itemContextMenu
+        objectName: "itemContextMenu"
+        onMoveToTrashRequested: (docId, filePath) => {
+            trashDialog.docId = docId
+            trashDialog.filePath = filePath
+            trashDialog.open()
+        }
     }
 
     // Top Header ToolBar

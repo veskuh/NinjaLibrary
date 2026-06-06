@@ -155,6 +155,7 @@ Item {
                             itemContextMenu.targetDocId = docId
                             itemContextMenu.targetPath = model.absolutePath
                             itemContextMenu.targetRating = model.starRating
+                            itemContextMenu.targetIsOffline = model.isOffline
                             itemContextMenu.popup(globalPos.x, globalPos.y)
                         }
                         return

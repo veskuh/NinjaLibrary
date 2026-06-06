@@ -223,6 +223,74 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     return true;
 }
 
+bool LibraryController::moveToTrash(int documentId, const QString &filePath)
+{
+    QUrl url(filePath);
+    QString localPath = url.isLocalFile() ? url.toLocalFile() : filePath;
+
+    if (localPath.isEmpty() || !QFile::exists(localPath)) {
+        qWarning() << "moveToTrash: File does not exist or path is empty:" << localPath;
+        return false;
+    }
+
+    if (!QFile::moveToTrash(localPath)) {
+        qWarning() << "moveToTrash: Failed to move file to trash:" << localPath;
+        return false;
+    }
+
+    // Clean up sidecar file if exists
+    QString sidecarPath = getSidecarPath(localPath);
+    if (!sidecarPath.isEmpty() && QFile::exists(sidecarPath)) {
+        QFile::remove(sidecarPath);
+    }
+
+    // Clean up cached thumbnail file if exists
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(localPath.toUtf8());
+    QString hashStr = hash.result().toHex();
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbnails/";
+    QString thumbPath = cacheDir + hashStr + ".png";
+    if (QFile::exists(thumbPath)) {
+        QFile::remove(thumbPath);
+    }
+
+    // Now remove from database
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return false;
+
+    db.transaction();
+
+    // 1. Delete search index entries first
+    QSqlQuery deleteSearch(db);
+    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
+    deleteSearch.bindValue(":docId", documentId);
+    if (!deleteSearch.exec()) {
+        qWarning() << "Failed to clean up document search index:" << deleteSearch.lastError().text();
+    }
+
+    // 2. Delete document tags
+    QSqlQuery deleteTags(db);
+    deleteTags.prepare("DELETE FROM document_tags WHERE document_id = :docId;");
+    deleteTags.bindValue(":docId", documentId);
+    if (!deleteTags.exec()) {
+        qWarning() << "Failed to clean up document tags:" << deleteTags.lastError().text();
+    }
+
+    // 3. Delete document record
+    QSqlQuery deleteDoc(db);
+    deleteDoc.prepare("DELETE FROM documents WHERE id = :docId;");
+    deleteDoc.bindValue(":docId", documentId);
+    if (!deleteDoc.exec()) {
+        qWarning() << "Failed to delete document:" << deleteDoc.lastError().text();
+        db.rollback();
+        return false;
+    }
+
+    db.commit();
+    emit libraryChanged();
+    return true;
+}
+
 bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QStringList &tags)
 {
     if (documentIds.isEmpty()) return true;

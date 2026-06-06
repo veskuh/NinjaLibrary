@@ -61,6 +61,7 @@ public:
 public slots:
     bool addWatchedFolder(const QString &folderPath);
     bool removeWatchedFolder(const QString &folderPath);
+    bool moveToTrash(int documentId, const QString &filePath);
     
     // Batch operations executed inside SQL transactions
     bool batchUpdateTags(const QList<int> &documentIds, const QStringList &tags);

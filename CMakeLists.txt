@@ -137,6 +137,8 @@ qt_add_qml_module(NinjaLibrary
         src/components/DocumentCard.qml
         src/components/TagPill.qml
         src/components/LocalTableRowDelegate.qml
+        src/components/DocumentPreview.qml
+        src/components/ImagePreview.qml
         src/views/GridCanvas.qml
         src/views/TableCanvas.qml
         src/panels/Sidebar.qml

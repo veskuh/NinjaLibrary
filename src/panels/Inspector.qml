@@ -367,24 +367,13 @@ Rectangle {
                     border.color: Theme.buttonBorder
                     Layout.alignment: Qt.AlignHCenter
 
-                    Image {
-                        id: previewImage
+                    DocumentPreview {
                         anchors.fill: parent
                         anchors.margins: 4
-                        source: (inspector.docData && inspector.docData.thumbnailPath) || ""
-                        fillMode: Image.PreserveAspectFit
-                        autoTransform: true
-                        visible: source.toString() !== "" && status === Image.Ready
-                    }
-
-                    KaakaoLabel {
-                        text: inspector.docData && inspector.docData.isOffline ? "UNAVAILABLE" : "NO PREVIEW"
-                        role: KaakaoLabel.Role.Small
-                        font.weight: Font.Bold
-                        color: inspector.docData && inspector.docData.isOffline ? Theme.colorError : Theme.sidebarSectionText
-                        opacity: 1.0
-                        anchors.centerIn: parent
-                        visible: previewImage.source.toString() === "" || previewImage.status !== Image.Ready
+                        thumbnailPath: (inspector.docData && inspector.docData.thumbnailPath) || ""
+                        fileName: (inspector.docData && inspector.docData.fileName) || ""
+                        isOffline: !!(inspector.docData && inspector.docData.isOffline)
+                        fontPixelSize: 32
                     }
                 }
 

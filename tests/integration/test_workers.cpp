@@ -498,6 +498,73 @@ void TestWorkers::testLibraryControllerAPIs()
 
     query.finish();
 
+    // 9. Test moveToTrash
+    QString testTrashPath = QDir(tempPath).filePath("trash_test.pdf");
+    QFile trashFile(testTrashPath);
+    QVERIFY(trashFile.open(QIODevice::WriteOnly));
+    trashFile.write("trash content");
+    trashFile.close();
+    testTrashPath = QFileInfo(testTrashPath).canonicalFilePath();
+
+    QSqlQuery insertTrashDoc(db);
+    insertTrashDoc.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+                           "VALUES (1, 'trash_test.pdf', :path, 100, 0);");
+    insertTrashDoc.bindValue(":path", testTrashPath);
+    QVERIFY(insertTrashDoc.exec());
+    int trashDocId = insertTrashDoc.lastInsertId().toInt();
+
+    // Create sidecar
+    QVERIFY(m_controller->writeSidecar(testTrashPath, {"tagA"}, 3, "trash-notes"));
+
+    // Insert FTS search record manually
+    QSqlQuery ftsQuery(db);
+    ftsQuery.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:id, 'trash_test.pdf', 'dummy text', 'trash-notes');");
+    ftsQuery.bindValue(":id", trashDocId);
+    QVERIFY(ftsQuery.exec());
+
+    // Insert tag link manually
+    QSqlQuery tagLinkQuery(db);
+    tagLinkQuery.prepare("INSERT INTO document_tags (document_id, tag_id) VALUES (:docId, 1);");
+    tagLinkQuery.bindValue(":docId", trashDocId);
+    QVERIFY(tagLinkQuery.exec());
+
+    // Call moveToTrash
+    spyLibrary.clear();
+    QVERIFY(m_controller->moveToTrash(trashDocId, testTrashPath));
+    QCOMPARE(spyLibrary.count(), 1); // should emit libraryChanged
+
+    // Verify physical file is gone (moved to trash)
+    QVERIFY(!QFile::exists(testTrashPath));
+
+    // Verify sidecar is gone
+    QString checkTrashTagsList;
+    int checkTrashRating = 0;
+    QString checkTrashNotes;
+    QStringList dummyTagsList;
+    QVERIFY(!m_controller->readSidecar(testTrashPath, dummyTagsList, checkTrashRating, checkTrashNotes));
+
+    // Verify DB records are deleted
+    QSqlQuery checkDocQuery(db);
+    checkDocQuery.prepare("SELECT COUNT(*) FROM documents WHERE id = :id;");
+    checkDocQuery.bindValue(":id", trashDocId);
+    QVERIFY(checkDocQuery.exec());
+    QVERIFY(checkDocQuery.next());
+    QCOMPARE(checkDocQuery.value(0).toInt(), 0);
+
+    QSqlQuery checkTagsQuery(db);
+    checkTagsQuery.prepare("SELECT COUNT(*) FROM document_tags WHERE document_id = :id;");
+    checkTagsQuery.bindValue(":id", trashDocId);
+    QVERIFY(checkTagsQuery.exec());
+    QVERIFY(checkTagsQuery.next());
+    QCOMPARE(checkTagsQuery.value(0).toInt(), 0);
+
+    QSqlQuery checkSearchQuery(db);
+    checkSearchQuery.prepare("SELECT COUNT(*) FROM document_search WHERE document_id = :id;");
+    checkSearchQuery.bindValue(":id", trashDocId);
+    QVERIFY(checkSearchQuery.exec());
+    QVERIFY(checkSearchQuery.next());
+    QCOMPARE(checkSearchQuery.value(0).toInt(), 0);
+
     // Wait for any pending thread pool tasks to complete before modifying tables
     QCoreApplication::processEvents();
     QThreadPool::globalInstance()->waitForDone();

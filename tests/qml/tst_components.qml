@@ -110,6 +110,15 @@ TestCase {
         compare(statusLabel.text, "LOADING...", "Status label text should be LOADING... when thumbnail is set but not ready")
         compare(statusLabel.visible, true, "Status label should be visible when loading thumbnail")
 
+        // Wait for it to fail because /tmp/dummy.png does not exist
+        tryCompare(statusLabel, "text", "", 2000, "Status label text should become empty when loading fails")
+        tryCompare(statusLabel, "visible", false, 2000, "Status label should be hidden when loading fails")
+
+        // Set card online but with a failed/empty thumbnail path ("file://")
+        card.thumbnailPath = "file://"
+        compare(statusLabel.text, "", "Status label text should be empty when thumbnail path is 'file://'")
+        compare(statusLabel.visible, false, "Status label should be hidden when thumbnail path is 'file://'")
+
         // Verify there are ZERO raw Text elements (only KaakaoLabel/Label should be used)
         let hasRaw = hasRawTextElement(card);
         verify(!hasRaw, "DocumentCard must not contain raw Text elements");
