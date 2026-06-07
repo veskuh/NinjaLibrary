@@ -36,4 +36,4 @@ echo "=== Running CTest verification ==="
 ctest --test-dir build --output-on-failure
 
 echo "=== Running NinjaLibrary application ==="
-./build/NinjaLibraryApp
+./build/NinjaLibrary.app/Contents/MacOS/NinjaLibrary

@@ -1,53 +1,25 @@
-# NinjaLibrary (v26.6.0)
+# NinjaLibrary
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
-[![Coverage](https://img.shields.io/badge/coverage-87.8%25-brightgreen.svg)](#)
-[![Platform Compatibility](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-blue.svg)](#)
-[![Qt Version](https://img.shields.io/badge/Qt-6.8+-blueviolet.svg)](#)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
-
-NinjaLibrary is a premium, local-first document gallery application designed for macOS 12+ (Universal Binaries: Apple Silicon `arm64` and Intel `x86_64`) and Linux.
-
----
-
-## Table of Contents
-- [Features](#features)
-- [Visual Preview](#visual-preview)
-- [Third-Party Libraries & Attributions](#third-party-libraries--attributions)
-- [Development and Build Instructions](#development-and-build-instructions)
-- [Platform Directories & Standard Storage](#platform-directories--standard-storage)
-- [Architectural Choices](#architectural-choices)
-- [Keyboard Shortcuts](#keyboard-shortcuts)
-- [Codebase Structure](#codebase-structure)
-- [Contributing](#contributing)
-- [Roadmap](#roadmap)
-- [License](#license)
+NinjaLibrary is a local-first document gallery application designed for macOS (Universal Binaries: Apple Silicon `arm64` and Intel `x86_64`) and Linux.
 
 ---
 
 ## Features
 - **iPhoto-Style Grid & iTunes-Style Table Views**: Dual layout canvas using Kaakao.
-- **SQLite Metadata Schema**: Fully indexed using SQLite FTS5 for debounced, instant search queries.
-- **Background Ingestion & OCR**: High-performance pipeline parsing textual PDFs via Poppler-Qt6 or falling back to Tesseract-OCR for scanned images.
+- **SQLite Metadata Schema**: Fully indexed using SQLite FTS5 for debounced, fast queries.
+- **Background Ingestion & OCR**: Pipeline parsing textual PDFs via Poppler-Qt6 or falling back to Tesseract-OCR for scanned images.
 - **macOS Sandbox Persistence**: Objective-C++ security-scoped URL bookmark resolution.
-- **Centralized Sidecar Storage**: Centralized metadata backup in `~/.local/share/NinjaLibrary/sidecars/` without polluting user document folders.
+- **Centralized Sidecar Storage**: Centralized metadata backup in `~/.local/share/NinjaLibrary/sidecars/`.
 
 ---
 
-## Visual Preview
-
-![NinjaLibrary Desktop Application Interface](assets/ninjalibrary.png)
-
-*The application features a sleek Yosemite-Catalina style layout, integrating a dual-layout canvas (iTunes-style table & iPhoto-style grid), a robust sidebar manager for watchfolders and tags, and real-time status and progress indication.*
-
----
 
 ## Third-Party Libraries & Attributions
 
 This project relies on the following third-party dependencies:
 
 1. **[Qt 6.8](https://www.qt.io/)** (Core, Gui, Qml, Quick, Sql, Test, QuickTest)
-   - *License*: LGPLv3 or Commercial.
+   - *License*: LGPLv3.
    - *Role*: Core application runtime, graphics renderer, and database encapsulation layer.
 2. **[SQLite 3](https://sqlite.org/)**
    - *License*: Public Domain.
@@ -112,12 +84,10 @@ The application utilizes platform-standard paths configured dynamically via `QSt
 
 ## Architectural Choices
 
-NinjaLibrary is architected with a local-first, high-performance, and secure-by-default design ethos. Below are the key architectural decisions governing directory scanning, metadata storage, and deployment.
-
 ### 1. Local-First Ingestion & Scanning Pipeline
 * **Asynchronous Directory Traversal**: Folder scanning runs asynchronously inside background threads (`ScannerTask` executing on the global `QThreadPool`), preventing blocking of the QML UI thread.
 * **Cryptographic Deduplication & Change Tracking**: Every file's SHA-256 hash is computed. Hashing, text extraction, and PDF parsing occur completely outside of database write transactions to minimize lock contention. The database uses these hashes to track file movements, renames, and contents uniquely.
-* **Smart OCR Scheduling**: For images or PDFs lacking native text layer annotations (fewer than 10 words extracted), the system automatically queues an asynchronous `OcrTask` via `OcrTask` (which uses Tesseract OCR) to extract text content, and updates a centered progress bar in the main view's status bar.
+* **OCR Scheduling**: For images or PDFs lacking native text layer annotations (fewer than 10 words extracted), the system queues an asynchronous `OcrTask` via `OcrTask` (which uses Tesseract OCR) to extract text content, and updates a centered progress bar in the main view's status bar.
 
 ### 2. SQLite Database & Centralized Sidecars
 * **WAL Journaling Mode**: SQLite is configured with Write-Ahead Logging (`PRAGMA journal_mode = WAL;`) and synchronous mode set to `NORMAL`. This allows concurrent readers (e.g., QML UI thread reading document lists) and a single background writer to operate without lock conflicts.
@@ -128,13 +98,11 @@ NinjaLibrary is architected with a local-first, high-performance, and secure-by-
   - *Self-Healing Re-indexing*: If the database is rebuilt, scanning the watched directories again reads the file hashes, locates the corresponding `<SHA256>.ninja` sidecar, and automatically restores all user-generated tags, ratings, and notes.
 
 ### 3. macOS Sandboxed Deployment & Security
-* **App Sandboxing**: NinjaLibrary complies fully with macOS App Sandbox requirements. To access directories outside of the app container, the application utilizes Objective-C++ (`MacBookmarks.mm`) to resolve security-scoped bookmarks.
+* **App Sandboxing**: NinjaLibrary complies with macOS App Sandbox requirements. To access directories outside of the app container, the application utilizes Objective-C++ (`MacBookmarks.mm`) to resolve security-scoped bookmarks.
 * **Security-Scoped Bookmarks**: When the user adds a watched directory, the app requests the OS for a security-scoped URL bookmark and persists this bookmark as a `BLOB` in the database. On subsequent app launches, the application resolves these bookmarks dynamically to regain authorized access to files outside its sandbox without prompting the user.
 * **Standalone Packaging**: The build pipeline (`build_mac_release.sh`) compiles a release-mode build (targeting macOS 12+), copies OCR trained data files (`eng.traineddata`) directly into the bundle's `Resources` directory, uses `macdeployqt` to resolve and embed shared Qt libraries, performs ad-hoc codesigning with Sandbox entitlements, and packages the result into a `.dmg` installer.
 
 ## Codebase Structure
-
-The project code is organized logically by architectural layer and component responsibilities:
 
 - **[src/](src/)**: Core application sources:
   - **[app/](src/app/)**: Main entry points and application-wide bootstrapper.
@@ -156,7 +124,7 @@ The project code is organized logically by architectural layer and component res
 
 ## Keyboard Shortcuts
 
-NinjaLibrary is fully optimized for keyboard-centric workflows, supporting native system accelerators:
+NinjaLibrary is supports keyboard-centric:
 
 | Shortcut | Action |
 | --- | --- |
@@ -173,27 +141,15 @@ NinjaLibrary is fully optimized for keyboard-centric workflows, supporting nativ
 
 ---
 
-## Contributing
-
-We welcome contributions! To maintain code quality and consistency:
+## Coding convetions
 
 1. **Code Formatting**: Format C++ code using standard style rules (ClangFormat). Ensure QML files are clean and follow standard spacing convention.
 2. **Adding Tests**: Any new features should be accompanied by comprehensive tests under the `tests/` directory (either C++ unit tests or QML QuickTests).
-3. **Running Verification**: Before submitting a Pull Request, run the local verification suite:
+3. **Running Verification**: Before submitting, run the local verification suite:
    ```bash
    ./scripts/build_and_run.sh
    ```
    Ensure 100% test pass rate and that code coverage remains above the **80%** threshold.
-
----
-
-## Roadmap
-
-Future developments planned for NinjaLibrary:
-- [ ] **Extended Format Support**: Rich Text Format (RTF), OpenDocument text (ODT), and Microsoft Word (DOCX) text extraction optimizations.
-- [ ] **Tag Auto-Suggestions**: AI/NLP-based tagging suggestions based on document content text mining.
-- [ ] **Remote Database Syncer**: Optional encrypted synchronization of sidecar configurations across local devices.
-- [ ] **Trash Bin Integration**: Dedicated soft-delete zone before removing files permanently from watch list indexing.
 
 ---
 
