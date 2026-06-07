@@ -279,22 +279,58 @@ Rectangle {
                 }
 
                 Row {
+                    id: batchRatingRow
                     spacing: 4
                     Layout.alignment: Qt.AlignHCenter
+
+                    property int hoveredIndex: -1
+                    property int localRating: 0
+
+                    Connections {
+                        target: inspector
+                        ignoreUnknownSignals: true
+                        function onSelectedIdsChanged() {
+                            batchRatingRow.localRating = 0
+                        }
+                    }
+
                     Repeater {
                         model: 5
                         KaakaoLabel {
                             text: "★"
                             font.pixelSize: 22
-                            color: hoverArea.containsMouse ? "#f1c40f" : "#bdc3c7"
+                            color: {
+                                var active = false
+                                if (batchRatingRow.hoveredIndex !== -1) {
+                                    active = index <= batchRatingRow.hoveredIndex
+                                } else {
+                                    active = index < batchRatingRow.localRating
+                                }
+                                return active ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc")
+                            }
                             opacity: 1.0
-                            
+                            scale: batchStarMouseArea.containsMouse ? 1.2 : 1.0
+
+                            Behavior on scale {
+                                NumberAnimation { duration: 100 }
+                            }
+                            Behavior on color {
+                                ColorAnimation { duration: 100 }
+                            }
+
                             MouseArea {
-                                id: hoverArea
+                                id: batchStarMouseArea
                                 anchors.fill: parent
                                 hoverEnabled: true
+                                onEntered: batchRatingRow.hoveredIndex = index
+                                onExited: batchRatingRow.hoveredIndex = -1
                                 onClicked: {
-                                    libraryController.batchUpdateRating(inspector.selectedIds, index + 1)
+                                    var newRating = index + 1
+                                    if (batchRatingRow.localRating === newRating) {
+                                        newRating = 0
+                                    }
+                                    batchRatingRow.localRating = newRating
+                                    libraryController.batchUpdateRating(inspector.selectedIds, newRating)
                                 }
                             }
                         }
@@ -443,15 +479,13 @@ Rectangle {
                             anchors.margins: 4
                             clip: true
 
-                            KaakaoTextArea {
-                                width: previewScroll.width - 8
+                            Text {
+                                width: previewContainer.width - 16
                                 text: inspector.docData ? inspector.docData.textSnippet : ""
-                                readOnly: true
-                                placeholderText: "No text content extracted."
-                                placeholderTextColor: Theme.sidebarSectionText
+                                font.family: Theme.defaultFont.family
                                 font.pixelSize: 11
+                                color: Theme.primaryText
                                 wrapMode: Text.Wrap
-                                background: null
                             }
                         }
                     }
@@ -555,20 +589,58 @@ Rectangle {
                 }
 
                 Row {
+                    id: singleRatingRow
                     spacing: 4
                     Layout.alignment: Qt.AlignHCenter
+
+                    property int hoveredIndex: -1
+                    property int localRating: inspector.docData ? inspector.docData.starRating : 0
+
+                    Connections {
+                        target: inspector
+                        ignoreUnknownSignals: true
+                        function onDocDataChanged() {
+                            singleRatingRow.localRating = inspector.docData ? inspector.docData.starRating : 0
+                        }
+                    }
+
                     Repeater {
                         model: 5
                         KaakaoLabel {
                             text: "★"
                             font.pixelSize: 22
-                            color: index < (inspector.docData ? inspector.docData.starRating : 0) ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc")
+                            color: {
+                                var active = false
+                                if (singleRatingRow.hoveredIndex !== -1) {
+                                    active = index <= singleRatingRow.hoveredIndex
+                                } else {
+                                    active = index < singleRatingRow.localRating
+                                }
+                                return active ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc")
+                            }
                             opacity: 1.0
-                            
+                            scale: starMouseArea.containsMouse ? 1.2 : 1.0
+
+                            Behavior on scale {
+                                NumberAnimation { duration: 100 }
+                            }
+                            Behavior on color {
+                                ColorAnimation { duration: 100 }
+                            }
+
                             MouseArea {
+                                id: starMouseArea
                                 anchors.fill: parent
+                                hoverEnabled: true
+                                onEntered: singleRatingRow.hoveredIndex = index
+                                onExited: singleRatingRow.hoveredIndex = -1
                                 onClicked: {
-                                    libraryController.batchUpdateRating([inspector.selectedId], index + 1)
+                                    var newRating = index + 1
+                                    if (singleRatingRow.localRating === newRating) {
+                                        newRating = 0
+                                    }
+                                    singleRatingRow.localRating = newRating
+                                    libraryController.batchUpdateRating([inspector.selectedId], newRating)
                                 }
                             }
                         }

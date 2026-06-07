@@ -283,7 +283,21 @@ KaakaoWindow {
                     NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
                 }
                 onTextChanged: {
-                    proxyFilter.filterString = text
+                    if (text === "") {
+                        searchDebounceTimer.stop()
+                        proxyFilter.filterString = ""
+                    } else {
+                        searchDebounceTimer.restart()
+                    }
+                }
+
+                Timer {
+                    id: searchDebounceTimer
+                    interval: 150
+                    repeat: false
+                    onTriggered: {
+                        proxyFilter.filterString = searchField.text
+                    }
                 }
             }
 
