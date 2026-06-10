@@ -310,13 +310,13 @@ ItemDelegate {
                 control.ListView.view.forceActiveFocus()
             }
             if (mouse.button === Qt.RightButton) {
-                var globalPos = mapToItem(null, mouse.x, mouse.y)
+                var popupPos = mapToItem(itemContextMenu.parent, mouse.x, mouse.y)
                 if (typeof itemContextMenu !== "undefined") {
                     itemContextMenu.targetDocId = control.docIdValue
                     itemContextMenu.targetPath = control.absolutePathValue
                     itemContextMenu.targetRating = control.starRatingValue
                     itemContextMenu.targetIsOffline = control.isOffline
-                    itemContextMenu.popup(globalPos.x, globalPos.y)
+                    itemContextMenu.popup(popupPos.x, popupPos.y)
                 }
             }
         }

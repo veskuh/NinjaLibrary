@@ -148,9 +148,10 @@ KaakaoSidebar {
     onContextMenu: (index, globalPos) => {
         if (index < 0 || index >= sidebarModel.count) return
         var item = sidebarModel.get(index)
-        if (item.type === "folder") {
+        if (item.type === "folder" && item.target !== "") {
+            var localPos = folderContextMenu.parent.mapFromItem(null, globalPos.x, globalPos.y)
             folderContextMenu.targetPath = item.target
-            folderContextMenu.popup(globalPos)
+            folderContextMenu.popup(localPos.x, localPos.y)
         }
     }
 

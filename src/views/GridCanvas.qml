@@ -150,13 +150,13 @@ Item {
                             gridView.gridView.forceActiveFocus()
                             gridCanvas.selectionChanged(gridCanvas.selectedIds)
                         }
-                        var globalPos = docCard.mapToItem(null, event.x, event.y)
+                        var popupPos = docCard.mapToItem(itemContextMenu.parent, event.x, event.y)
                         if (typeof itemContextMenu !== "undefined") {
                             itemContextMenu.targetDocId = docId
                             itemContextMenu.targetPath = model.absolutePath
                             itemContextMenu.targetRating = model.starRating
                             itemContextMenu.targetIsOffline = model.isOffline
-                            itemContextMenu.popup(globalPos.x, globalPos.y)
+                            itemContextMenu.popup(popupPos.x, popupPos.y)
                         }
                         return
                     }
