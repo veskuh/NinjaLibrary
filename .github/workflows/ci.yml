@@ -44,7 +44,8 @@ jobs:
           libxcb-render-util0 \
           libxcb-xkb1 \
           libegl1-mesa-dev \
-          xvfb
+            xvfb \
+            openbox
 
     - name: Install Qt 6.8 Core Frameworks
       uses: jurplel/install-qt-action@v3
@@ -69,7 +70,7 @@ jobs:
       run: |
         cd build
         if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
-          xvfb-run ctest --output-on-failure --parallel 4
+          xvfb-run -s "-screen 0 1024x768x24" bash -c "openbox & sleep 1 && ctest --output-on-failure --parallel 4"
         else
           ctest --output-on-failure --parallel 4
         fi

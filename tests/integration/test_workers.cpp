@@ -116,6 +116,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     // Wait for the scanner to finish
     QSignalSpy spyLibrary(m_controller, &LibraryController::libraryChanged);
     QVERIFY(spyLibrary.wait(5000));
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Check if file was inserted
     {
@@ -135,6 +137,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Check if document was deleted from database
     {
@@ -155,6 +159,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Check that it's back in DB online
     int newDocId = -1;
@@ -175,8 +181,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QCoreApplication::processEvents();
     QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Check if marked offline (not deleted, because folder was missing)
     {
@@ -195,8 +201,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QCoreApplication::processEvents();
     QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Check if back online
     {
@@ -215,8 +221,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QCoreApplication::processEvents();
     QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Confirm it's offline again
     {
@@ -239,8 +245,8 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QCoreApplication::processEvents();
     QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) { QTest::qWait(50); }
 
     // Check if document was deleted from database
     {

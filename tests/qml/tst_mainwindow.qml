@@ -169,14 +169,12 @@ TestCase {
         // Click to collapse
         mouseClick(inspectorBtn);
         compare(inspector.collapsed, true, "Inspector should be collapsed after click");
-        wait(250);
-        compare(inspector.visible, false, "Inspector should be invisible after click");
+        tryCompare(inspector, "visible", false, 5000, "Inspector should be invisible after click")
 
         // Click again to expand
         mouseClick(inspectorBtn);
         compare(inspector.collapsed, false, "Inspector should not be collapsed after second click");
-        wait(250);
-        compare(inspector.visible, true, "Inspector should be visible after second click");
+        tryCompare(inspector, "visible", true, 5000, "Inspector should be visible after second click")
 
         win.destroy();
     }

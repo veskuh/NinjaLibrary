@@ -69,7 +69,7 @@ TestCase {
         wait(500)
 
         // Verify Theme colors are applied (e.g. selection/highlight state)
-        compare(card.color, Theme.isDarkMode ? "#2d3748" : "#e1f0ff", "Card background color should match selection theme color")
+        tryCompare(card, "color", Theme.isDarkMode ? "#2d3748" : "#e1f0ff", 5000, "Card background color should match selection theme color")
 
         // Verify we can update and get correct values
         card.isOffline = true
