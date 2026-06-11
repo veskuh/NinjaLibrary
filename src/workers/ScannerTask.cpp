@@ -52,6 +52,10 @@
 
 #include "../utils/MacBookmarks.h"
 
+std::atomic<bool> ScannerTask::s_scanPaused{false};
+QMutex ScannerTask::s_pauseMutex;
+QWaitCondition ScannerTask::s_pauseCondition;
+
 ScannerTask::ScannerTask(DatabaseManager *dbMgr, const QString &folderPath)
     : m_dbMgr(dbMgr)
     , m_folderPath(folderPath)
@@ -113,6 +117,25 @@ void ScannerTask::run()
     emit progress(m_folderPath, 0, totalFiles);
 
     for (const QString &filePath : filesToProcess) {
+        if (s_scanPaused) {
+            QMutexLocker locker(&s_pauseMutex);
+            while (s_scanPaused) {
+                s_pauseCondition.wait(&s_pauseMutex);
+            }
+        }
+
+        // Check if the folder is still in watched_folders list
+        if (processedCount % 5 == 0) {
+            QSqlQuery checkWatched(db);
+            checkWatched.prepare("SELECT id FROM watched_folders WHERE id = :id;");
+            checkWatched.bindValue(":id", folderId);
+            if (!checkWatched.exec() || !checkWatched.next()) {
+                qDebug() << "ScannerTask: Folder was unwatched during scan, aborting immediately:" << m_folderPath;
+                emit finished(m_folderPath);
+                return;
+            }
+        }
+
         filesOnDisk.insert(filePath);
         QFileInfo fileInfo(filePath);
         QString ext = fileInfo.suffix().toLower();

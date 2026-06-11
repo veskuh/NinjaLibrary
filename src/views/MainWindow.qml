@@ -741,8 +741,10 @@ KaakaoWindow {
                             text: libraryController.scanStatusText
                             role: KaakaoLabel.Role.Small
                             color: Theme.sidebarSectionText
-                            opacity: 1.0
+                            opacity: libraryController.isScanPaused ? 0.6 : 1.0
                             Layout.alignment: Qt.AlignVCenter
+                            
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
                         }
 
                         KaakaoProgressBar {
@@ -750,6 +752,26 @@ KaakaoWindow {
                             Layout.preferredHeight: 8
                             Layout.alignment: Qt.AlignVCenter
                             value: libraryController.scanProgress
+                            opacity: libraryController.isScanPaused ? 0.5 : 1.0
+                            
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
+                        }
+
+                        KaakaoButton {
+                            id: pauseResumeButton
+                            Layout.alignment: Qt.AlignVCenter
+                            implicitWidth: 24
+                            implicitHeight: 18
+                            leftPadding: 2
+                            rightPadding: 2
+                            font.pixelSize: 10
+                            text: libraryController.isScanPaused ? "▶" : "⏸"
+                            onClicked: libraryController.toggleScanPause()
+
+                            KaakaoToolTip {
+                                visible: parent.hovered
+                                text: libraryController.isScanPaused ? "Resume Scanning" : "Pause Scanning"
+                            }
                         }
 
                         Item { Layout.fillWidth: true } // Right spacer for centering progress bar inside center area

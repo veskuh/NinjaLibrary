@@ -48,6 +48,7 @@ class LibraryController : public QObject
     Q_PROPERTY(bool isScanning READ isScanning NOTIFY isScanningChanged)
     Q_PROPERTY(double scanProgress READ scanProgress NOTIFY scanProgressChanged)
     Q_PROPERTY(QString scanStatusText READ scanStatusText NOTIFY scanStatusTextChanged)
+    Q_PROPERTY(bool isScanPaused READ isScanPaused NOTIFY isScanPausedChanged)
 
 public:
     explicit LibraryController(DatabaseManager *dbMgr, QObject *parent = nullptr);
@@ -57,6 +58,7 @@ public:
     bool isScanning() const;
     double scanProgress() const;
     QString scanStatusText() const;
+    bool isScanPaused() const;
 
 public slots:
     bool addWatchedFolder(const QString &folderPath);
@@ -83,6 +85,11 @@ public slots:
     // QML-facing thumbnail request
     void requestThumbnail(int docId, const QString &filePath, bool highPriority = false);
 
+    // Pause/Resume API
+    void pauseScan();
+    void resumeScan();
+    Q_INVOKABLE void toggleScanPause();
+
 signals:
     void watchedFoldersChanged();
     void folderAdded(const QString &folderPath);
@@ -91,7 +98,9 @@ signals:
     void scanStatusTextChanged();
     void scanRequested(const QString &folderPath);
     void libraryChanged();
+    void libraryUpdated();
     void thumbnailGenerated(int docId, const QString &thumbnailPath);
+    void isScanPausedChanged();
 
 private slots:
     void onDirectoryChanged(const QString &path);

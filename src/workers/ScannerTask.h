@@ -34,6 +34,9 @@
 #include <QObject>
 #include <QRunnable>
 #include <QString>
+#include <QMutex>
+#include <QWaitCondition>
+#include <atomic>
 #include "../database/DatabaseManager.h"
 
 class ScannerTask : public QObject, public QRunnable
@@ -44,6 +47,10 @@ public:
     ~ScannerTask();
 
     void run() override;
+
+    static std::atomic<bool> s_scanPaused;
+    static QMutex s_pauseMutex;
+    static QWaitCondition s_pauseCondition;
 
 signals:
     void finished(const QString &folderPath);

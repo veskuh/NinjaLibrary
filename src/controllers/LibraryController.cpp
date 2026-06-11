@@ -83,10 +83,21 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     connect(this, &LibraryController::scanRequested, this, &LibraryController::onScanRequested);
 
     updateFoldersCache();
+
+    // Resume scans that were active when the app quit
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (db.isOpen()) {
+        QSqlQuery query("SELECT folder_path FROM active_scans;", db);
+        while (query.next()) {
+            QString folderPath = query.value(0).toString();
+            emit scanRequested(folderPath);
+        }
+    }
 }
 
 LibraryController::~LibraryController()
 {
+    resumeScan();
 }
 
 QStringList LibraryController::watchedFolders() const
@@ -112,6 +123,9 @@ double LibraryController::scanProgress() const
 QString LibraryController::scanStatusText() const
 {
     if (m_isScanning) {
+        if (isScanPaused()) {
+            return QString("Scanning Paused: %1%").arg(qRound(m_scanProgress * 100));
+        }
         return QString("Scanning: %1%").arg(qRound(m_scanProgress * 100));
     } else if (m_activeOcrTasks > 0) {
         return QString("Extracting Text: %1/%2").arg(m_totalOcrTasks - m_activeOcrTasks).arg(m_totalOcrTasks);
@@ -165,6 +179,14 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     if (!db.isOpen()) return false;
 
     db.transaction();
+
+    // Delete active scan for this folder if exists
+    {
+        QSqlQuery removeScan(db);
+        removeScan.prepare("DELETE FROM active_scans WHERE folder_path = :path;");
+        removeScan.bindValue(":path", absPath);
+        removeScan.exec();
+    }
 
     // 1. Get folder ID from database
     int folderId = -1;
@@ -880,6 +902,17 @@ void LibraryController::onScanRequested(const QString &folderPath)
         emit scanStatusTextChanged();
     }
 
+    // Record active scan in database
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (db.isOpen()) {
+        QSqlQuery recordScan(db);
+        recordScan.prepare("INSERT OR IGNORE INTO active_scans (folder_path) VALUES (:path);");
+        recordScan.bindValue(":path", absPath);
+        if (!recordScan.exec()) {
+            qWarning() << "Failed to record active scan in database:" << recordScan.lastError().text();
+        }
+    }
+
     ScannerTask *task = new ScannerTask(m_dbMgr, absPath);
     connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
     connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
@@ -933,11 +966,23 @@ void LibraryController::onScanProgress(const QString &folderPath, int processed,
 {
     m_scanProgressMap[folderPath] = qMakePair(processed, total);
     updateScanProgress();
+    emit libraryUpdated();
 }
 
 void LibraryController::onScannerTaskFinished(const QString &folderPath)
 {
     m_scanProgressMap.remove(folderPath);
+
+    // Remove active scan record from database
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (db.isOpen()) {
+        QSqlQuery removeScan(db);
+        removeScan.prepare("DELETE FROM active_scans WHERE folder_path = :path;");
+        removeScan.bindValue(":path", folderPath);
+        if (!removeScan.exec()) {
+            qWarning() << "Failed to remove active scan record:" << removeScan.lastError().text();
+        }
+    }
 
     if (m_scanProgressMap.isEmpty()) {
         if (m_isScanning) {
@@ -1077,6 +1122,42 @@ void LibraryController::cleanupSidecars()
         if (!activeHashes.contains(baseName)) {
             dir.remove(filename);
         }
+    }
+}
+
+bool LibraryController::isScanPaused() const
+{
+    return ScannerTask::s_scanPaused;
+}
+
+void LibraryController::pauseScan()
+{
+    if (!ScannerTask::s_scanPaused) {
+        ScannerTask::s_scanPaused = true;
+        emit isScanPausedChanged();
+        emit scanStatusTextChanged();
+    }
+}
+
+void LibraryController::resumeScan()
+{
+    if (ScannerTask::s_scanPaused) {
+        ScannerTask::s_scanPaused = false;
+        {
+            QMutexLocker locker(&ScannerTask::s_pauseMutex);
+            ScannerTask::s_pauseCondition.wakeAll();
+        }
+        emit isScanPausedChanged();
+        emit scanStatusTextChanged();
+    }
+}
+
+void LibraryController::toggleScanPause()
+{
+    if (isScanPaused()) {
+        resumeScan();
+    } else {
+        pauseScan();
     }
 }
 

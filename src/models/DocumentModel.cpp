@@ -187,8 +187,7 @@ void DocumentModel::forceRefresh()
     QSet<QString> uniqueFolders;
     QMap<QString, int> folderIdMap;
 
-    beginResetModel();
-    m_documents.clear();
+    QList<DocumentInfo> newDocs;
 
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     if (cacheDir.isEmpty()) {
@@ -236,7 +235,7 @@ void DocumentModel::forceRefresh()
             doc.thumbnailPath = "";
         }
 
-        m_documents.append(doc);
+        newDocs.append(doc);
 
         // Track folders recursively
         QString root = watchedRoots.value(doc.folderId);
@@ -266,16 +265,17 @@ void DocumentModel::forceRefresh()
         folderDoc.starRating = 0;
         folderDoc.isOffline = false;
         folderDoc.dateModified = QFileInfo(folderPath).lastModified();
-        m_documents.append(folderDoc);
+        newDocs.append(folderDoc);
     }
 
+    // Calculate count changes
     int tempPdf = 0;
     int tempImage = 0;
     int tempText = 0;
     int tempLocal = 0;
     int tempUnavailable = 0;
 
-    for (const auto &doc : m_documents) {
+    for (const auto &doc : newDocs) {
         if (doc.isFolder) {
             continue;
         }
@@ -306,7 +306,77 @@ void DocumentModel::forceRefresh()
     m_localCount = tempLocal;
     m_unavailableCount = tempUnavailable;
 
-    endResetModel();
+    // Check if the current model is completely empty
+    if (m_documents.isEmpty()) {
+        beginResetModel();
+        m_documents = newDocs;
+        endResetModel();
+    } else {
+        // Reconcile changes incrementally
+        QMap<QString, DocumentInfo> currentMap;
+        for (const auto &doc : m_documents) {
+            currentMap[doc.absolutePath] = doc;
+        }
+
+        QMap<QString, DocumentInfo> newMap;
+        for (const auto &doc : newDocs) {
+            newMap[doc.absolutePath] = doc;
+        }
+
+        // 1. Remove items no longer present (descending order to preserve indices)
+        for (int i = m_documents.size() - 1; i >= 0; --i) {
+            const QString &path = m_documents.at(i).absolutePath;
+            if (!newMap.contains(path)) {
+                beginRemoveRows(QModelIndex(), i, i);
+                m_documents.removeAt(i);
+                endRemoveRows();
+            }
+        }
+
+        // 2. Update existing items
+        for (int i = 0; i < m_documents.size(); ++i) {
+            const QString &path = m_documents.at(i).absolutePath;
+            if (newMap.contains(path)) {
+                const DocumentInfo &newDoc = newMap.value(path);
+                const DocumentInfo &oldDoc = m_documents.at(i);
+
+                bool itemChanged = (oldDoc.id != newDoc.id ||
+                                oldDoc.folderId != newDoc.folderId ||
+                                oldDoc.fileName != newDoc.fileName ||
+                                oldDoc.fileSize != newDoc.fileSize ||
+                                oldDoc.fileHash != newDoc.fileHash ||
+                                oldDoc.dateCreated != newDoc.dateCreated ||
+                                oldDoc.dateModified != newDoc.dateModified ||
+                                oldDoc.dateAdded != newDoc.dateAdded ||
+                                oldDoc.pageCount != newDoc.pageCount ||
+                                oldDoc.starRating != newDoc.starRating ||
+                                oldDoc.isOffline != newDoc.isOffline ||
+                                oldDoc.tags != newDoc.tags ||
+                                oldDoc.textSnippet != newDoc.textSnippet ||
+                                oldDoc.notes != newDoc.notes ||
+                                oldDoc.thumbnailPath != newDoc.thumbnailPath ||
+                                oldDoc.lastOpened != newDoc.lastOpened ||
+                                oldDoc.isFolder != newDoc.isFolder ||
+                                oldDoc.itemCount != newDoc.itemCount);
+
+                if (itemChanged) {
+                    m_documents[i] = newDoc;
+                    QModelIndex idx = index(i);
+                    emit dataChanged(idx, idx);
+                }
+            }
+        }
+
+        // 3. Add new items
+        for (const auto &newDoc : newDocs) {
+            if (!currentMap.contains(newDoc.absolutePath)) {
+                int insertPos = m_documents.size();
+                beginInsertRows(QModelIndex(), insertPos, insertPos);
+                m_documents.append(newDoc);
+                endInsertRows();
+            }
+        }
+    }
 
     if (changed) {
         emit countsChanged();

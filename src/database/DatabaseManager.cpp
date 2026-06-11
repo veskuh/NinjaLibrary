@@ -387,6 +387,14 @@ bool DatabaseManager::initializeDatabase()
         }
     }
 
+    // Ensure active_scans table exists for interrupted scan tracking
+    {
+        QSqlQuery query(db);
+        if (!query.exec("CREATE TABLE IF NOT EXISTS active_scans (folder_path TEXT PRIMARY KEY);")) {
+            qWarning() << "Failed to create active_scans table:" << query.lastError().text();
+        }
+    }
+
     return true;
 }
 

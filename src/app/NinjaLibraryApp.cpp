@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
 
     // Connect controller signals to model slots
     QObject::connect(controller, &LibraryController::libraryChanged, docModel, &DocumentModel::refresh, Qt::QueuedConnection);
+    QObject::connect(controller, &LibraryController::libraryUpdated, docModel, &DocumentModel::refresh, Qt::QueuedConnection);
     QObject::connect(controller, &LibraryController::thumbnailGenerated, docModel, &DocumentModel::updateThumbnail);
 
     QQmlApplicationEngine engine;
