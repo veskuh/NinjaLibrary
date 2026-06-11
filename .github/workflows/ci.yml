@@ -29,7 +29,7 @@ jobs:
         sudo apt-get install -y build-essential cmake ninja-build libgl1-mesa-dev libpoppler-qt6-dev tesseract-ocr libtesseract-dev
 
     - name: Install Qt 6.8 Core Frameworks
-      uses: jurplel/install-qt-action@v3
+      uses: jurplel/install-qt-action@v4
       with:
         version: '6.8.*'
         host: ${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
