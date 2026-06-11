@@ -32,8 +32,10 @@ jobs:
       uses: jurplel/install-qt-action@v4
       with:
         version: '6.8.*'
+        host: ${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
         target: 'desktop'
-        modules: 'qtshadertools qt5compat'
+        arch: ${{ matrix.os == 'ubuntu-latest' && 'gcc_64' || 'clang_64' }}
+        modules: 'qt5compat qtshadertools qtimageformats'
 
     - name: Configure CMake & Activate Profiling Code Coverage
       run: |
