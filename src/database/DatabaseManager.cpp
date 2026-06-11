@@ -34,6 +34,7 @@
 #include <QSqlRecord>
 #include <QThreadStorage>
 #include <QCoreApplication>
+#include <QUuid>
 
 struct ConnectionHolder {
     QString name;
@@ -61,6 +62,9 @@ DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent)
             dataDir = QDir::homePath() + "/.config/NinjaLibrary";
         }
         m_dbPath = dataDir + "/library.db";
+    } else if (dbPath == ":memory:") {
+        m_dbPath = QString("file:ninjalib_shared_%1?mode=memory&cache=shared")
+                   .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     } else {
         m_dbPath = dbPath;
     }
@@ -82,9 +86,6 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
     QString connectionName = QString("NinjaLibrary_Connection_%1").arg(threadId);
 
     QString expectedDbName = m_dbPath;
-    if (expectedDbName == ":memory:") {
-        expectedDbName = "file:ninjalib_shared_test?mode=memory&cache=shared";
-    }
 
     if (!s_connectionStorage.hasLocalData()) {
         if (QSqlDatabase::contains(connectionName)) {
