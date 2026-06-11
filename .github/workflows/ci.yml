@@ -9,7 +9,6 @@ on:
 jobs:
   build-and-test:
     name: Build & Test (${{ matrix.os }})
-    runs-runs-on: ubuntu-latest # Wait, let's look at the matrix. Matrix os is matrix.os, runs-on should be ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     
     strategy:
