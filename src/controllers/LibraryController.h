@@ -101,6 +101,7 @@ signals:
     void libraryUpdated();
     void thumbnailGenerated(int docId, const QString &thumbnailPath);
     void isScanPausedChanged();
+    void folderConflictDetected(const QString &message);
 
 private slots:
     void onDirectoryChanged(const QString &path);
@@ -113,6 +114,7 @@ private slots:
     
     void onScannerTaskFinished(const QString &folderPath);
     void onScanProgress(const QString &folderPath, int processed, int total);
+    void onLowDiskSpaceDetected();
     void onOcrTaskFinished(int docId);
     void onThumbnailTaskFinished(int docId, const QString &thumbnailPath);
 

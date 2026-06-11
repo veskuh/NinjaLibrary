@@ -670,6 +670,74 @@ void TestWorkers::testLibraryControllerAPIs()
 
     // Verify sidecar was deleted (garbage collected) because the document was deleted
     QVERIFY(!m_controller->readSidecar(imgPath, checkTags, checkRating, checkNotes));
+
+    // Test Feature 4: Folder conflict and merging
+    {
+        QTemporaryDir testConflictDir;
+        QVERIFY(testConflictDir.isValid());
+        QString parentDir = QFileInfo(testConflictDir.path()).canonicalFilePath();
+        QString subDir = parentDir + "/subFolder";
+        QVERIFY(QDir().mkpath(subDir));
+
+        // Add subfolder first
+        QVERIFY(m_controller->addWatchedFolder(subDir));
+        QVERIFY(m_controller->watchedFolders().contains(subDir));
+
+        QCoreApplication::processEvents();
+        QThreadPool::globalInstance()->waitForDone();
+
+        // Try to add sub-subfolder (should conflict)
+        QString subSubDir = subDir + "/subSubFolder";
+        QVERIFY(QDir().mkpath(subSubDir));
+        QSignalSpy spyConflict(m_controller, &LibraryController::folderConflictDetected);
+        QVERIFY(!m_controller->addWatchedFolder(subSubDir));
+        QCOMPARE(spyConflict.count(), 1);
+        QVERIFY(spyConflict.at(0).at(0).toString().contains("Folder is already monitored under"));
+
+        // Add parent folder (should merge and remove child folder watch)
+        QVERIFY(m_controller->addWatchedFolder(parentDir));
+        QVERIFY(m_controller->watchedFolders().contains(parentDir));
+        QVERIFY(!m_controller->watchedFolders().contains(subDir));
+
+        QCoreApplication::processEvents();
+        QThreadPool::globalInstance()->waitForDone();
+
+        // Clean up
+        QVERIFY(m_controller->removeWatchedFolder(parentDir));
+        
+        QCoreApplication::processEvents();
+        QThreadPool::globalInstance()->waitForDone();
+    }
+
+    // Test Feature 5: Low disk space detection and pause
+    {
+        ScannerTask::s_lowDiskSpace = true;
+        ScannerTask::s_scanPaused = true;
+        
+        QTemporaryDir testDiskSpaceDir;
+        QVERIFY(testDiskSpaceDir.isValid());
+        QString diskSpacePath = QFileInfo(testDiskSpaceDir.path()).canonicalFilePath();
+        
+        QVERIFY(m_controller->addWatchedFolder(diskSpacePath));
+        QVERIFY(m_controller->isScanning());
+        QCOMPARE(m_controller->scanStatusText(), QString("Scanning Paused: Low Disk Space (< 500MB)"));
+        
+        // Reset and clean up
+        ScannerTask::s_lowDiskSpace = false;
+        ScannerTask::s_scanPaused = false;
+        {
+            QMutexLocker locker(&ScannerTask::s_pauseMutex);
+            ScannerTask::s_pauseCondition.wakeAll();
+        }
+        
+        QCoreApplication::processEvents();
+        QThreadPool::globalInstance()->waitForDone();
+        
+        QVERIFY(m_controller->removeWatchedFolder(diskSpacePath));
+        
+        QCoreApplication::processEvents();
+        QThreadPool::globalInstance()->waitForDone();
+    }
 }
 
 void TestWorkers::testTextAndDocIngestion()

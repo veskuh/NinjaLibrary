@@ -123,6 +123,9 @@ double LibraryController::scanProgress() const
 QString LibraryController::scanStatusText() const
 {
     if (m_isScanning) {
+        if (ScannerTask::s_lowDiskSpace) {
+            return "Scanning Paused: Low Disk Space (< 500MB)";
+        }
         if (isScanPaused()) {
             return QString("Scanning Paused: %1%").arg(qRound(m_scanProgress * 100));
         }
@@ -141,6 +144,38 @@ bool LibraryController::addWatchedFolder(const QString &folderPath)
 
     QString absPath = dir.canonicalPath();
     if (absPath.isEmpty()) absPath = dir.absolutePath();
+
+    // 1. Conflict detection: subfolder of an already watched directory
+    for (const QString &parentPath : m_watchedFoldersCache) {
+        if (absPath == parentPath) {
+            return true; // Already watched, return true to avoid duplicate errors
+        }
+        if (absPath.startsWith(parentPath + "/") || absPath.startsWith(parentPath + "\\")) {
+            int lastSlash = parentPath.lastIndexOf('/');
+            if (lastSlash == -1) {
+                lastSlash = parentPath.lastIndexOf('\\');
+            }
+            QString folderName = (lastSlash != -1) ? parentPath.mid(lastSlash + 1) : parentPath;
+            if (folderName.isEmpty()) {
+                folderName = parentPath;
+            }
+            emit folderConflictDetected(QString("Folder is already monitored under: %1").arg(folderName));
+            return false;
+        }
+    }
+
+    // 2. Conflict detection / merging: parent of already watched directories
+    QStringList childrenToRemove;
+    for (const QString &childPath : m_watchedFoldersCache) {
+        if (childPath.startsWith(absPath + "/") || childPath.startsWith(absPath + "\\")) {
+            childrenToRemove.append(childPath);
+        }
+    }
+
+    for (const QString &childPath : childrenToRemove) {
+        removeWatchedFolder(childPath);
+    }
+
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return false;
 
@@ -918,6 +953,7 @@ void LibraryController::onScanRequested(const QString &folderPath)
     connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
     connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
     connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
+    connect(task, &ScannerTask::lowDiskSpaceDetected, this, &LibraryController::onLowDiskSpaceDetected);
     task->setAutoDelete(true);
     QThreadPool::globalInstance()->start(task);
 }
@@ -1062,6 +1098,12 @@ void LibraryController::onOcrTaskFinished(int docId)
 void LibraryController::onThumbnailTaskFinished(int docId, const QString &thumbnailPath)
 {
     emit thumbnailGenerated(docId, thumbnailPath);
+}
+
+void LibraryController::onLowDiskSpaceDetected()
+{
+    emit isScanPausedChanged();
+    emit scanStatusTextChanged();
 }
 
 void LibraryController::showInFinder(const QString &filePath)

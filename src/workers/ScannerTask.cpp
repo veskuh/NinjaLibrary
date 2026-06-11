@@ -51,10 +51,12 @@
 #include <QStandardPaths>
 
 #include "../utils/MacBookmarks.h"
+#include <QStorageInfo>
 
 std::atomic<bool> ScannerTask::s_scanPaused{false};
 QMutex ScannerTask::s_pauseMutex;
 QWaitCondition ScannerTask::s_pauseCondition;
+std::atomic<bool> ScannerTask::s_lowDiskSpace{false};
 
 ScannerTask::ScannerTask(DatabaseManager *dbMgr, const QString &folderPath)
     : m_dbMgr(dbMgr)
@@ -117,6 +119,16 @@ void ScannerTask::run()
     emit progress(m_folderPath, 0, totalFiles);
 
     for (const QString &filePath : filesToProcess) {
+        // Check disk space (safeguard threshold: 500MB)
+        QStorageInfo storage(m_folderPath);
+        if (storage.isValid() && storage.bytesAvailable() < 500LL * 1024LL * 1024LL) {
+            s_lowDiskSpace = true;
+            s_scanPaused = true;
+            emit lowDiskSpaceDetected();
+        } else {
+            s_lowDiskSpace = false;
+        }
+
         if (s_scanPaused) {
             QMutexLocker locker(&s_pauseMutex);
             while (s_scanPaused) {

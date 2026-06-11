@@ -126,6 +126,10 @@ KaakaoWindow {
             }
             proxyFilter.scopeFilter = "All"
         }
+        function onFolderConflictDetected(message) {
+            conflictDialog.message = message
+            conflictDialog.open()
+        }
     }
 
     Connections {
@@ -238,6 +242,21 @@ KaakaoWindow {
         onAccepted: {
             libraryController.moveToTrash(docId, filePath)
         }
+    }
+
+    KaakaoDialog {
+        id: conflictDialog
+        objectName: "conflictDialog"
+        title: "Folder Conflict"
+        symbol: "⚠️"
+        width: 380
+        standardButtons: Dialog.Ok
+        
+        x: parent ? (parent.width - width) / 2 : 100
+        y: parent ? (parent.height - implicitHeight) / 2 : 100
+        
+        property string message: ""
+        text: message
     }
 
     Shortcut {

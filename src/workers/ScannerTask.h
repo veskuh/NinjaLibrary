@@ -51,12 +51,14 @@ public:
     static std::atomic<bool> s_scanPaused;
     static QMutex s_pauseMutex;
     static QWaitCondition s_pauseCondition;
+    static std::atomic<bool> s_lowDiskSpace;
 
 signals:
     void finished(const QString &folderPath);
     void progress(const QString &folderPath, int processed, int total);
     void ocrRequested(int docId, const QString &filePath);
     void thumbnailRequested(int docId, const QString &filePath);
+    void lowDiskSpaceDetected();
 
 private:
     DatabaseManager *m_dbMgr;
