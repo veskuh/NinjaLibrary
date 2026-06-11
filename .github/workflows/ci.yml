@@ -35,7 +35,7 @@ jobs:
         host: ${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
         target: 'desktop'
         arch: ${{ matrix.os == 'ubuntu-latest' && 'gcc_64' || 'clang_64' }}
-        modules: 'qtquickcontrols2 qt5compat'
+        modules: 'qtshadertools qt5compat'
 
     - name: Configure CMake & Activate Profiling Code Coverage
       run: |
