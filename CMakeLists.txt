@@ -4,7 +4,11 @@ cmake_minimum_required(VERSION 3.16)
 # Copyright (c) 2026 NinjaLibrary. All rights reserved.
 # Licensed under the BSD-3-Clause License.
 
-project(NinjaLibrary VERSION 26.6.0 LANGUAGES CXX OBJCXX)
+project(NinjaLibrary VERSION 26.6.0 LANGUAGES CXX)
+
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-12]
+        os: [ubuntu-24.04, macos-14]
 
     steps:
     - name: Checkout Source Code
@@ -22,27 +22,45 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Setup Compiler Environment (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    - name: Setup Compiler & System Dependencies (Linux)
+      if: matrix.os == 'ubuntu-24.04'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake ninja-build libgl1-mesa-dev libpoppler-qt6-dev tesseract-ocr libtesseract-dev
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libgl1-mesa-dev \
+          libpoppler-qt6-dev \
+          tesseract-ocr \
+          libtesseract-dev \
+          libxkbcommon-dev \
+          libxkbcommon-x11-0 \
+          libxcb-cursor0 \
+          libxcb-xinerama0 \
+          libxcb-icccm4 \
+          libxcb-image0 \
+          libxcb-keysyms1 \
+          libxcb-render-util0 \
+          libxcb-xkb1 \
+          libegl1-mesa-dev \
+          xvfb
 
     - name: Install Qt 6.8 Core Frameworks
-      uses: jurplel/install-qt-action@v4
+      uses: jurplel/install-qt-action@v3
       with:
-        version: '6.8.*'
-        host: ${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
+        version: '6.8.3'
+        host: ${{ matrix.os == 'ubuntu-24.04' && 'linux' || 'mac' }}
         target: 'desktop'
-        arch: ${{ matrix.os == 'ubuntu-latest' && 'gcc_64' || 'clang_64' }}
         modules: 'qt5compat qtshadertools qtimageformats'
+        cache: true
 
     - name: Configure CMake & Activate Profiling Code Coverage
       run: |
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Debug \
           -DENABLE_TESTING=ON \
-          -DENABLE_COVERAGE=${{ matrix.os == 'ubuntu-latest' && 'ON' || 'OFF' }}
+          -DENABLE_COVERAGE=${{ matrix.os == 'ubuntu-24.04' && 'ON' || 'OFF' }}
 
     - name: Compile Application & Test Binaries
       run: cmake --build build
@@ -50,10 +68,14 @@ jobs:
     - name: Execute Automated Unit & Integration Tests (CTest)
       run: |
         cd build
-        ctest --output-on-failure --parallel 4
+        if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
+          xvfb-run ctest --output-on-failure --parallel 4
+        else
+          ctest --output-on-failure --parallel 4
+        fi
 
     - name: Generate Code Coverage Diagnostics Dashboard (Linux Only)
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-24.04'
       run: |
         sudo apt-get install -y lcov
         lcov --directory . --capture --output-file coverage.info
