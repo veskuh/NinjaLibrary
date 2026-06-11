@@ -56,9 +56,9 @@ OcrTask::~OcrTask()
 
 void OcrTask::run()
 {
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
 #ifdef Q_OS_MAC
     QByteArray bookmark;
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (db.isOpen()) {
         QSqlQuery q(db);
         q.prepare("SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || '%' ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
