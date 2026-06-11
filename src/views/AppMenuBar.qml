@@ -39,6 +39,9 @@ MenuBar {
     signal toggleSidebarRequested()
     signal toggleInspectorRequested()
     signal setViewModeRequested(int index)
+    signal setFolderViewModeRequested(string mode)
+    property bool includeSubfolderContentsVal: false
+    property bool showSubfolderIconsVal: true
     signal minimizeRequested()
     signal openAboutRequested()
     signal openPreferencesRequested()
@@ -171,6 +174,31 @@ MenuBar {
                 text: "Table View Layout"
                 shortcut: "Ctrl+2"
                 onTriggered: appMenuBar.setViewModeRequested(1)
+            }
+        }
+        MenuSeparator {}
+        MenuItem {
+            action: Action {
+                text: "Browse Folders Hierarchically"
+                checkable: true
+                checked: !appMenuBar.includeSubfolderContentsVal && appMenuBar.showSubfolderIconsVal
+                onTriggered: appMenuBar.setFolderViewModeRequested("hierarchical")
+            }
+        }
+        MenuItem {
+            action: Action {
+                text: "Only Show Files at Current Level"
+                checkable: true
+                checked: !appMenuBar.includeSubfolderContentsVal && !appMenuBar.showSubfolderIconsVal
+                onTriggered: appMenuBar.setFolderViewModeRequested("direct")
+            }
+        }
+        MenuItem {
+            action: Action {
+                text: "Include All Subfolder Contents"
+                checkable: true
+                checked: appMenuBar.includeSubfolderContentsVal
+                onTriggered: appMenuBar.setFolderViewModeRequested("recursive")
             }
         }
     }

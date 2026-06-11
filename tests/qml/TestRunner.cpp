@@ -286,12 +286,16 @@ class MockProxyFilter : public QAbstractListModel
     Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
     Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
     Q_PROPERTY(QStringList activeScopes READ activeScopes WRITE setActiveScopes NOTIFY activeScopesChanged)
+    Q_PROPERTY(bool includeSubfolderContents READ includeSubfolderContents WRITE setIncludeSubfolderContents NOTIFY includeSubfolderContentsChanged)
+    Q_PROPERTY(bool showSubfolderIcons READ showSubfolderIcons WRITE setShowSubfolderIcons NOTIFY showSubfolderIconsChanged)
     QList<QVariantMap> m_rows;
 public:
     explicit MockProxyFilter(QObject *parent = nullptr)
         : QAbstractListModel(parent)
         , m_scopeFilter("All")
         , m_activeScopes(QStringList{"All"})
+        , m_includeSubfolderContents(false)
+        , m_showSubfolderIcons(true)
     {}
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override {
@@ -412,6 +416,10 @@ public:
     void setScopeFilter(const QString &s) { if (m_scopeFilter != s) { m_scopeFilter = s; emit scopeFilterChanged(); } }
     QStringList activeScopes() const { return m_activeScopes; }
     void setActiveScopes(const QStringList &l) { if (m_activeScopes != l) { m_activeScopes = l; emit activeScopesChanged(); } }
+    bool includeSubfolderContents() const { return m_includeSubfolderContents; }
+    void setIncludeSubfolderContents(bool enable) { if (m_includeSubfolderContents != enable) { m_includeSubfolderContents = enable; emit includeSubfolderContentsChanged(); } }
+    bool showSubfolderIcons() const { return m_showSubfolderIcons; }
+    void setShowSubfolderIcons(bool enable) { if (m_showSubfolderIcons != enable) { m_showSubfolderIcons = enable; emit showSubfolderIconsChanged(); } }
     Q_INVOKABLE void setSortRole(int) {}
     Q_INVOKABLE void sort(int, int) {}
 signals:
@@ -421,6 +429,8 @@ signals:
     void categoryFilterChanged();
     void scopeFilterChanged();
     void activeScopesChanged();
+    void includeSubfolderContentsChanged();
+    void showSubfolderIconsChanged();
 private:
     QString m_filterString;
     QStringList m_selectedTags;
@@ -428,6 +438,8 @@ private:
     QString m_categoryFilter;
     QString m_scopeFilter;
     QStringList m_activeScopes;
+    bool m_includeSubfolderContents;
+    bool m_showSubfolderIcons;
 };
 
 class Setup : public QObject

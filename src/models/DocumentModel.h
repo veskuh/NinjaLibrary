@@ -57,6 +57,8 @@ struct DocumentInfo {
     QString notes;
     QString thumbnailPath;
     qint64 lastOpened;
+    bool isFolder = false;
+    int itemCount = 0;
 };
 
 class DocumentModel : public QAbstractListModel
@@ -91,7 +93,10 @@ public:
         OfflineColorRole,
         DateModifiedStrRole,
         TagsStrRole,
-        LastOpenedRole
+        LastOpenedRole,
+        IsFolderRole,
+        ItemCountRole,
+        ItemCountStrRole
     };
 
     explicit DocumentModel(DatabaseManager *dbMgr, QObject *parent = nullptr);

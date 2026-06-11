@@ -48,6 +48,8 @@ class ProxyFilter : public QSortFilterProxyModel
     Q_PROPERTY(QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
     Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
     Q_PROPERTY(QStringList activeScopes READ activeScopes NOTIFY activeScopesChanged)
+    Q_PROPERTY(bool includeSubfolderContents READ includeSubfolderContents WRITE setIncludeSubfolderContents NOTIFY includeSubfolderContentsChanged)
+    Q_PROPERTY(bool showSubfolderIcons READ showSubfolderIcons WRITE setShowSubfolderIcons NOTIFY showSubfolderIconsChanged)
 
 public:
     explicit ProxyFilter(DatabaseManager *dbMgr, QObject *parent = nullptr);
@@ -62,6 +64,8 @@ public:
     QString folderFilter() const { return m_folderFilter; }
     QString scopeFilter() const { return m_scopeFilter; }
     QStringList activeScopes() const { return m_activeScopes; }
+    bool includeSubfolderContents() const { return m_includeSubfolderContents; }
+    bool showSubfolderIcons() const { return m_showSubfolderIcons; }
 
     Q_INVOKABLE QVariant get(int row, const QString &roleName) const;
     Q_INVOKABLE void setSortRole(int role);
@@ -76,6 +80,8 @@ public slots:
     void setCategoryFilter(const QString &category);
     void setFolderFilter(const QString &folder); // "All", "Recent", "Favorites" etc.
     void setScopeFilter(const QString &scope);
+    void setIncludeSubfolderContents(bool enable);
+    void setShowSubfolderIcons(bool enable);
     void recalculateScopes();
     bool filterAcceptsRowWithoutScope(int source_row, const QModelIndex &source_parent) const;
     
@@ -92,6 +98,8 @@ signals:
     void folderFilterChanged();
     void scopeFilterChanged();
     void activeScopesChanged();
+    void includeSubfolderContentsChanged();
+    void showSubfolderIconsChanged();
 
 protected:
     bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
@@ -108,6 +116,8 @@ private:
     QString m_folderFilter;
     QString m_scopeFilter;
     QStringList m_activeScopes;
+    bool m_includeSubfolderContents;
+    bool m_showSubfolderIcons;
 
     QSet<int> m_matchedDocIds;
     QSet<QString> m_duplicateHashes;

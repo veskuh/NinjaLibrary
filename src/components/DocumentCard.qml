@@ -43,6 +43,9 @@ Rectangle {
     property int starRating: 0
     property bool isOffline: false
     property bool isSelected: false
+    property bool isFolder: false
+    property int itemCount: 0
+    property string itemCountStr: ""
 
     signal clicked(var event)
     signal doubleClicked()
@@ -77,9 +80,10 @@ Rectangle {
 
         // Thumbnail Area
         Rectangle {
+            id: thumbnailArea
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.isDarkMode ? "#181818" : "#f0f0f0"
+            color: card.isFolder ? "transparent" : (Theme.isDarkMode ? "#181818" : "#f0f0f0")
             radius: 4
             clip: true
 
@@ -90,6 +94,22 @@ Rectangle {
                 fileName: card.fileName
                 isOffline: card.isOffline
                 fontPixelSize: 24
+                visible: !card.isFolder
+            }
+
+            // Folder representation
+            Rectangle {
+                anchors.fill: parent
+                color: "transparent"
+                visible: card.isFolder
+
+                KaakaoLabel {
+                    anchors.centerIn: parent
+                    text: "📁"
+                    font.pixelSize: Math.min(parent.width, parent.height) * 0.6
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             // Offline indicator badge
@@ -101,7 +121,7 @@ Rectangle {
                 height: 14
                 radius: 7
                 color: Theme.colorError
-                visible: card.isOffline
+                visible: card.isOffline && !card.isFolder
                 
                 KaakaoLabel {
                     text: "!"
@@ -127,6 +147,7 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             spacing: 2
+            visible: !card.isFolder
             
             // Stars Rating display
             Row {
@@ -158,6 +179,17 @@ Rectangle {
                 opacity: 1.0
                 Layout.alignment: Qt.AlignRight
             }
+        }
+
+        KaakaoLabel {
+            text: card.itemCountStr
+            visible: card.isFolder
+            role: KaakaoLabel.Role.Small
+            font.pixelSize: 10
+            color: Theme.sidebarSectionText
+            opacity: 1.0
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 

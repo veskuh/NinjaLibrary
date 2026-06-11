@@ -48,6 +48,8 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     , m_scopeFilter("All")
     , m_activeScopes(QStringList{"All"})
     , m_searchActive(false)
+    , m_includeSubfolderContents(false)
+    , m_showSubfolderIcons(true)
 {
     setDynamicSortFilter(true);
     // Sort by file name ascending by default
@@ -155,6 +157,22 @@ void ProxyFilter::setFolderFilter(const QString &folder)
     emit folderFilterChanged();
 }
 
+void ProxyFilter::setIncludeSubfolderContents(bool enable)
+{
+    if (m_includeSubfolderContents == enable) return;
+    m_includeSubfolderContents = enable;
+    invalidateAndRecalculate();
+    emit includeSubfolderContentsChanged();
+}
+
+void ProxyFilter::setShowSubfolderIcons(bool enable)
+{
+    if (m_showSubfolderIcons == enable) return;
+    m_showSubfolderIcons = enable;
+    invalidateAndRecalculate();
+    emit showSubfolderIconsChanged();
+}
+
 void ProxyFilter::setScopeFilter(const QString &scope)
 {
     if (m_scopeFilter == scope) return;
@@ -245,6 +263,11 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex
 
     QModelIndex idx = sourceModel()->index(source_row, 0, source_parent);
     
+    bool isFolder = sourceModel()->data(idx, DocumentModel::IsFolderRole).toBool();
+    if (isFolder && (!m_filterString.isEmpty() || m_folderFilter.isEmpty())) {
+        return false;
+    }
+
     // 1. Offline filter
     bool isOffline = sourceModel()->data(idx, DocumentModel::IsOfflineRole).toBool();
     if (isOffline && !m_showUnavailable && m_categoryFilter != "Unavailable") {
@@ -307,8 +330,28 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex
     // 7. Folder filter
     if (!m_folderFilter.isEmpty()) {
         QString absolutePath = sourceModel()->data(idx, DocumentModel::AbsolutePathRole).toString();
-        if (!absolutePath.startsWith(m_folderFilter)) {
-            return false;
+        
+        if (m_includeSubfolderContents) {
+            if (isFolder) {
+                return false;
+            }
+            if (!absolutePath.startsWith(m_folderFilter)) {
+                return false;
+            }
+        } else {
+            QString parentDir = QFileInfo(absolutePath).absolutePath();
+            if (isFolder) {
+                if (!m_showSubfolderIcons) {
+                    return false;
+                }
+                if (parentDir != m_folderFilter) {
+                    return false;
+                }
+            } else {
+                if (parentDir != m_folderFilter) {
+                    return false;
+                }
+            }
         }
     }
 
@@ -462,6 +505,16 @@ void ProxyFilter::invalidateAndRecalculate()
 
 bool ProxyFilter::lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const
 {
+    bool leftFolder = sourceModel()->data(source_left, DocumentModel::IsFolderRole).toBool();
+    bool rightFolder = sourceModel()->data(source_right, DocumentModel::IsFolderRole).toBool();
+
+    if (leftFolder && !rightFolder) {
+        return sortOrder() == Qt::AscendingOrder;
+    }
+    if (!leftFolder && rightFolder) {
+        return sortOrder() == Qt::DescendingOrder;
+    }
+
     return QSortFilterProxyModel::lessThan(source_left, source_right);
 }
 

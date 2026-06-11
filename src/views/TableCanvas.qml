@@ -168,10 +168,28 @@ Item {
         function onPressed(event) {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 if (tableView.currentIndex >= 0 && tableView.currentIndex < proxyFilter.rowCount()) {
-                    var idx = proxyFilter.index(tableView.currentIndex, 0)
-                    var path = proxyFilter.data(idx, 260) // 260 is absolutePath
-                    tableCanvas.doubleClicked(path)
+                    var isFolder = proxyFilter.get(tableView.currentIndex, "isFolder")
+                    var path = proxyFilter.get(tableView.currentIndex, "absolutePath")
+                    if (isFolder) {
+                        proxyFilter.folderFilter = path
+                    } else {
+                        tableCanvas.doubleClicked(path)
+                    }
                     event.accepted = true
+                }
+            } else if (event.key === Qt.Key_Backspace || 
+                       (event.key === Qt.Key_Up && (event.modifiers & Qt.MetaModifier || event.modifiers & Qt.ControlModifier))) {
+                var current = proxyFilter.folderFilter
+                var selectedRoot = sidebar.getSelectedFolder()
+                if (current !== "" && current !== selectedRoot) {
+                    var lastSlash = current.lastIndexOf('/')
+                    if (lastSlash > 0) {
+                        var parentPath = current.substring(0, lastSlash)
+                        if (parentPath.length >= selectedRoot.length) {
+                            proxyFilter.folderFilter = parentPath
+                            event.accepted = true
+                        }
+                    }
                 }
             }
         }

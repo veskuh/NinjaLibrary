@@ -107,7 +107,10 @@ Rectangle {
                     thumbnailPath: documentModel.data(idx, 272) || "",
                     dateAdded: documentModel.data(idx, 265),
                     dateModified: documentModel.data(idx, 264),
-                    lastOpened: documentModel.data(idx, 278)
+                    lastOpened: documentModel.data(idx, 278),
+                    isFolder: documentModel.data(idx, 279) === true || documentModel.data(idx, 279) === "true" || documentModel.data(idx, 279) === 1 || documentModel.data(idx, 279) === "1",
+                    itemCount: documentModel.data(idx, 280) || 0,
+                    itemCountStr: documentModel.data(idx, 281) || ""
                 }
                 if (notesArea) {
                     notesArea.text = docData.notes
@@ -393,14 +396,13 @@ Rectangle {
                 Layout.fillWidth: true
                 visible: inspector.selectedId !== -1 && inspector.docData !== null
                 spacing: 10
-
-                // Preview Box
+                
                 Rectangle {
                     width: 140
                     height: 140
-                    color: Theme.isDarkMode ? "#121212" : "#f0f0f0"
+                    color: (inspector.docData && inspector.docData.isFolder) ? "transparent" : (Theme.isDarkMode ? "#121212" : "#f0f0f0")
                     radius: 4
-                    border.color: Theme.buttonBorder
+                    border.color: (inspector.docData && inspector.docData.isFolder) ? "transparent" : Theme.buttonBorder
                     Layout.alignment: Qt.AlignHCenter
 
                     DocumentPreview {
@@ -411,6 +413,22 @@ Rectangle {
                         fileName: (inspector.docData && inspector.docData.fileName) || ""
                         isOffline: !!(inspector.docData && inspector.docData.isOffline)
                         fontPixelSize: 32
+                        visible: !(inspector.docData && inspector.docData.isFolder)
+                    }
+
+                    // Folder representation
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "transparent"
+                        visible: !!(inspector.docData && inspector.docData.isFolder)
+
+                        KaakaoLabel {
+                            anchors.centerIn: parent
+                            text: "📁"
+                            font.pixelSize: 64
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
                 }
 
@@ -436,7 +454,7 @@ Rectangle {
 
                 KaakaoLabel {
                     text: "Unavailable"
-                    visible: !!(inspector.docData && inspector.docData.isOffline)
+                    visible: !!(inspector.docData && inspector.docData.isOffline) && !(inspector.docData && inspector.docData.isFolder)
                     role: KaakaoLabel.Role.Small
                     color: Theme.colorError
                     opacity: 1.0
@@ -447,16 +465,16 @@ Rectangle {
                     id: previewDisclosure
                     text: "Extracted Text Preview"
                     expanded: false
-                    visible: inspector.docData && inspector.docData.textSnippet !== ""
+                    visible: inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder
                     Layout.fillWidth: true
                 }
 
                 Item {
                     id: previewContainer
                     Layout.fillWidth: true
-                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "") ? 110 : 0
+                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder) ? 110 : 0
                     clip: true
-                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "")
+                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder)
 
                     Behavior on Layout.preferredHeight {
                         NumberAnimation {
@@ -500,16 +518,21 @@ Rectangle {
                     columnSpacing: 8
                     Layout.fillWidth: true
 
-                    KaakaoLabel { text: "Size:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
-                    KaakaoLabel { text: (inspector.docData && inspector.docData.fileSizeStr) || ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+                    KaakaoLabel { text: "Contents:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0; visible: !!(inspector.docData && inspector.docData.isFolder) }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.itemCountStr) || ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0; visible: !!(inspector.docData && inspector.docData.isFolder) }
 
-                    KaakaoLabel { text: "Pages:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
-                    KaakaoLabel { text: (inspector.docData && inspector.docData.pageCount !== undefined) ? inspector.docData.pageCount : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+                    KaakaoLabel { text: "Size:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.fileSizeStr) || ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
+
+                    KaakaoLabel { text: "Pages:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.pageCount !== undefined) ? inspector.docData.pageCount : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
 
                     KaakaoLabel { text: "Type:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
                     KaakaoLabel {
                         text: {
-                            if (!inspector.docData || !inspector.docData.fileName) return ""
+                            if (!inspector.docData) return ""
+                            if (inspector.docData.isFolder) return "Folder"
+                            if (!inspector.docData.fileName) return ""
                             var parts = inspector.docData.fileName.split('.')
                             if (parts.length <= 1) return "Unknown File"
                             var ext = parts[parts.length - 1].toLowerCase()
@@ -570,188 +593,194 @@ Rectangle {
                     KaakaoLabel { text: "Modified:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
                     KaakaoLabel { text: (inspector.docData && inspector.docData.dateModified) ? inspector.formatDate(inspector.docData.dateModified) : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
 
-                    KaakaoLabel { text: "Imported:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
-                    KaakaoLabel { text: (inspector.docData && inspector.docData.dateAdded) ? inspector.formatDate(inspector.docData.dateAdded) : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+                    KaakaoLabel { text: "Imported:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.dateAdded) ? inspector.formatDate(inspector.docData.dateAdded) : ""; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
 
-                    KaakaoLabel { text: "Opened:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0 }
-                    KaakaoLabel { text: (inspector.docData && inspector.docData.lastOpened !== undefined) ? inspector.formatLastOpened(inspector.docData.lastOpened) : "Never"; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0 }
+                    KaakaoLabel { text: "Opened:"; role: KaakaoLabel.Role.Small; color: Theme.sidebarSectionText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
+                    KaakaoLabel { text: (inspector.docData && inspector.docData.lastOpened !== undefined) ? inspector.formatLastOpened(inspector.docData.lastOpened) : "Never"; role: KaakaoLabel.Role.Small; color: Theme.primaryText; opacity: 1.0; visible: !(inspector.docData && inspector.docData.isFolder) }
                 }
 
-                KaakaoSeparator { Layout.fillWidth: true }
-
-                // Clickable Star Rating
-                KaakaoLabel {
-                    text: "Rating"
-                    role: KaakaoLabel.Role.Small
-                    font.weight: Font.DemiBold
-                    color: Theme.sidebarSectionText
-                    opacity: 1.0
-                }
-
-                Row {
-                    id: singleRatingRow
-                    spacing: 4
-                    Layout.alignment: Qt.AlignHCenter
-
-                    property int hoveredIndex: -1
-                    property int localRating: inspector.docData ? inspector.docData.starRating : 0
-
-                    Connections {
-                        target: inspector
-                        ignoreUnknownSignals: true
-                        function onDocDataChanged() {
-                            singleRatingRow.localRating = inspector.docData ? inspector.docData.starRating : 0
-                        }
-                    }
-
-                    Repeater {
-                        model: 5
-                        KaakaoLabel {
-                            text: "★"
-                            font.pixelSize: 22
-                            color: {
-                                var active = false
-                                if (singleRatingRow.hoveredIndex !== -1) {
-                                    active = index <= singleRatingRow.hoveredIndex
-                                } else {
-                                    active = index < singleRatingRow.localRating
-                                }
-                                return active ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc")
-                            }
-                            opacity: 1.0
-                            scale: starMouseArea.containsMouse ? 1.2 : 1.0
-
-                            Behavior on scale {
-                                NumberAnimation { duration: 100 }
-                            }
-                            Behavior on color {
-                                ColorAnimation { duration: 100 }
-                            }
-
-                            MouseArea {
-                                id: starMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onEntered: singleRatingRow.hoveredIndex = index
-                                onExited: singleRatingRow.hoveredIndex = -1
-                                onClicked: {
-                                    var newRating = index + 1
-                                    if (singleRatingRow.localRating === newRating) {
-                                        newRating = 0
-                                    }
-                                    singleRatingRow.localRating = newRating
-                                    libraryController.batchUpdateRating([inspector.selectedId], newRating)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                KaakaoSeparator { Layout.fillWidth: true }
-
-                // Tags Section
-                KaakaoLabel {
-                    text: "Tags"
-                    role: KaakaoLabel.Role.Small
-                    font.weight: Font.DemiBold
-                    color: Theme.sidebarSectionText
-                    opacity: 1.0
-                }
-
-                // Tags Flow layout list
-                Flow {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 4
-                    Repeater {
-                        model: inspector.docData ? inspector.docData.tags : 0
-                        TagPill {
-                            text: modelData
-                            showDelete: true
-                            onRemoveRequested: {
-                                var currentTags = inspector.docData.tags.slice()
-                                var idx = currentTags.indexOf(modelData)
-                                if (idx >= 0) {
-                                    currentTags.splice(idx, 1)
-                                    libraryController.batchUpdateTags([inspector.selectedId], currentTags)
-                                }
-                            }
-                        }
-                    }
-                }
+                    spacing: 10
+                    visible: !(inspector.docData && inspector.docData.isFolder)
 
-                // Add tag input
-                KaakaoTextField {
-                    id: addTagField
-                    placeholderText: "Add tag..."
-                    Layout.fillWidth: true
-                    onAccepted: {
-                        var rawText = text.trim()
-                        if (rawText !== "" && inspector.docData) {
-                            var currentTags = inspector.docData.tags.slice()
-                            var parts = rawText.split(",")
-                            var addedAny = false
-                            for (var i = 0; i < parts.length; i++) {
-                                var part = parts[i].trim()
-                                if (part !== "" && currentTags.indexOf(part) === -1) {
-                                    currentTags.push(part)
-                                    addedAny = true
-                                }
-                            }
-                            if (addedAny) {
-                                libraryController.batchUpdateTags([inspector.selectedId], currentTags)
-                            }
-                            text = ""
-                        }
-                    }
-                }
+                    KaakaoSeparator { Layout.fillWidth: true }
 
-                KaakaoSeparator { Layout.fillWidth: true }
-
-                // Notes Section
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 0
-                    
+                    // Clickable Star Rating
                     KaakaoLabel {
-                        text: "Notes"
+                        text: "Rating"
                         role: KaakaoLabel.Role.Small
                         font.weight: Font.DemiBold
                         color: Theme.sidebarSectionText
                         opacity: 1.0
                     }
 
-                    Item { Layout.fillWidth: true } // Spacer
+                    Row {
+                        id: singleRatingRow
+                        spacing: 4
+                        Layout.alignment: Qt.AlignHCenter
 
-                    KaakaoLabel {
-                        text: "Saved"
-                        role: KaakaoLabel.Role.Small
-                        font.pixelSize: 10
-                        font.italic: true
-                        color: Theme.isDarkMode ? "#2ecc71" : "#27ae60"
-                        opacity: inspector.showSavedIndicator ? 1.0 : 0.0
-                        
-                        Behavior on opacity {
-                            NumberAnimation { duration: 200 }
+                        property int hoveredIndex: -1
+                        property int localRating: inspector.docData ? inspector.docData.starRating : 0
+
+                        Connections {
+                            target: inspector
+                            ignoreUnknownSignals: true
+                            function onDocDataChanged() {
+                                singleRatingRow.localRating = inspector.docData ? inspector.docData.starRating : 0
+                            }
+                        }
+
+                        Repeater {
+                            model: 5
+                            KaakaoLabel {
+                                text: "★"
+                                font.pixelSize: 22
+                                color: {
+                                    var active = false
+                                    if (singleRatingRow.hoveredIndex !== -1) {
+                                        active = index <= singleRatingRow.hoveredIndex
+                                    } else {
+                                        active = index < singleRatingRow.localRating
+                                    }
+                                    return active ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc")
+                                }
+                                opacity: 1.0
+                                scale: starMouseArea.containsMouse ? 1.2 : 1.0
+
+                                Behavior on scale {
+                                    NumberAnimation { duration: 100 }
+                                }
+                                Behavior on color {
+                                    ColorAnimation { duration: 100 }
+                                }
+
+                                MouseArea {
+                                    id: starMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onEntered: singleRatingRow.hoveredIndex = index
+                                    onExited: singleRatingRow.hoveredIndex = -1
+                                    onClicked: {
+                                        var newRating = index + 1
+                                        if (singleRatingRow.localRating === newRating) {
+                                            newRating = 0
+                                        }
+                                        singleRatingRow.localRating = newRating
+                                        libraryController.batchUpdateRating([inspector.selectedId], newRating)
+                                    }
+                                }
+                            }
                         }
                     }
-                }
 
-                ScrollView {
-                    Layout.fillWidth: true
-                    height: 80
-                    clip: true
-                    
-                    KaakaoTextArea {
-                        id: notesArea
-                        objectName: "notesArea"
-                        text: inspector.docData ? inspector.docData.notes : ""
-                        placeholderText: "Write details or thoughts..."
-                        placeholderTextColor: Theme.sidebarSectionText
+                    KaakaoSeparator { Layout.fillWidth: true }
 
-                        // Save notes when leaving focus
-                        onActiveFocusChanged: {
-                            if (!activeFocus) {
-                                inspector.saveNotes()
+                    // Tags Section
+                    KaakaoLabel {
+                        text: "Tags"
+                        role: KaakaoLabel.Role.Small
+                        font.weight: Font.DemiBold
+                        color: Theme.sidebarSectionText
+                        opacity: 1.0
+                    }
+
+                    // Tags Flow layout list
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Repeater {
+                            model: inspector.docData ? inspector.docData.tags : 0
+                            TagPill {
+                                text: modelData
+                                showDelete: true
+                                onRemoveRequested: {
+                                    var currentTags = inspector.docData.tags.slice()
+                                    var idx = currentTags.indexOf(modelData)
+                                    if (idx >= 0) {
+                                        currentTags.splice(idx, 1)
+                                        libraryController.batchUpdateTags([inspector.selectedId], currentTags)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Add tag input
+                    KaakaoTextField {
+                        id: addTagField
+                        placeholderText: "Add tag..."
+                        Layout.fillWidth: true
+                        onAccepted: {
+                            var rawText = text.trim()
+                            if (rawText !== "" && inspector.docData) {
+                                var currentTags = inspector.docData.tags.slice()
+                                var parts = rawText.split(",")
+                                var addedAny = false
+                                for (var i = 0; i < parts.length; i++) {
+                                    var part = parts[i].trim()
+                                    if (part !== "" && currentTags.indexOf(part) === -1) {
+                                        currentTags.push(part)
+                                        addedAny = true
+                                    }
+                                }
+                                if (addedAny) {
+                                    libraryController.batchUpdateTags([inspector.selectedId], currentTags)
+                                }
+                                text = ""
+                            }
+                        }
+                    }
+
+                    KaakaoSeparator { Layout.fillWidth: true }
+
+                    // Notes Section
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+
+                        KaakaoLabel {
+                            text: "Notes"
+                            role: KaakaoLabel.Role.Small
+                            font.weight: Font.DemiBold
+                            color: Theme.sidebarSectionText
+                            opacity: 1.0
+                        }
+
+                        Item { Layout.fillWidth: true } // Spacer
+
+                        KaakaoLabel {
+                            text: "Saved"
+                            role: KaakaoLabel.Role.Small
+                            font.pixelSize: 10
+                            font.italic: true
+                            color: Theme.isDarkMode ? "#2ecc71" : "#27ae60"
+                            opacity: inspector.showSavedIndicator ? 1.0 : 0.0
+
+                            Behavior on opacity {
+                                NumberAnimation { duration: 200 }
+                            }
+                        }
+                    }
+
+                    ScrollView {
+                        Layout.fillWidth: true
+                        height: 80
+                        clip: true
+
+                        KaakaoTextArea {
+                            id: notesArea
+                            objectName: "notesArea"
+                            text: inspector.docData ? inspector.docData.notes : ""
+                            placeholderText: "Write details or thoughts..."
+                            placeholderTextColor: Theme.sidebarSectionText
+
+                            // Save notes when leaving focus
+                            onActiveFocusChanged: {
+                                if (!activeFocus) {
+                                    inspector.saveNotes()
+                                }
                             }
                         }
                     }

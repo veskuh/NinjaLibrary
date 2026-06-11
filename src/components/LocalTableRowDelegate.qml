@@ -85,6 +85,24 @@ ItemDelegate {
         return false
     }
 
+    readonly property bool isFolderValue: {
+        let dummy = control.modelUpdateCount
+        if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+            let val = control.ListView.view.model.get(control.rowIndex, "isFolder")
+            return val !== undefined ? (val === true || val === "true" || val === 1 || val === "1") : false
+        }
+        return false
+    }
+
+    readonly property string itemCountStrValue: {
+        let dummy = control.modelUpdateCount
+        if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
+            let val = control.ListView.view.model.get(control.rowIndex, "itemCountStr")
+            return val !== undefined ? val.toString() : ""
+        }
+        return ""
+    }
+
 
 
     Connections {
@@ -225,12 +243,20 @@ ItemDelegate {
                     anchors.rightMargin: 8
                     verticalAlignment: Text.AlignVCenter
                     visible: !modelData.showAsIndicator && modelData.role !== "starRatingStr"
-                    text: cellItem.cellValue
+                    text: {
+                        if (control.isFolderValue) {
+                            if (modelData.role === "fileName") return "📁 " + cellItem.cellValue
+                            if (modelData.role === "fileSizeStr") return control.itemCountStrValue
+                            if (modelData.role === "dateModifiedStr") return cellItem.cellValue
+                            return ""
+                        }
+                        return cellItem.cellValue
+                    }
                     font: Theme.defaultFont
                     elide: modelData.elide !== undefined ? modelData.elide : Text.ElideRight
                     renderType: Text.NativeRendering
                     color: {
-                        if (control.isOffline) {
+                        if (control.isOffline && !control.isFolderValue) {
                             return "#8e8e93"
                         }
                         return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) 
@@ -244,7 +270,7 @@ ItemDelegate {
                     anchors.fill: parent
                     anchors.leftMargin: 8
                     anchors.rightMargin: 8
-                    visible: modelData.role === "starRatingStr"
+                    visible: modelData.role === "starRatingStr" && !control.isFolderValue
                     spacing: 2
 
                     property int hoveredIndex: -1
@@ -322,7 +348,9 @@ ItemDelegate {
         }
         onDoubleClicked: (mouse) => {
             if (mouse.button === Qt.LeftButton) {
-                if (typeof tableCanvas !== "undefined") {
+                if (control.isFolderValue) {
+                    proxyFilter.folderFilter = control.absolutePathValue
+                } else if (typeof tableCanvas !== "undefined") {
                     tableCanvas.doubleClicked(control.absolutePathValue)
                 }
             }

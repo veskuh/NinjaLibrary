@@ -920,4 +920,43 @@ TestCase {
         scanSpy.destroy();
         win.destroy();
     }
+
+    function test_subfolder_navigation_and_view_modes() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let mainMenuBar = win.mainMenuBar;
+        verify(mainMenuBar !== null, "AppMenuBar should exist");
+
+        // Verify initial state
+        compare(proxyFilter.includeSubfolderContents, false, "includeSubfolderContents should default to false");
+        compare(proxyFilter.showSubfolderIcons, true, "showSubfolderIcons should default to true");
+
+        // Change mode to direct view (only files at current level)
+        mainMenuBar.setFolderViewModeRequested("direct");
+        wait(100);
+        compare(proxyFilter.includeSubfolderContents, false, "includeSubfolderContents should be false in direct mode");
+        compare(proxyFilter.showSubfolderIcons, false, "showSubfolderIcons should be false in direct mode");
+
+        // Change mode to recursive view (include all subfolder contents)
+        mainMenuBar.setFolderViewModeRequested("recursive");
+        wait(100);
+        compare(proxyFilter.includeSubfolderContents, true, "includeSubfolderContents should be true in recursive mode");
+
+        // Change mode to hierarchical view (browse folders hierarchically)
+        mainMenuBar.setFolderViewModeRequested("hierarchical");
+        wait(100);
+        compare(proxyFilter.includeSubfolderContents, false, "includeSubfolderContents should be false in hierarchical mode");
+        compare(proxyFilter.showSubfolderIcons, true, "showSubfolderIcons should be true in hierarchical mode");
+
+        // Test path helpers
+        let root = "/Users/vesku/Documents";
+        let sub = "/Users/vesku/Documents/Receipts/2026";
+        compare(win.getRootFolderName(root), "Documents", "getRootFolderName should parse root folder name");
+        compare(win.getRelativeSubfolderPath(sub, root), "Receipts/2026", "getRelativeSubfolderPath should return relative path");
+        compare(win.getRelativeSubfolderPath(root, root), "", "getRelativeSubfolderPath should return empty for root");
+
+        win.destroy();
+    }
 }

@@ -106,6 +106,12 @@ QVariant DocumentModel::data(const QModelIndex &index, int role) const
             return doc.tags.join(", ");
         }
         case LastOpenedRole: return doc.lastOpened;
+        case IsFolderRole: return doc.isFolder;
+        case ItemCountRole: return doc.itemCount;
+        case ItemCountStrRole: {
+            if (!doc.isFolder) return QString();
+            return QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
+        }
         default: return QVariant();
     }
 }
@@ -135,6 +141,9 @@ QHash<int, QByteArray> DocumentModel::roleNames() const
     roles[DateModifiedStrRole] = "dateModifiedStr";
     roles[TagsStrRole] = "tagsStr";
     roles[LastOpenedRole] = "lastOpened";
+    roles[IsFolderRole] = "isFolder";
+    roles[ItemCountRole] = "itemCount";
+    roles[ItemCountStrRole] = "itemCountStr";
     return roles;
 }
 
@@ -166,6 +175,18 @@ void DocumentModel::forceRefresh()
         }
     }
 
+    QMap<int, QString> watchedRoots;
+    {
+        QSqlQuery q("SELECT id, absolute_path FROM watched_folders;", db);
+        while (q.next()) {
+            watchedRoots[q.value(0).toInt()] = q.value(1).toString();
+        }
+    }
+
+    QMap<QString, int> folderFileCounts;
+    QSet<QString> uniqueFolders;
+    QMap<QString, int> folderIdMap;
+
     beginResetModel();
     m_documents.clear();
 
@@ -190,6 +211,8 @@ void DocumentModel::forceRefresh()
         doc.starRating = record.value(10).toInt();
         doc.isOffline = record.value(11).toBool();
         doc.lastOpened = record.value(12).toLongLong();
+        doc.isFolder = false;
+        doc.itemCount = 0;
 
         QString tagsStr = record.value(13).toString();
         if (!tagsStr.isEmpty()) {
@@ -214,6 +237,36 @@ void DocumentModel::forceRefresh()
         }
 
         m_documents.append(doc);
+
+        // Track folders recursively
+        QString root = watchedRoots.value(doc.folderId);
+        if (!root.isEmpty()) {
+            QString parentDir = QFileInfo(doc.absolutePath).absolutePath();
+            QString dir = parentDir;
+            while (dir.startsWith(root) && dir.length() > root.length()) {
+                uniqueFolders.insert(dir);
+                folderIdMap[dir] = doc.folderId;
+                folderFileCounts[dir]++;
+                dir = QFileInfo(dir).absolutePath();
+            }
+        }
+    }
+
+    // Append virtual folders
+    int virtualFolderId = -1;
+    for (const QString &folderPath : uniqueFolders) {
+        DocumentInfo folderDoc;
+        folderDoc.id = virtualFolderId--;
+        folderDoc.folderId = folderIdMap.value(folderPath);
+        folderDoc.fileName = QFileInfo(folderPath).fileName();
+        folderDoc.absolutePath = folderPath;
+        folderDoc.isFolder = true;
+        folderDoc.itemCount = folderFileCounts.value(folderPath, 0);
+        folderDoc.fileSize = 0;
+        folderDoc.starRating = 0;
+        folderDoc.isOffline = false;
+        folderDoc.dateModified = QFileInfo(folderPath).lastModified();
+        m_documents.append(folderDoc);
     }
 
     int tempPdf = 0;
@@ -223,6 +276,10 @@ void DocumentModel::forceRefresh()
     int tempUnavailable = 0;
 
     for (const auto &doc : m_documents) {
+        if (doc.isFolder) {
+            continue;
+        }
+
         if (doc.isOffline) {
             tempUnavailable++;
         } else {

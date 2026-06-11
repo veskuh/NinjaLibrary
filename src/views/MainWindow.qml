@@ -59,6 +59,28 @@ KaakaoWindow {
     }
 
     property string pendingSelectDocPath: ""
+    property var folderNavigationMap: ({})
+
+    function getRootFolderName(rootPath) {
+        if (!rootPath) return "";
+        var lastSlash = rootPath.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            return rootPath.substring(lastSlash + 1);
+        }
+        return rootPath;
+    }
+
+    function getRelativeSubfolderPath(currentPath, rootPath) {
+        if (!currentPath || !rootPath) return "";
+        if (currentPath === rootPath) return "";
+        if (currentPath.startsWith(rootPath + "/")) {
+            return currentPath.substring(rootPath.length + 1);
+        }
+        if (currentPath.startsWith(rootPath)) {
+            return currentPath.substring(rootPath.length);
+        }
+        return "";
+    }
 
     function selectDocument(docId) {
         inspector.selectedIds = [docId]
@@ -106,6 +128,20 @@ KaakaoWindow {
         }
     }
 
+    Connections {
+        target: proxyFilter
+        ignoreUnknownSignals: true
+        function onFolderFilterChanged() {
+            var selectedRoot = sidebar.getSelectedFolder()
+            if (selectedRoot !== "") {
+                var currentPath = proxyFilter.folderFilter
+                if (currentPath.startsWith(selectedRoot)) {
+                    window.folderNavigationMap[selectedRoot] = currentPath
+                }
+            }
+        }
+    }
+
     onXChanged: {
         if (window.visibility === Window.Windowed) {
             winSettings.x = window.x
@@ -133,11 +169,25 @@ KaakaoWindow {
 
     menuBar: AppMenuBar {
         id: mainMenuBar
+        includeSubfolderContentsVal: proxyFilter.includeSubfolderContents
+        showSubfolderIconsVal: proxyFilter.showSubfolderIcons
         onOpenFolderRequested: folderDialog.open()
         onFocusSearchRequested: searchField.forceActiveFocus()
         onToggleSidebarRequested: sidebar.collapsed = !sidebar.collapsed
         onToggleInspectorRequested: inspector.collapsed = !inspector.collapsed
         onSetViewModeRequested: (index) => viewSegment.currentIndex = index
+        onSetFolderViewModeRequested: (mode) => {
+            if (mode === "hierarchical") {
+                proxyFilter.includeSubfolderContents = false
+                proxyFilter.showSubfolderIcons = true
+            } else if (mode === "direct") {
+                proxyFilter.includeSubfolderContents = false
+                proxyFilter.showSubfolderIcons = false
+            } else if (mode === "recursive") {
+                proxyFilter.includeSubfolderContents = true
+                proxyFilter.showSubfolderIcons = false
+            }
+        }
         onMinimizeRequested: window.showMinimized()
         onOpenAboutRequested: aboutDialog.open()
         onOpenPreferencesRequested: prefsDialog.open()
@@ -211,6 +261,39 @@ KaakaoWindow {
         KaakaoMenuItem {
             text: "Refresh Library"
             onTriggered: documentModel.refresh()
+        }
+        KaakaoMenuSeparator {
+            visible: sidebar.getSelectedFolder() !== ""
+        }
+        KaakaoMenuItem {
+            text: "Browse Folders Hierarchically"
+            visible: sidebar.getSelectedFolder() !== ""
+            checkable: true
+            checked: !proxyFilter.includeSubfolderContents && proxyFilter.showSubfolderIcons
+            onTriggered: {
+                proxyFilter.includeSubfolderContents = false
+                proxyFilter.showSubfolderIcons = true
+            }
+        }
+        KaakaoMenuItem {
+            text: "Only Show Files at Current Level"
+            visible: sidebar.getSelectedFolder() !== ""
+            checkable: true
+            checked: !proxyFilter.includeSubfolderContents && !proxyFilter.showSubfolderIcons
+            onTriggered: {
+                proxyFilter.includeSubfolderContents = false
+                proxyFilter.showSubfolderIcons = false
+            }
+        }
+        KaakaoMenuItem {
+            text: "Include All Subfolder Contents"
+            visible: sidebar.getSelectedFolder() !== ""
+            checkable: true
+            checked: proxyFilter.includeSubfolderContents
+            onTriggered: {
+                proxyFilter.includeSubfolderContents = true
+                proxyFilter.showSubfolderIcons = false
+            }
         }
         KaakaoMenuSeparator {
             visible: sidebar.getSelectedFolder() !== ""
@@ -389,10 +472,15 @@ KaakaoWindow {
                     onFolderSelected: (path) => {
                         proxyFilter.categoryFilter = "All"
                         proxyFilter.selectedTags = []
-                        proxyFilter.folderFilter = path
                         proxyFilter.scopeFilter = "All"
                         searchField.text = ""
                         canvasStack.clearSelections()
+                        var cached = window.folderNavigationMap[path]
+                        if (cached !== undefined) {
+                            proxyFilter.folderFilter = cached
+                        } else {
+                            proxyFilter.folderFilter = path
+                        }
                     }
                     onTagSelected: (tag) => {
                         proxyFilter.categoryFilter = "All"
@@ -522,6 +610,33 @@ KaakaoWindow {
                             var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
                             scopeBar.currentIndex = idx >= 0 ? idx : 0
                         }
+                    }
+                }
+
+                // Clickable path breadcrumbs (only in hierarchical/direct browse views when browsing a watched folder)
+                Rectangle {
+                    id: pathBarContainer
+                    Layout.fillWidth: true
+                    height: 32
+                    visible: !proxyFilter.includeSubfolderContents && sidebar.getSelectedFolder() !== ""
+                    color: Theme.sidebarBackground
+
+                    KaakaoPathControl {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        rootLabel: window.getRootFolderName(sidebar.getSelectedFolder())
+                        path: window.getRelativeSubfolderPath(proxyFilter.folderFilter, sidebar.getSelectedFolder())
+                        onPathClicked: (targetPath) => {
+                            proxyFilter.folderFilter = sidebar.getSelectedFolder() + (targetPath !== "" ? "/" + targetPath : "")
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: Theme.sidebarBorder
                     }
                 }
 

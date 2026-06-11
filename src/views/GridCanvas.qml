@@ -77,15 +77,28 @@ Item {
             target: gridView.gridView.Keys
             function onPressed(event) {
                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    if (gridCanvas.selectedIds.length === 1) {
-                        var docId = gridCanvas.selectedIds[0]
-                        for (var i = 0; i < proxyFilter.rowCount(); i++) {
-                            var idx = proxyFilter.index(i, 0)
-                            if (proxyFilter.data(idx, 257) === docId) {
-                                var path = proxyFilter.data(idx, 260) // 260 is absolutePath
-                                gridCanvas.doubleClicked(path)
+                    var idx = gridView.currentIndex
+                    if (idx >= 0 && idx < proxyFilter.rowCount()) {
+                        var isFolder = proxyFilter.get(idx, "isFolder")
+                        var path = proxyFilter.get(idx, "absolutePath")
+                        if (isFolder) {
+                            proxyFilter.folderFilter = path
+                        } else {
+                            gridCanvas.doubleClicked(path)
+                        }
+                        event.accepted = true
+                    }
+                } else if (event.key === Qt.Key_Backspace || 
+                           (event.key === Qt.Key_Up && (event.modifiers & Qt.MetaModifier || event.modifiers & Qt.ControlModifier))) {
+                    var current = proxyFilter.folderFilter
+                    var selectedRoot = sidebar.getSelectedFolder()
+                    if (current !== "" && current !== selectedRoot) {
+                        var lastSlash = current.lastIndexOf('/')
+                        if (lastSlash > 0) {
+                            var parentPath = current.substring(0, lastSlash)
+                            if (parentPath.length >= selectedRoot.length) {
+                                proxyFilter.folderFilter = parentPath
                                 event.accepted = true
-                                break
                             }
                         }
                     }
@@ -121,6 +134,9 @@ Item {
                 thumbnailPath: model.thumbnailPath || ""
                 starRating: model.starRating
                 isOffline: model.isOffline
+                isFolder: model.isFolder !== undefined ? model.isFolder : false
+                itemCount: model.itemCount !== undefined ? model.itemCount : 0
+                itemCountStr: model.itemCountStr !== undefined ? model.itemCountStr : ""
                 
                 width: scaleFactor
                 height: scaleFactor * 1.25
@@ -129,7 +145,7 @@ Item {
 
                 // Request thumbnail if not loaded yet
                 Component.onCompleted: {
-                    if (model.thumbnailPath === "" && !model.isOffline) {
+                    if (!model.isFolder && model.thumbnailPath === "" && !model.isOffline) {
                         var ext = model.fileName.substring(model.fileName.lastIndexOf('.') + 1).toLowerCase();
                         var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" ||
                                          ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
@@ -180,7 +196,11 @@ Item {
                 }
 
                 onDoubleClicked: {
-                    gridCanvas.doubleClicked(model.absolutePath)
+                    if (model.isFolder) {
+                        proxyFilter.folderFilter = model.absolutePath
+                    } else {
+                        gridCanvas.doubleClicked(model.absolutePath)
+                    }
                 }
             }
         }
