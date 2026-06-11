@@ -118,9 +118,21 @@ target_link_libraries(test_qml_ui PRIVATE
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickTest
-    NinjaLibrary
-    Kaakao
 )
+
+if(APPLE)
+    target_link_libraries(test_qml_ui PRIVATE
+        NinjaLibrary
+        Kaakao
+    )
+else()
+    target_link_libraries(test_qml_ui PRIVATE
+        -Wl,--no-as-needed
+        NinjaLibrary
+        Kaakao
+        -Wl,--as-needed
+    )
+endif()
 
 target_compile_definitions(test_qml_ui PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
