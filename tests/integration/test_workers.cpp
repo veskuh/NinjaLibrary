@@ -868,6 +868,7 @@ void TestWorkers::testTextAndDocIngestion()
 
 void TestWorkers::testMacBookmarksAndEdgeCases()
 {
+#ifdef Q_OS_MAC
     // Test MacBookmarks functions on macOS
     QString testPath = "/tmp";
     QByteArray bookmark = MacBookmarks::getBookmarkForUrl(testPath);
@@ -883,6 +884,9 @@ void TestWorkers::testMacBookmarksAndEdgeCases()
 
     // Cover empty path bookmark creation
     MacBookmarks::getBookmarkForUrl("");
+#else
+    QSKIP("MacBookmarks tests are macOS specific");
+#endif
 }
 
 void TestWorkers::testOcrNonsenseRejection()
