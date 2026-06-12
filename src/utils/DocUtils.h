@@ -34,14 +34,14 @@
 #include <QString>
 
 namespace DocUtils {
-    // Returns true if the file extension is supported for text extraction
-    bool isSupportedTextDocument(const QString &filePath);
+// Returns true if the file extension is supported for text extraction
+bool isSupportedTextDocument(const QString &filePath);
 
-    // Extracts plain text from the document at filePath
-    QString extractText(const QString &filePath);
+// Extracts plain text from the document at filePath
+QString extractText(const QString &filePath);
 
-    // Copies plain text to the system clipboard
-    void copyToClipboard(const QString &text);
-}
+// Copies plain text to the system clipboard
+void copyToClipboard(const QString &text);
+}  // namespace DocUtils
 
-#endif // DOCUTILS_H
+#endif  // DOCUTILS_H

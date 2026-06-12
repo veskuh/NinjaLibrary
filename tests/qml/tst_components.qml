@@ -27,8 +27,9 @@ TestCase {
 
     // Helper to recursively check for raw Text elements
     function hasRawTextElement(item) {
-        if (!item) return false;
-        
+        if (!item)
+            return false;
+
         let str = item.toString();
         // A raw Text element starts with QQuickText.
         // A Label starts with QQuickLabel or KaakaoLabel.
@@ -36,7 +37,7 @@ TestCase {
             // It is a raw Text element!
             return true;
         }
-        
+
         // Recursively check children
         if (item.children) {
             for (let i = 0; i < item.children.length; ++i) {
@@ -60,31 +61,33 @@ TestCase {
         verify(card !== null, "DocumentCard should be created");
 
         // Verify property propagation
-        card.fileName = "test_document.pdf"
-        card.absolutePath = "/path/to/test_document.pdf"
-        card.fileSize = 1048576 // 1MB
-        card.starRating = 3
-        card.isOffline = false
-        card.isSelected = true
-        wait(500)
+        card.fileName = "test_document.pdf";
+        card.absolutePath = "/path/to/test_document.pdf";
+        card.fileSize = 1048576; // 1MB
+        card.starRating = 3;
+        card.isOffline = false;
+        card.isSelected = true;
+        wait(500);
 
         // Verify Theme colors are applied (e.g. selection/highlight state)
-        tryCompare(card, "color", Theme.isDarkMode ? "#2d3748" : "#e1f0ff", 5000, "Card background color should match selection theme color")
+        tryCompare(card, "color", Theme.isDarkMode ? "#2d3748" : "#e1f0ff", 5000, "Card background color should match selection theme color");
 
         // Verify we can update and get correct values
-        card.isOffline = true
-        compare(card.isOffline, true)
+        card.isOffline = true;
+        compare(card.isOffline, true);
 
         // Helper to find status label inside DocumentCard (identified by font.pixelSize === 9)
         function findStatusLabel(parent) {
-            if (!parent) return null;
+            if (!parent)
+                return null;
             if (parent.toString().indexOf("Label") >= 0 && parent.font.pixelSize === 9) {
                 return parent;
             }
             if (parent.children) {
                 for (let i = 0; i < parent.children.length; ++i) {
                     let found = findStatusLabel(parent.children[i]);
-                    if (found) return found;
+                    if (found)
+                        return found;
                 }
             }
             return null;
@@ -94,74 +97,77 @@ TestCase {
         verify(statusLabel !== null, "Status label should exist");
 
         // Set card online and empty thumbnail path (simulating a text file card)
-        card.isOffline = false
-        card.thumbnailPath = ""
-        compare(statusLabel.visible, false, "Status label should be hidden when online and thumbnailPath is empty")
-        compare(statusLabel.text, "", "Status label text should be empty when online and thumbnailPath is empty")
+        card.isOffline = false;
+        card.thumbnailPath = "";
+        compare(statusLabel.visible, false, "Status label should be hidden when online and thumbnailPath is empty");
+        compare(statusLabel.text, "", "Status label text should be empty when online and thumbnailPath is empty");
 
         // Set card offline
-        card.isOffline = true
-        compare(statusLabel.text, "UNAVAILABLE", "Status label text should be UNAVAILABLE when offline")
-        compare(statusLabel.visible, true, "Status label should be visible when offline")
+        card.isOffline = true;
+        compare(statusLabel.text, "UNAVAILABLE", "Status label text should be UNAVAILABLE when offline");
+        compare(statusLabel.visible, true, "Status label should be visible when offline");
 
         // Set card online but with a thumbnail path (simulating loading a PDF thumbnail)
-        card.isOffline = false
-        card.thumbnailPath = "file:///tmp/dummy.png"
-        compare(statusLabel.text, "LOADING...", "Status label text should be LOADING... when thumbnail is set but not ready")
-        compare(statusLabel.visible, true, "Status label should be visible when loading thumbnail")
+        card.isOffline = false;
+        card.thumbnailPath = "file:///tmp/dummy.png";
+        compare(statusLabel.text, "LOADING...", "Status label text should be LOADING... when thumbnail is set but not ready");
+        compare(statusLabel.visible, true, "Status label should be visible when loading thumbnail");
 
         // Wait for it to fail because /tmp/dummy.png does not exist
-        tryCompare(statusLabel, "text", "", 2000, "Status label text should become empty when loading fails")
-        tryCompare(statusLabel, "visible", false, 2000, "Status label should be hidden when loading fails")
+        tryCompare(statusLabel, "text", "", 2000, "Status label text should become empty when loading fails");
+        tryCompare(statusLabel, "visible", false, 2000, "Status label should be hidden when loading fails");
 
         // Set card online but with a failed/empty thumbnail path ("file://")
-        card.thumbnailPath = "file://"
-        compare(statusLabel.text, "", "Status label text should be empty when thumbnail path is 'file://'")
-        compare(statusLabel.visible, false, "Status label should be hidden when thumbnail path is 'file://'")
+        card.thumbnailPath = "file://";
+        compare(statusLabel.text, "", "Status label text should be empty when thumbnail path is 'file://'");
+        compare(statusLabel.visible, false, "Status label should be hidden when thumbnail path is 'file://'");
 
         // Verify there are ZERO raw Text elements (only KaakaoLabel/Label should be used)
         let hasRaw = hasRawTextElement(card);
         verify(!hasRaw, "DocumentCard must not contain raw Text elements");
-        
-        card.destroy()
+
+        card.destroy();
     }
 
     function test_tag_pill() {
         let pill = createTemporaryQmlObject("import NinjaLibrary; TagPill {}", this);
         verify(pill !== null, "TagPill should be created");
 
-        pill.text = "Important"
-        pill.showDelete = true
-        pill.isSelected = false
+        pill.text = "Important";
+        pill.showDelete = true;
+        pill.isSelected = false;
 
         // Check signals
         let clickSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
-        clickSpy.target = pill
-        clickSpy.signalName = "clicked"
+        clickSpy.target = pill;
+        clickSpy.signalName = "clicked";
 
         let removeSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
-        removeSpy.target = pill
-        removeSpy.signalName = "removeRequested"
+        removeSpy.target = pill;
+        removeSpy.signalName = "removeRequested";
 
         // Helper to find visual child with specific text
         function findChildByText(parent, targetText) {
-            if (!parent) return null;
-            if (parent.text === targetText) return parent;
+            if (!parent)
+                return null;
+            if (parent.text === targetText)
+                return parent;
             if (parent.children) {
                 for (let i = 0; i < parent.children.length; ++i) {
                     let found = findChildByText(parent.children[i], targetText);
-                    if (found) return found;
+                    if (found)
+                        return found;
                 }
             }
             return null;
         }
 
         // Wait for layout flow pass
-        wait(200)
+        wait(200);
 
         // Simulate click on the main pill area
-        mouseClick(pill)
-        compare(clickSpy.count, 1, "Click signal should be emitted")
+        mouseClick(pill);
+        compare(clickSpy.count, 1, "Click signal should be emitted");
 
         // Simulate click on the delete "×" button
         let deleteBtn = findChildByText(pill, "×");
@@ -173,8 +179,8 @@ TestCase {
         let hasRaw = hasRawTextElement(pill);
         verify(!hasRaw, "TagPill must not contain raw Text elements");
 
-        pill.destroy()
-        clickSpy.destroy()
-        removeSpy.destroy()
+        pill.destroy();
+        clickSpy.destroy();
+        removeSpy.destroy();
     }
 }

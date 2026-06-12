@@ -31,15 +31,15 @@
 #ifndef DATABASEMANAGER_H
 #define DATABASEMANAGER_H
 
+#include <QDebug>
+#include <QDir>
 #include <QObject>
-#include <QString>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QThread>
-#include <QDebug>
-#include <QDir>
 #include <QStandardPaths>
+#include <QString>
+#include <QThread>
 
 class DatabaseManager : public QObject
 {
@@ -61,4 +61,4 @@ private:
     QString m_dbPath;
 };
 
-#endif // DATABASEMANAGER_H
+#endif  // DATABASEMANAGER_H

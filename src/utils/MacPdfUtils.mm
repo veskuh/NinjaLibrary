@@ -28,85 +28,87 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "PdfUtils.h"
-#import <PDFKit/PDFKit.h>
 #import <AppKit/AppKit.h>
+#import <PDFKit/PDFKit.h>
 #include <QDebug>
+#include "PdfUtils.h"
 
 namespace PdfUtils {
 
-    QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth)
-    {
-        @autoreleasepool {
-            NSString *nsPath = pdfPath.toNSString();
-            NSURL *url = [NSURL fileURLWithPath:nsPath];
-            if (!url) return QImage();
+QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth)
+{
+    @autoreleasepool {
+        NSString *nsPath = pdfPath.toNSString();
+        NSURL *url = [NSURL fileURLWithPath:nsPath];
+        if (!url) return QImage();
 
-            PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
-            if (!pdfDoc || [pdfDoc pageCount] == 0) return QImage();
+        PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
+        if (!pdfDoc || [pdfDoc pageCount] == 0) return QImage();
 
-            PDFPage *page = [pdfDoc pageAtIndex:0];
-            NSRect bounds = [page boundsForBox:kPDFDisplayBoxMediaBox];
-            if (bounds.size.width <= 0 || bounds.size.height <= 0) return QImage();
+        PDFPage *page = [pdfDoc pageAtIndex:0];
+        NSRect bounds = [page boundsForBox:kPDFDisplayBoxMediaBox];
+        if (bounds.size.width <= 0 || bounds.size.height <= 0) return QImage();
 
-            CGFloat scale = (CGFloat)targetWidth / bounds.size.width;
-            NSSize targetSize = NSMakeSize(targetWidth, bounds.size.height * scale);
+        CGFloat scale = (CGFloat)targetWidth / bounds.size.width;
+        NSSize targetSize = NSMakeSize(targetWidth, bounds.size.height * scale);
 
-            NSImage *image = [page thumbnailOfSize:targetSize forBox:kPDFDisplayBoxMediaBox];
-            if (!image) return QImage();
+        NSImage *image = [page thumbnailOfSize:targetSize forBox:kPDFDisplayBoxMediaBox];
+        if (!image) return QImage();
 
-            CGImageRef cgImage = [image CGImageForProposedRect:NULL context:NULL hints:NULL];
-            if (!cgImage) return QImage();
+        CGImageRef cgImage = [image CGImageForProposedRect:NULL context:NULL hints:NULL];
+        if (!cgImage) return QImage();
 
-            int width = (int)targetSize.width;
-            int height = (int)targetSize.height;
+        int width = (int)targetSize.width;
+        int height = (int)targetSize.height;
 
-            QImage qimg(width, height, QImage::Format_ARGB32_Premultiplied);
-            qimg.fill(Qt::transparent);
+        QImage qimg(width, height, QImage::Format_ARGB32_Premultiplied);
+        qimg.fill(Qt::transparent);
 
-            CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-            CGContextRef context = CGBitmapContextCreate(qimg.bits(), width, height, 8, qimg.bytesPerLine(), colorSpace, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host);
-            if (!context) {
-                CGColorSpaceRelease(colorSpace);
-                return QImage();
-            }
-
-            CGContextDrawImage(context, CGRectMake(0, 0, width, height), cgImage);
-            CGContextRelease(context);
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        CGContextRef context =
+            CGBitmapContextCreate(qimg.bits(), width, height, 8, qimg.bytesPerLine(), colorSpace,
+                                  kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host);
+        if (!context) {
             CGColorSpaceRelease(colorSpace);
-
-            return qimg;
+            return QImage();
         }
-    }
 
-    QString extractPdfText(const QString &pdfPath)
-    {
-        @autoreleasepool {
-            NSString *nsPath = pdfPath.toNSString();
-            NSURL *url = [NSURL fileURLWithPath:nsPath];
-            if (!url) return QString();
+        CGContextDrawImage(context, CGRectMake(0, 0, width, height), cgImage);
+        CGContextRelease(context);
+        CGColorSpaceRelease(colorSpace);
 
-            PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
-            if (!pdfDoc) return QString();
-
-            NSString *allText = [pdfDoc string];
-            if (!allText) return QString();
-
-            return QString::fromNSString(allText);
-        }
-    }
-
-    int getPdfPageCount(const QString &pdfPath)
-    {
-        @autoreleasepool {
-            NSString *nsPath = pdfPath.toNSString();
-            NSURL *url = [NSURL fileURLWithPath:nsPath];
-            if (!url) return 0;
-
-            PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
-            if (!pdfDoc) return 0;
-
-            return (int)[pdfDoc pageCount];
-        }
+        return qimg;
     }
 }
+
+QString extractPdfText(const QString &pdfPath)
+{
+    @autoreleasepool {
+        NSString *nsPath = pdfPath.toNSString();
+        NSURL *url = [NSURL fileURLWithPath:nsPath];
+        if (!url) return QString();
+
+        PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
+        if (!pdfDoc) return QString();
+
+        NSString *allText = [pdfDoc string];
+        if (!allText) return QString();
+
+        return QString::fromNSString(allText);
+    }
+}
+
+int getPdfPageCount(const QString &pdfPath)
+{
+    @autoreleasepool {
+        NSString *nsPath = pdfPath.toNSString();
+        NSURL *url = [NSURL fileURLWithPath:nsPath];
+        if (!url) return 0;
+
+        PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
+        if (!pdfDoc) return 0;
+
+        return (int)[pdfDoc pageCount];
+    }
+}
+}  // namespace PdfUtils

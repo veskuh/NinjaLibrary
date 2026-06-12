@@ -29,44 +29,46 @@
  */
 
 #include "LibraryController.h"
-#include "../workers/ScannerTask.h"
-#include <QStandardPaths>
-#include "../workers/OcrTask.h"
-#include "../workers/ThumbnailTask.h"
-#include "../utils/DocUtils.h"
+
+#include <QClipboard>
+#include <QCryptographicHash>
+#include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QCryptographicHash>
+#include <QFile>
+#include <QFileInfo>
+#include <QGuiApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QFile>
-#include <QSaveFile>
-#include <QUrl>
-#include <QFileInfo>
 #include <QProcess>
-#include <QDesktopServices>
-#include <QGuiApplication>
-#include <QClipboard>
+#include <QSaveFile>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QStandardPaths>
+#include <QUrl>
 #include <thread>
+
+#include "../utils/DocUtils.h"
+#include "../workers/OcrTask.h"
+#include "../workers/ScannerTask.h"
+#include "../workers/ThumbnailTask.h"
 
 #ifdef Q_OS_MAC
 #include "../utils/MacBookmarks.h"
 #endif
 
 LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
-    : QObject(parent)
-    , m_dbMgr(dbMgr)
+    : QObject(parent), m_dbMgr(dbMgr)
 {
     m_watcher = new QFileSystemWatcher(this);
-    connect(m_watcher, &QFileSystemWatcher::directoryChanged, this, &LibraryController::onDirectoryChanged);
+    connect(m_watcher, &QFileSystemWatcher::directoryChanged, this,
+            &LibraryController::onDirectoryChanged);
 
     // Hybrid background crawler timer (30-minute interval)
     m_crawlTimer = new QTimer(this);
     connect(m_crawlTimer, &QTimer::timeout, this, &LibraryController::triggerBackgroundCrawl);
-    m_crawlTimer->start(30 * 60 * 1000); // 30 minutes in milliseconds
+    m_crawlTimer->start(30 * 60 * 1000);  // 30 minutes in milliseconds
 
     // Initialize sidecar storage location
     QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
@@ -95,20 +97,11 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     }
 }
 
-LibraryController::~LibraryController()
-{
-    resumeScan();
-}
+LibraryController::~LibraryController() { resumeScan(); }
 
-QStringList LibraryController::watchedFolders() const
-{
-    return m_watchedFoldersCache;
-}
+QStringList LibraryController::watchedFolders() const { return m_watchedFoldersCache; }
 
-bool LibraryController::isScanning() const
-{
-    return m_isScanning || m_activeOcrTasks > 0;
-}
+bool LibraryController::isScanning() const { return m_isScanning || m_activeOcrTasks > 0; }
 
 double LibraryController::scanProgress() const
 {
@@ -131,7 +124,9 @@ QString LibraryController::scanStatusText() const
         }
         return QString("Scanning: %1%").arg(qRound(m_scanProgress * 100));
     } else if (m_activeOcrTasks > 0) {
-        return QString("Extracting Text: %1/%2").arg(m_totalOcrTasks - m_activeOcrTasks).arg(m_totalOcrTasks);
+        return QString("Extracting Text: %1/%2")
+            .arg(m_totalOcrTasks - m_activeOcrTasks)
+            .arg(m_totalOcrTasks);
     }
     return "";
 }
@@ -148,7 +143,7 @@ bool LibraryController::addWatchedFolder(const QString &folderPath)
     // 1. Conflict detection: subfolder of an already watched directory
     for (const QString &parentPath : m_watchedFoldersCache) {
         if (absPath == parentPath) {
-            return true; // Already watched, return true to avoid duplicate errors
+            return true;  // Already watched, return true to avoid duplicate errors
         }
         if (absPath.startsWith(parentPath + "/") || absPath.startsWith(parentPath + "\\")) {
             int lastSlash = parentPath.lastIndexOf('/');
@@ -159,7 +154,8 @@ bool LibraryController::addWatchedFolder(const QString &folderPath)
             if (folderName.isEmpty()) {
                 folderName = parentPath;
             }
-            emit folderConflictDetected(QString("Folder is already monitored under: %1").arg(folderName));
+            emit folderConflictDetected(
+                QString("Folder is already monitored under: %1").arg(folderName));
             return false;
         }
     }
@@ -180,7 +176,9 @@ bool LibraryController::addWatchedFolder(const QString &folderPath)
     if (!db.isOpen()) return false;
 
     QSqlQuery query(db);
-    query.prepare("INSERT OR IGNORE INTO watched_folders (absolute_path, macos_bookmark) VALUES (:path, :bookmark);");
+    query.prepare(
+        "INSERT OR IGNORE INTO watched_folders (absolute_path, macos_bookmark) VALUES (:path, "
+        ":bookmark);");
     query.bindValue(":path", absPath);
 
 #ifdef Q_OS_MAC
@@ -233,20 +231,27 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     }
 
     if (folderId != -1) {
-        // 2. Delete search index entries first (since there is no foreign key constraint on virtual FTS5 table)
+        // 2. Delete search index entries first (since there is no foreign key constraint on virtual
+        // FTS5 table)
         QSqlQuery deleteSearch(db);
-        deleteSearch.prepare("DELETE FROM document_search WHERE document_id IN (SELECT id FROM documents WHERE folder_id = :folderId);");
+        deleteSearch.prepare(
+            "DELETE FROM document_search WHERE document_id IN (SELECT id FROM documents WHERE "
+            "folder_id = :folderId);");
         deleteSearch.bindValue(":folderId", folderId);
         if (!deleteSearch.exec()) {
-            qWarning() << "Failed to clean up document search index on stopwatching:" << deleteSearch.lastError().text();
+            qWarning() << "Failed to clean up document search index on stopwatching:"
+                       << deleteSearch.lastError().text();
         }
 
         // 3. Delete document tags first
         QSqlQuery deleteTags(db);
-        deleteTags.prepare("DELETE FROM document_tags WHERE document_id IN (SELECT id FROM documents WHERE folder_id = :folderId);");
+        deleteTags.prepare(
+            "DELETE FROM document_tags WHERE document_id IN (SELECT id FROM documents WHERE "
+            "folder_id = :folderId);");
         deleteTags.bindValue(":folderId", folderId);
         if (!deleteTags.exec()) {
-            qWarning() << "Failed to clean up document tags on stopwatching:" << deleteTags.lastError().text();
+            qWarning() << "Failed to clean up document tags on stopwatching:"
+                       << deleteTags.lastError().text();
         }
 
         // 4. Delete documents
@@ -254,7 +259,8 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         deleteDocs.prepare("DELETE FROM documents WHERE folder_id = :folderId;");
         deleteDocs.bindValue(":folderId", folderId);
         if (!deleteDocs.exec()) {
-            qWarning() << "Failed to delete documents on stopwatching:" << deleteDocs.lastError().text();
+            qWarning() << "Failed to delete documents on stopwatching:"
+                       << deleteDocs.lastError().text();
             db.rollback();
             return false;
         }
@@ -306,7 +312,8 @@ bool LibraryController::moveToTrash(int documentId, const QString &filePath)
     QCryptographicHash hash(QCryptographicHash::Sha256);
     hash.addData(localPath.toUtf8());
     QString hashStr = hash.result().toHex();
-    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbnails/";
+    QString cacheDir =
+        QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbnails/";
     QString thumbPath = cacheDir + hashStr + ".png";
     if (QFile::exists(thumbPath)) {
         QFile::remove(thumbPath);
@@ -323,7 +330,8 @@ bool LibraryController::moveToTrash(int documentId, const QString &filePath)
     deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
     deleteSearch.bindValue(":docId", documentId);
     if (!deleteSearch.exec()) {
-        qWarning() << "Failed to clean up document search index:" << deleteSearch.lastError().text();
+        qWarning() << "Failed to clean up document search index:"
+                   << deleteSearch.lastError().text();
     }
 
     // 2. Delete document tags
@@ -391,7 +399,9 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
             int tagId = query.value(0).toInt();
 
             // Link tag to document
-            query.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+            query.prepare(
+                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, "
+                ":tagId);");
             query.bindValue(":docId", docId);
             query.bindValue(":tagId", tagId);
             if (!query.exec()) {
@@ -399,14 +409,14 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
                 return false;
             }
         }
-        
+
         // Load notes & rating to update the centralized sidecar if sidecar is active
         query.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
         query.bindValue(":docId", docId);
         if (query.exec() && query.next()) {
             QString docPath = query.value(0).toString();
             int rating = query.value(1).toInt();
-            
+
             QSqlQuery notesQuery(db);
             notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
             notesQuery.bindValue(":docId", docId);
@@ -414,7 +424,7 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
             if (notesQuery.exec() && notesQuery.next()) {
                 notes = notesQuery.value(0).toString();
             }
-            
+
             // Sidecar updating helper
             writeSidecar(docPath, tags, rating, notes);
         }
@@ -457,7 +467,9 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
             int tagId = query.value(0).toInt();
 
             // Link tag to document
-            query.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+            query.prepare(
+                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, "
+                ":tagId);");
             query.bindValue(":docId", docId);
             query.bindValue(":tagId", tagId);
             if (!query.exec()) {
@@ -465,10 +477,12 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
                 return false;
             }
         }
-        
+
         // Fetch all current tags for this document to write the sidecar
         QSqlQuery fetchTags(db);
-        fetchTags.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :docId;");
+        fetchTags.prepare(
+            "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
+            "dt.document_id = :docId;");
         fetchTags.bindValue(":docId", docId);
         QStringList allDocTags;
         if (fetchTags.exec()) {
@@ -476,7 +490,7 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
                 allDocTags << fetchTags.value(0).toString();
             }
         }
-        
+
         // Fetch path, rating, notes for sidecar
         QSqlQuery docQuery(db);
         docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
@@ -484,7 +498,7 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
         if (docQuery.exec() && docQuery.next()) {
             QString docPath = docQuery.value(0).toString();
             int rating = docQuery.value(1).toInt();
-            
+
             QSqlQuery notesQuery(db);
             notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
             notesQuery.bindValue(":docId", docId);
@@ -519,12 +533,13 @@ bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QSt
             query.prepare("SELECT id FROM tags WHERE name = :name;");
             query.bindValue(":name", tagName.trimmed());
             if (!query.exec() || !query.next()) {
-                continue; // Tag doesn't exist globally, nothing to remove
+                continue;  // Tag doesn't exist globally, nothing to remove
             }
             int tagId = query.value(0).toInt();
 
             // Delete link
-            query.prepare("DELETE FROM document_tags WHERE document_id = :docId AND tag_id = :tagId;");
+            query.prepare(
+                "DELETE FROM document_tags WHERE document_id = :docId AND tag_id = :tagId;");
             query.bindValue(":docId", docId);
             query.bindValue(":tagId", tagId);
             if (!query.exec()) {
@@ -535,7 +550,9 @@ bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QSt
 
         // Fetch all current tags for this document to write the sidecar
         QSqlQuery fetchTags(db);
-        fetchTags.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :docId;");
+        fetchTags.prepare(
+            "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
+            "dt.document_id = :docId;");
         fetchTags.bindValue(":docId", docId);
         QStringList allDocTags;
         if (fetchTags.exec()) {
@@ -543,7 +560,7 @@ bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QSt
                 allDocTags << fetchTags.value(0).toString();
             }
         }
-        
+
         // Fetch path, rating, notes for sidecar
         QSqlQuery docQuery(db);
         docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
@@ -551,7 +568,7 @@ bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QSt
         if (docQuery.exec() && docQuery.next()) {
             QString docPath = docQuery.value(0).toString();
             int rating = docQuery.value(1).toInt();
-            
+
             QSqlQuery notesQuery(db);
             notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
             notesQuery.bindValue(":docId", docId);
@@ -574,7 +591,10 @@ QStringList LibraryController::getUniqueTags() const
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return tags;
 
-    QSqlQuery query("SELECT DISTINCT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id ORDER BY t.name COLLATE NOCASE ASC;", db);
+    QSqlQuery query(
+        "SELECT DISTINCT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id ORDER BY "
+        "t.name COLLATE NOCASE ASC;",
+        db);
     while (query.next()) {
         tags << query.value(0).toString();
     }
@@ -665,16 +685,18 @@ bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rat
             db.rollback();
             return false;
         }
-        
+
         // Fetch current tags & notes to update the centralized sidecar
         query.prepare("SELECT absolute_path FROM documents WHERE id = :docId;");
         query.bindValue(":docId", docId);
         if (query.exec() && query.next()) {
             QString docPath = query.value(0).toString();
-            
+
             // Fetch tags
             QSqlQuery tagQuery(db);
-            tagQuery.prepare("SELECT name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :docId;");
+            tagQuery.prepare(
+                "SELECT name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
+                "dt.document_id = :docId;");
             tagQuery.bindValue(":docId", docId);
             QStringList tags;
             if (tagQuery.exec()) {
@@ -682,7 +704,7 @@ bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rat
                     tags.append(tagQuery.value(0).toString());
                 }
             }
-            
+
             // Fetch notes
             QSqlQuery notesQuery(db);
             notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
@@ -691,7 +713,7 @@ bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rat
             if (notesQuery.exec() && notesQuery.next()) {
                 notes = notesQuery.value(0).toString();
             }
-            
+
             writeSidecar(docPath, tags, rating, notes);
         }
     }
@@ -726,7 +748,9 @@ bool LibraryController::updateNotes(int docId, const QString &notes)
 
         // Fetch tags
         QSqlQuery tagQuery(db);
-        tagQuery.prepare("SELECT name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :docId;");
+        tagQuery.prepare(
+            "SELECT name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
+            "dt.document_id = :docId;");
         tagQuery.bindValue(":docId", docId);
         QStringList tags;
         if (tagQuery.exec()) {
@@ -743,7 +767,8 @@ bool LibraryController::updateNotes(int docId, const QString &notes)
     return true;
 }
 
-bool LibraryController::writeSidecar(const QString &documentPath, const QStringList &tags, int rating, const QString &notes)
+bool LibraryController::writeSidecar(const QString &documentPath, const QStringList &tags,
+                                     int rating, const QString &notes)
 {
     QString sidecarPath = getSidecarPath(documentPath);
     if (sidecarPath.isEmpty()) return false;
@@ -752,7 +777,7 @@ bool LibraryController::writeSidecar(const QString &documentPath, const QStringL
     obj["document_path"] = documentPath;
     obj["star_rating"] = rating;
     obj["notes"] = notes;
-    
+
     QJsonArray tagsArray;
     for (const QString &tag : tags) {
         tagsArray.append(tag);
@@ -768,7 +793,8 @@ bool LibraryController::writeSidecar(const QString &documentPath, const QStringL
     return file.commit();
 }
 
-bool LibraryController::readSidecar(const QString &documentPath, QStringList &tags, int &rating, QString &notes)
+bool LibraryController::readSidecar(const QString &documentPath, QStringList &tags, int &rating,
+                                    QString &notes)
 {
     QString sidecarPath = getSidecarPath(documentPath);
     if (sidecarPath.isEmpty()) return false;
@@ -786,7 +812,7 @@ bool LibraryController::readSidecar(const QString &documentPath, QStringList &ta
 
     rating = obj["star_rating"].toInt(0);
     notes = obj["notes"].toString();
-    
+
     tags.clear();
     QJsonArray tagsArray = obj["tags"].toArray();
     for (int i = 0; i < tagsArray.size(); ++i) {
@@ -817,7 +843,8 @@ void LibraryController::onDirectoryChanged(const QString &path)
 
 void LibraryController::triggerBackgroundCrawl()
 {
-    // 30-minute crawler sweep of all watched folders to handle deep changes not captured by watch limit.
+    // 30-minute crawler sweep of all watched folders to handle deep changes not captured by watch
+    // limit.
     for (const QString &folder : m_watchedFoldersCache) {
         emit scanRequested(folder);
     }
@@ -843,7 +870,7 @@ void LibraryController::updateFoldersCache()
     while (query.next()) {
         QString path = query.value(0).toString();
         QByteArray bookmark = query.value(1).toByteArray();
-        
+
         QString resolvedPath = path;
 #ifdef Q_OS_MAC
         if (!bookmark.isEmpty()) {
@@ -880,7 +907,8 @@ void LibraryController::watchFolderRecursively(const QString &folderPath)
 
         // Filter out unwanted directories (same logic as in ScannerTask)
         bool ok = true;
-        QStringList segments = absSubDirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
+        QStringList segments =
+            absSubDirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
         for (const QString &segment : segments) {
             if (segment.endsWith(".app", Qt::CaseInsensitive) ||
                 segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||
@@ -896,10 +924,8 @@ void LibraryController::watchFolderRecursively(const QString &folderPath)
                 segment.endsWith(".plugin", Qt::CaseInsensitive) ||
                 segment.endsWith(".appex", Qt::CaseInsensitive) ||
                 segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
-                segment.endsWith(".xcassets", Qt::CaseInsensitive) ||
-                segment == ".git" ||
-                segment == ".svn" ||
-                segment.toLower() == ".trash") {
+                segment.endsWith(".xcassets", Qt::CaseInsensitive) || segment == ".git" ||
+                segment == ".svn" || segment.toLower() == ".trash") {
                 ok = false;
                 break;
             }
@@ -944,7 +970,8 @@ void LibraryController::onScanRequested(const QString &folderPath)
         recordScan.prepare("INSERT OR IGNORE INTO active_scans (folder_path) VALUES (:path);");
         recordScan.bindValue(":path", absPath);
         if (!recordScan.exec()) {
-            qWarning() << "Failed to record active scan in database:" << recordScan.lastError().text();
+            qWarning() << "Failed to record active scan in database:"
+                       << recordScan.lastError().text();
         }
     }
 
@@ -953,7 +980,8 @@ void LibraryController::onScanRequested(const QString &folderPath)
     connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
     connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
     connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
-    connect(task, &ScannerTask::lowDiskSpaceDetected, this, &LibraryController::onLowDiskSpaceDetected);
+    connect(task, &ScannerTask::lowDiskSpaceDetected, this,
+            &LibraryController::onLowDiskSpaceDetected);
     task->setAutoDelete(true);
     QThreadPool::globalInstance()->start(task);
 }
@@ -1081,7 +1109,7 @@ void LibraryController::updateScanProgress()
 void LibraryController::onOcrTaskFinished(int docId)
 {
     Q_UNUSED(docId);
-    
+
     if (m_activeOcrTasks > 0) {
         m_activeOcrTasks--;
         if (m_activeOcrTasks == 0) {
@@ -1111,17 +1139,15 @@ void LibraryController::showInFinder(const QString &filePath)
 #if defined(Q_OS_MAC)
     QProcess::startDetached("open", QStringList() << "-R" << filePath);
 #elif defined(Q_OS_WIN)
-    QProcess::startDetached("explorer.exe", QStringList() << "/select," << QDir::toNativeSeparators(filePath));
+    QProcess::startDetached("explorer.exe",
+                            QStringList() << "/select," << QDir::toNativeSeparators(filePath));
 #else
     QFileInfo fi(filePath);
     QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absolutePath()));
 #endif
 }
 
-void LibraryController::copyToClipboard(const QString &text)
-{
-    DocUtils::copyToClipboard(text);
-}
+void LibraryController::copyToClipboard(const QString &text) { DocUtils::copyToClipboard(text); }
 
 bool LibraryController::markDocumentOpened(int docId)
 {
@@ -1167,10 +1193,7 @@ void LibraryController::cleanupSidecars()
     }
 }
 
-bool LibraryController::isScanPaused() const
-{
-    return ScannerTask::s_scanPaused;
-}
+bool LibraryController::isScanPaused() const { return ScannerTask::s_scanPaused; }
 
 void LibraryController::pauseScan()
 {
@@ -1202,5 +1225,3 @@ void LibraryController::toggleScanPause()
         pauseScan();
     }
 }
-
-

@@ -31,14 +31,15 @@
 #ifndef LIBRARYCONTROLLER_H
 #define LIBRARYCONTROLLER_H
 
-#include <QObject>
-#include <QStringList>
 #include <QFileSystemWatcher>
-#include <QTimer>
-#include <QThreadPool>
-#include <QVariantMap>
 #include <QMap>
+#include <QObject>
 #include <QSet>
+#include <QStringList>
+#include <QThreadPool>
+#include <QTimer>
+#include <QVariantMap>
+
 #include "../database/DatabaseManager.h"
 
 class LibraryController : public QObject
@@ -64,7 +65,7 @@ public slots:
     bool addWatchedFolder(const QString &folderPath);
     bool removeWatchedFolder(const QString &folderPath);
     bool moveToTrash(int documentId, const QString &filePath);
-    
+
     // Batch operations executed inside SQL transactions
     bool batchUpdateTags(const QList<int> &documentIds, const QStringList &tags);
     bool batchUpdateRating(const QList<int> &documentIds, int rating);
@@ -76,9 +77,10 @@ public slots:
     Q_INVOKABLE void showInFinder(const QString &filePath);
     Q_INVOKABLE void copyToClipboard(const QString &text);
     bool markDocumentOpened(int docId);
-    
+
     // Centralized sidecar read/write APIs
-    bool writeSidecar(const QString &documentPath, const QStringList &tags, int rating, const QString &notes);
+    bool writeSidecar(const QString &documentPath, const QStringList &tags, int rating,
+                      const QString &notes);
     bool readSidecar(const QString &documentPath, QStringList &tags, int &rating, QString &notes);
     void cleanupSidecars();
 
@@ -106,12 +108,12 @@ signals:
 private slots:
     void onDirectoryChanged(const QString &path);
     void triggerBackgroundCrawl();
-    
+
     // Worker slots
     void onScanRequested(const QString &folderPath);
     void onOcrRequested(int docId, const QString &filePath);
     void onThumbnailRequested(int docId, const QString &filePath);
-    
+
     void onScannerTaskFinished(const QString &folderPath);
     void onScanProgress(const QString &folderPath, int processed, int total);
     void onLowDiskSpaceDetected();
@@ -139,4 +141,4 @@ private:
     void updateScanProgress();
 };
 
-#endif // LIBRARYCONTROLLER_H
+#endif  // LIBRARYCONTROLLER_H

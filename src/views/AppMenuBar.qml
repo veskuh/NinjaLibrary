@@ -34,17 +34,17 @@ import QtQuick.Controls.Basic
 MenuBar {
     id: appMenuBar
 
-    signal openFolderRequested()
-    signal focusSearchRequested()
-    signal toggleSidebarRequested()
-    signal toggleInspectorRequested()
+    signal openFolderRequested
+    signal focusSearchRequested
+    signal toggleSidebarRequested
+    signal toggleInspectorRequested
     signal setViewModeRequested(int index)
     signal setFolderViewModeRequested(string mode)
     property bool includeSubfolderContentsVal: false
     property bool showSubfolderIconsVal: true
-    signal minimizeRequested()
-    signal openAboutRequested()
-    signal openPreferencesRequested()
+    signal minimizeRequested
+    signal openAboutRequested
+    signal openPreferencesRequested
 
     Menu {
         title: "File"

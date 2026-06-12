@@ -34,7 +34,7 @@
 #include <QString>
 
 namespace HashUtils {
-    QString computeSha256(const QString &filePath);
+QString computeSha256(const QString &filePath);
 }
 
-#endif // HASHUTILS_H
+#endif  // HASHUTILS_H

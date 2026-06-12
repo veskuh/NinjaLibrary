@@ -42,20 +42,23 @@ Item {
     property var innerListView: null
 
     Component.onCompleted: {
-        let lv = findListView(tableView)
+        let lv = findListView(tableView);
         if (lv) {
-            lv.delegate = rowDelegateComponent
-            innerListView = lv
+            lv.delegate = rowDelegateComponent;
+            innerListView = lv;
         }
     }
 
     function findListView(parent) {
-        if (!parent) return null;
-        if (parent.toString().indexOf("ListView") >= 0) return parent;
+        if (!parent)
+            return null;
+        if (parent.toString().indexOf("ListView") >= 0)
+            return parent;
         if (parent.children) {
             for (let i = 0; i < parent.children.length; ++i) {
                 let found = findListView(parent.children[i]);
-                if (found) return found;
+                if (found)
+                    return found;
             }
         }
         return null;
@@ -70,17 +73,17 @@ Item {
 
     function selectId(docId) {
         for (var i = 0; i < proxyFilter.rowCount(); i++) {
-            var idx = proxyFilter.index(i, 0)
+            var idx = proxyFilter.index(i, 0);
             if (proxyFilter.data(idx, 257) === docId) {
-                tableView.currentIndex = i
-                return
+                tableView.currentIndex = i;
+                return;
             }
         }
     }
 
     function clearSelection() {
-        tableView.currentIndex = -1
-        selectionChanged([])
+        tableView.currentIndex = -1;
+        selectionChanged([]);
     }
 
     KaakaoTableView {
@@ -135,31 +138,29 @@ Item {
 
         onCurrentIndexChanged: {
             if (currentIndex >= 0 && currentIndex < proxyFilter.rowCount()) {
-                var idx = proxyFilter.index(currentIndex, 0)
-                var docId = proxyFilter.data(idx, 257) // 257 is IdRole
-                tableCanvas.selectionChanged([docId])
+                var idx = proxyFilter.index(currentIndex, 0);
+                var docId = proxyFilter.data(idx, 257); // 257 is IdRole
+                tableCanvas.selectionChanged([docId]);
             } else {
-                tableCanvas.selectionChanged([])
+                tableCanvas.selectionChanged([]);
             }
         }
 
         // Handle sorting requests from table columns
         onSortRequested: (role, order) => {
             if (role === "fileName") {
-                proxyFilter.setSortRole(259) // FileNameRole
+                proxyFilter.setSortRole(259); // FileNameRole
             } else if (role === "fileSizeStr") {
-                proxyFilter.setSortRole(261) // FileSizeRole (sorts numerically!)
+                proxyFilter.setSortRole(261); // FileSizeRole (sorts numerically!)
             } else if (role === "pageCount") {
-                proxyFilter.setSortRole(266) // PageCountRole
+                proxyFilter.setSortRole(266); // PageCountRole
             } else if (role === "starRatingStr") {
-                proxyFilter.setSortRole(267) // StarRatingRole
+                proxyFilter.setSortRole(267); // StarRatingRole
             } else if (role === "dateModifiedStr") {
-                proxyFilter.setSortRole(264) // DateModifiedRole
+                proxyFilter.setSortRole(264); // DateModifiedRole
             }
-            proxyFilter.sort(0, order)
+            proxyFilter.sort(0, order);
         }
-
-
     }
 
     Connections {
@@ -168,26 +169,25 @@ Item {
         function onPressed(event) {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 if (tableView.currentIndex >= 0 && tableView.currentIndex < proxyFilter.rowCount()) {
-                    var isFolder = proxyFilter.get(tableView.currentIndex, "isFolder")
-                    var path = proxyFilter.get(tableView.currentIndex, "absolutePath")
+                    var isFolder = proxyFilter.get(tableView.currentIndex, "isFolder");
+                    var path = proxyFilter.get(tableView.currentIndex, "absolutePath");
                     if (isFolder) {
-                        proxyFilter.folderFilter = path
+                        proxyFilter.folderFilter = path;
                     } else {
-                        tableCanvas.doubleClicked(path)
+                        tableCanvas.doubleClicked(path);
                     }
-                    event.accepted = true
+                    event.accepted = true;
                 }
-            } else if (event.key === Qt.Key_Backspace || 
-                       (event.key === Qt.Key_Up && (event.modifiers & Qt.MetaModifier || event.modifiers & Qt.ControlModifier))) {
-                var current = proxyFilter.folderFilter
-                var selectedRoot = sidebar.getSelectedFolder()
+            } else if (event.key === Qt.Key_Backspace || (event.key === Qt.Key_Up && (event.modifiers & Qt.MetaModifier || event.modifiers & Qt.ControlModifier))) {
+                var current = proxyFilter.folderFilter;
+                var selectedRoot = sidebar.getSelectedFolder();
                 if (current !== "" && current !== selectedRoot) {
-                    var lastSlash = current.lastIndexOf('/')
+                    var lastSlash = current.lastIndexOf('/');
                     if (lastSlash > 0) {
-                        var parentPath = current.substring(0, lastSlash)
+                        var parentPath = current.substring(0, lastSlash);
                         if (parentPath.length >= selectedRoot.length) {
-                            proxyFilter.folderFilter = parentPath
-                            event.accepted = true
+                            proxyFilter.folderFilter = parentPath;
+                            event.accepted = true;
                         }
                     }
                 }

@@ -47,85 +47,89 @@ ItemDelegate {
     readonly property bool isSelected: ListView.isCurrentItem
     readonly property var rowData: modelData
     readonly property var docIdValue: {
-        let dummy = control.modelUpdateCount
-        if (typeof model !== "undefined" && model.docId !== undefined) return model.docId
-        if (control.rowData !== undefined && control.rowData.docId !== undefined) return control.rowData.docId
+        let dummy = control.modelUpdateCount;
+        if (typeof model !== "undefined" && model.docId !== undefined)
+            return model.docId;
+        if (control.rowData !== undefined && control.rowData.docId !== undefined)
+            return control.rowData.docId;
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-            let val = control.ListView.view.model.get(control.rowIndex, "docId")
-            return val !== undefined ? val : -1
+            let val = control.ListView.view.model.get(control.rowIndex, "docId");
+            return val !== undefined ? val : -1;
         }
-        return -1
+        return -1;
     }
     readonly property string absolutePathValue: {
-        let dummy = control.modelUpdateCount
-        if (typeof model !== "undefined" && model.absolutePath !== undefined) return model.absolutePath
-        if (control.rowData !== undefined && control.rowData.absolutePath !== undefined) return control.rowData.absolutePath
+        let dummy = control.modelUpdateCount;
+        if (typeof model !== "undefined" && model.absolutePath !== undefined)
+            return model.absolutePath;
+        if (control.rowData !== undefined && control.rowData.absolutePath !== undefined)
+            return control.rowData.absolutePath;
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-            let val = control.ListView.view.model.get(control.rowIndex, "absolutePath")
-            return val !== undefined ? val.toString() : ""
+            let val = control.ListView.view.model.get(control.rowIndex, "absolutePath");
+            return val !== undefined ? val.toString() : "";
         }
-        return ""
+        return "";
     }
     readonly property var starRatingValue: {
-        let dummy = control.modelUpdateCount
-        if (typeof model !== "undefined" && model.starRating !== undefined) return model.starRating
-        if (control.rowData !== undefined && control.rowData.starRating !== undefined) return control.rowData.starRating
+        let dummy = control.modelUpdateCount;
+        if (typeof model !== "undefined" && model.starRating !== undefined)
+            return model.starRating;
+        if (control.rowData !== undefined && control.rowData.starRating !== undefined)
+            return control.rowData.starRating;
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-            let val = control.ListView.view.model.get(control.rowIndex, "starRating")
-            return val !== undefined ? val : 0
+            let val = control.ListView.view.model.get(control.rowIndex, "starRating");
+            return val !== undefined ? val : 0;
         }
-        return 0
+        return 0;
     }
     readonly property bool isOffline: {
-        let dummy = control.modelUpdateCount
+        let dummy = control.modelUpdateCount;
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-            let val = control.ListView.view.model.get(control.rowIndex, "isOffline")
-            return val !== undefined ? (val === true || val === "true" || val === 1 || val === "1") : false
+            let val = control.ListView.view.model.get(control.rowIndex, "isOffline");
+            return val !== undefined ? (val === true || val === "true" || val === 1 || val === "1") : false;
         }
-        return false
+        return false;
     }
 
     readonly property bool isFolderValue: {
-        let dummy = control.modelUpdateCount
+        let dummy = control.modelUpdateCount;
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-            let val = control.ListView.view.model.get(control.rowIndex, "isFolder")
-            return val !== undefined ? (val === true || val === "true" || val === 1 || val === "1") : false
+            let val = control.ListView.view.model.get(control.rowIndex, "isFolder");
+            return val !== undefined ? (val === true || val === "true" || val === 1 || val === "1") : false;
         }
-        return false
+        return false;
     }
 
     readonly property string itemCountStrValue: {
-        let dummy = control.modelUpdateCount
+        let dummy = control.modelUpdateCount;
         if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-            let val = control.ListView.view.model.get(control.rowIndex, "itemCountStr")
-            return val !== undefined ? val.toString() : ""
+            let val = control.ListView.view.model.get(control.rowIndex, "itemCountStr");
+            return val !== undefined ? val.toString() : "";
         }
-        return ""
+        return "";
     }
-
-
 
     Connections {
         target: control.ListView.view ? control.ListView.view.model : null
         ignoreUnknownSignals: true
         function onLayoutChanged() {
-            control.modelUpdateCount++
+            control.modelUpdateCount++;
         }
         function onModelReset() {
-            control.modelUpdateCount++
+            control.modelUpdateCount++;
         }
         function onRowsInserted() {
-            control.modelUpdateCount++
+            control.modelUpdateCount++;
         }
         function onRowsRemoved() {
-            control.modelUpdateCount++
+            control.modelUpdateCount++;
         }
         function onRowsMoved() {
-            control.modelUpdateCount++
+            control.modelUpdateCount++;
         }
         function onDataChanged(topLeft, bottomRight) {
             if (control.rowIndex >= topLeft.row && control.rowIndex <= bottomRight.row) {
-                control.modelUpdateCount++
+                control.modelUpdateCount++;
             }
         }
     }
@@ -157,42 +161,42 @@ ItemDelegate {
                 clip: true
 
                 readonly property string cellValue: {
-                    let dummy = control.modelUpdateCount
-                    let roleName = modelData.role
+                    let dummy = control.modelUpdateCount;
+                    let roleName = modelData.role;
                     if (control.rowData !== undefined && control.rowData[roleName] !== undefined)
-                        return control.rowData[roleName]
-                    
+                        return control.rowData[roleName];
+
                     if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-                        let val = control.ListView.view.model.get(control.rowIndex, roleName)
-                        return val !== undefined ? val.toString() : ""
+                        let val = control.ListView.view.model.get(control.rowIndex, roleName);
+                        return val !== undefined ? val.toString() : "";
                     }
-                    
-                    return ""
+
+                    return "";
                 }
 
                 ToolTip.visible: cellMouse.containsMouse && ToolTip.text !== ""
                 ToolTip.text: {
-                    let dummy = control.modelUpdateCount
+                    let dummy = control.modelUpdateCount;
                     if (modelData.showAsIndicator) {
-                        return cellItem.cellValue
+                        return cellItem.cellValue;
                     }
-                    let roleName = modelData.role
-                    let tooltipRole = roleName + "Tooltip"
-                    
-                    let valTooltip = undefined
+                    let roleName = modelData.role;
+                    let tooltipRole = roleName + "Tooltip";
+
+                    let valTooltip = undefined;
                     if (control.rowData !== undefined && control.rowData[tooltipRole] !== undefined) {
-                        valTooltip = control.rowData[tooltipRole]
+                        valTooltip = control.rowData[tooltipRole];
                     } else if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-                        valTooltip = control.ListView.view.model.get(control.rowIndex, tooltipRole)
+                        valTooltip = control.ListView.view.model.get(control.rowIndex, tooltipRole);
                     }
-                    
+
                     if (valTooltip !== undefined && valTooltip !== "") {
-                        return valTooltip
+                        return valTooltip;
                     }
-                    
+
                     if (cellLabel.truncated)
-                        return cellLabel.text
-                    return ""
+                        return cellLabel.text;
+                    return "";
                 }
 
                 MouseArea {
@@ -210,27 +214,31 @@ ItemDelegate {
                     radius: 5
                     visible: modelData.showAsIndicator
                     color: {
-                        let dummy = control.modelUpdateCount
-                        let colorRole = modelData.indicatorColorRole
-                        let valColor = undefined
+                        let dummy = control.modelUpdateCount;
+                        let colorRole = modelData.indicatorColorRole;
+                        let valColor = undefined;
                         if (control.rowData !== undefined && control.rowData[colorRole] !== undefined) {
-                            valColor = control.rowData[colorRole]
+                            valColor = control.rowData[colorRole];
                         } else if (control.ListView.view && control.ListView.view.model && typeof control.ListView.view.model.get === "function") {
-                            valColor = control.ListView.view.model.get(control.rowIndex, colorRole)
+                            valColor = control.ListView.view.model.get(control.rowIndex, colorRole);
                         }
-                        
+
                         if (valColor !== undefined && valColor !== "") {
-                            if (valColor === "green") return Theme.colorSuccess || "#28a745"
-                            if (valColor === "red") return Theme.colorError || "#ff3b30"
-                            if (valColor === "orange") return "#ff9500"
-                            if (valColor === "purple") return "#af52de"
-                            return valColor
+                            if (valColor === "green")
+                                return Theme.colorSuccess || "#28a745";
+                            if (valColor === "red")
+                                return Theme.colorError || "#ff3b30";
+                            if (valColor === "orange")
+                                return "#ff9500";
+                            if (valColor === "purple")
+                                return "#af52de";
+                            return valColor;
                         }
                         // Fallback to value if it's already a color string/HEX
-                        let val = cellItem.cellValue
+                        let val = cellItem.cellValue;
                         if (val.startsWith("#") || val === "red" || val === "green" || val === "blue" || val === "orange" || val === "yellow" || val === "gray" || val === "purple")
-                            return val
-                        return "gray"
+                            return val;
+                        return "gray";
                     }
                     border.width: 1
                     border.color: Theme.isDarkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"
@@ -245,23 +253,24 @@ ItemDelegate {
                     visible: !modelData.showAsIndicator && modelData.role !== "starRatingStr"
                     text: {
                         if (control.isFolderValue) {
-                            if (modelData.role === "fileName") return "📁 " + cellItem.cellValue
-                            if (modelData.role === "fileSizeStr") return control.itemCountStrValue
-                            if (modelData.role === "dateModifiedStr") return cellItem.cellValue
-                            return ""
+                            if (modelData.role === "fileName")
+                                return "📁 " + cellItem.cellValue;
+                            if (modelData.role === "fileSizeStr")
+                                return control.itemCountStrValue;
+                            if (modelData.role === "dateModifiedStr")
+                                return cellItem.cellValue;
+                            return "";
                         }
-                        return cellItem.cellValue
+                        return cellItem.cellValue;
                     }
                     font: Theme.defaultFont
                     elide: modelData.elide !== undefined ? modelData.elide : Text.ElideRight
                     renderType: Text.NativeRendering
                     color: {
                         if (control.isOffline && !control.isFolderValue) {
-                            return "#8e8e93"
+                            return "#8e8e93";
                         }
-                        return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) 
-                               ? Theme.selectionTextActive 
-                               : Theme.selectionTextInactive
+                        return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) ? Theme.selectionTextActive : Theme.selectionTextInactive;
                     }
                 }
 
@@ -286,10 +295,9 @@ ItemDelegate {
                             }
                             font.pixelSize: 14
                             color: {
-                                if (control.isOffline) return "#8e8e93";
-                                return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus)
-                                       ? Theme.selectionTextActive
-                                       : (starRow.hoveredIndex >= 0 ? Theme.primaryAccent : Theme.primaryText);
+                                if (control.isOffline)
+                                    return "#8e8e93";
+                                return (control.isSelected && control.ListView.view && control.ListView.view.activeFocus) ? Theme.selectionTextActive : (starRow.hoveredIndex >= 0 ? Theme.primaryAccent : Theme.primaryText);
                             }
                             verticalAlignment: Text.AlignVCenter
                             height: parent.height
@@ -303,8 +311,8 @@ ItemDelegate {
                                 onExited: starRow.hoveredIndex = -1
                                 onClicked: {
                                     if (control.ListView.view) {
-                                        control.ListView.view.currentIndex = control.rowIndex
-                                        control.ListView.view.forceActiveFocus()
+                                        control.ListView.view.currentIndex = control.rowIndex;
+                                        control.ListView.view.forceActiveFocus();
                                     }
                                     if (control.docIdValue !== -1) {
                                         libraryController.batchUpdateRating([control.docIdValue], index + 1);
@@ -330,28 +338,28 @@ ItemDelegate {
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: (mouse) => {
+        onClicked: mouse => {
             if (control.ListView.view) {
-                control.ListView.view.currentIndex = index
-                control.ListView.view.forceActiveFocus()
+                control.ListView.view.currentIndex = index;
+                control.ListView.view.forceActiveFocus();
             }
             if (mouse.button === Qt.RightButton) {
-                var popupPos = mapToItem(itemContextMenu.parent, mouse.x, mouse.y)
+                var popupPos = mapToItem(itemContextMenu.parent, mouse.x, mouse.y);
                 if (typeof itemContextMenu !== "undefined") {
-                    itemContextMenu.targetDocId = control.docIdValue
-                    itemContextMenu.targetPath = control.absolutePathValue
-                    itemContextMenu.targetRating = control.starRatingValue
-                    itemContextMenu.targetIsOffline = control.isOffline
-                    itemContextMenu.popup(popupPos.x, popupPos.y)
+                    itemContextMenu.targetDocId = control.docIdValue;
+                    itemContextMenu.targetPath = control.absolutePathValue;
+                    itemContextMenu.targetRating = control.starRatingValue;
+                    itemContextMenu.targetIsOffline = control.isOffline;
+                    itemContextMenu.popup(popupPos.x, popupPos.y);
                 }
             }
         }
-        onDoubleClicked: (mouse) => {
+        onDoubleClicked: mouse => {
             if (mouse.button === Qt.LeftButton) {
                 if (control.isFolderValue) {
-                    proxyFilter.folderFilter = control.absolutePathValue
+                    proxyFilter.folderFilter = control.absolutePathValue;
                 } else if (typeof tableCanvas !== "undefined") {
-                    tableCanvas.doubleClicked(control.absolutePathValue)
+                    tableCanvas.doubleClicked(control.absolutePathValue);
                 }
             }
         }

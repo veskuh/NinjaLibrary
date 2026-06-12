@@ -31,25 +31,34 @@
 #ifndef PROXYFILTER_H
 #define PROXYFILTER_H
 
-#include <QSortFilterProxyModel>
 #include <QSet>
+#include <QSortFilterProxyModel>
 #include <QStringList>
+
 #include "../database/DatabaseManager.h"
 
 class ProxyFilter : public QSortFilterProxyModel
 {
     Q_OBJECT
-    Q_PROPERTY(QString filterString READ filterString WRITE setFilterString NOTIFY filterStringChanged)
-    Q_PROPERTY(QStringList selectedTags READ selectedTags WRITE setSelectedTags NOTIFY selectedTagsChanged)
+    Q_PROPERTY(
+        QString filterString READ filterString WRITE setFilterString NOTIFY filterStringChanged)
+    Q_PROPERTY(
+        QStringList selectedTags READ selectedTags WRITE setSelectedTags NOTIFY selectedTagsChanged)
     Q_PROPERTY(int minRating READ minRating WRITE setMinRating NOTIFY minRatingChanged)
-    Q_PROPERTY(bool showUnavailable READ showUnavailable WRITE setShowUnavailable NOTIFY showUnavailableChanged)
-    Q_PROPERTY(bool duplicatesOnly READ duplicatesOnly WRITE setDuplicatesOnly NOTIFY duplicatesOnlyChanged)
-    Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY categoryFilterChanged)
-    Q_PROPERTY(QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
+    Q_PROPERTY(bool showUnavailable READ showUnavailable WRITE setShowUnavailable NOTIFY
+                   showUnavailableChanged)
+    Q_PROPERTY(bool duplicatesOnly READ duplicatesOnly WRITE setDuplicatesOnly NOTIFY
+                   duplicatesOnlyChanged)
+    Q_PROPERTY(QString categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY
+                   categoryFilterChanged)
+    Q_PROPERTY(
+        QString folderFilter READ folderFilter WRITE setFolderFilter NOTIFY folderFilterChanged)
     Q_PROPERTY(QString scopeFilter READ scopeFilter WRITE setScopeFilter NOTIFY scopeFilterChanged)
     Q_PROPERTY(QStringList activeScopes READ activeScopes NOTIFY activeScopesChanged)
-    Q_PROPERTY(bool includeSubfolderContents READ includeSubfolderContents WRITE setIncludeSubfolderContents NOTIFY includeSubfolderContentsChanged)
-    Q_PROPERTY(bool showSubfolderIcons READ showSubfolderIcons WRITE setShowSubfolderIcons NOTIFY showSubfolderIconsChanged)
+    Q_PROPERTY(bool includeSubfolderContents READ includeSubfolderContents WRITE
+                   setIncludeSubfolderContents NOTIFY includeSubfolderContentsChanged)
+    Q_PROPERTY(bool showSubfolderIcons READ showSubfolderIcons WRITE setShowSubfolderIcons NOTIFY
+                   showSubfolderIconsChanged)
 
 public:
     explicit ProxyFilter(DatabaseManager *dbMgr, QObject *parent = nullptr);
@@ -78,13 +87,13 @@ public slots:
     void setShowUnavailable(bool show);
     void setDuplicatesOnly(bool only);
     void setCategoryFilter(const QString &category);
-    void setFolderFilter(const QString &folder); // "All", "Recent", "Favorites" etc.
+    void setFolderFilter(const QString &folder);  // "All", "Recent", "Favorites" etc.
     void setScopeFilter(const QString &scope);
     void setIncludeSubfolderContents(bool enable);
     void setShowSubfolderIcons(bool enable);
     void recalculateScopes();
     bool filterAcceptsRowWithoutScope(int source_row, const QModelIndex &source_parent) const;
-    
+
     void updateDuplicateHashes();
     void updateSearchMatches();
 
@@ -126,4 +135,4 @@ private:
     void invalidateAndRecalculate();
 };
 
-#endif // PROXYFILTER_H
+#endif  // PROXYFILTER_H

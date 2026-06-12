@@ -31,12 +31,13 @@
 #ifndef SCANNERTASK_H
 #define SCANNERTASK_H
 
+#include <QMutex>
 #include <QObject>
 #include <QRunnable>
 #include <QString>
-#include <QMutex>
 #include <QWaitCondition>
 #include <atomic>
+
 #include "../database/DatabaseManager.h"
 
 class ScannerTask : public QObject, public QRunnable
@@ -68,4 +69,4 @@ private:
     int countWords(const QString &text) const;
 };
 
-#endif // SCANNERTASK_H
+#endif  // SCANNERTASK_H

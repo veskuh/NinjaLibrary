@@ -22,7 +22,8 @@ Item {
     onIsOfflineChanged: updateImageSource()
 
     function updateImageSource() {
-        if (!imageLoader.item) return;
+        if (!imageLoader.item)
+            return;
         var hasThumbnail = (root.thumbnailPath !== "" && root.thumbnailPath !== "file://");
         if (hasThumbnail) {
             imageLoader.item.source = root.thumbnailPath;
@@ -41,7 +42,7 @@ Item {
 
         onLoaded: {
             if (item) {
-                root.updateImageSource()
+                root.updateImageSource();
             }
         }
     }
@@ -69,13 +70,19 @@ Item {
 
         KaakaoLabel {
             text: {
-                if (root.isOffline) return "⚠️";
+                if (root.isOffline)
+                    return "⚠️";
                 var ext = root.fileName.substring(root.fileName.lastIndexOf('.') + 1).toLowerCase();
-                if (ext === "pdf") return "📄";
-                if (ext === "txt" || ext === "md") return "📝";
-                if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif" || ext === "bmp") return "🖼️";
-                if (ext === "xls" || ext === "xlsx" || ext === "csv") return "📊";
-                if (ext === "doc" || ext === "docx") return "📘";
+                if (ext === "pdf")
+                    return "📄";
+                if (ext === "txt" || ext === "md")
+                    return "📝";
+                if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif" || ext === "bmp")
+                    return "🖼️";
+                if (ext === "xls" || ext === "xlsx" || ext === "csv")
+                    return "📊";
+                if (ext === "doc" || ext === "docx")
+                    return "📘";
                 return "📄";
             }
             font.pixelSize: root.fontPixelSize + 8
@@ -99,9 +106,11 @@ Item {
 
         KaakaoLabel {
             text: {
-                if (root.isOffline) return "UNAVAILABLE";
+                if (root.isOffline)
+                    return "UNAVAILABLE";
                 var hasError = imageLoader.status === Loader.Error || (imageLoader.item && imageLoader.item.status === Image.Error);
-                if (hasError) return "";
+                if (hasError)
+                    return "";
                 return (root.thumbnailPath !== "" && root.thumbnailPath !== "file://") ? "LOADING..." : "";
             }
             visible: text !== ""

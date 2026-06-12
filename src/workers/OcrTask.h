@@ -34,6 +34,7 @@
 #include <QObject>
 #include <QRunnable>
 #include <QString>
+
 #include "../database/DatabaseManager.h"
 
 class OcrTask : public QObject, public QRunnable
@@ -54,4 +55,4 @@ private:
     QString m_filePath;
 };
 
-#endif // OCRTASK_H
+#endif  // OCRTASK_H

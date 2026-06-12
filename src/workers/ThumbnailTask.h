@@ -34,6 +34,7 @@
 #include <QObject>
 #include <QRunnable>
 #include <QString>
+
 #include "../database/DatabaseManager.h"
 
 class ThumbnailTask : public QObject, public QRunnable
@@ -54,4 +55,4 @@ private:
     QString m_filePath;
 };
 
-#endif // THUMBNAILTASK_H
+#endif  // THUMBNAILTASK_H

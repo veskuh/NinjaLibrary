@@ -3,8 +3,8 @@
 
 #include "OcrUtils.h"
 
-#import <Vision/Vision.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <Vision/Vision.h>
 #include <QDebug>
 
 #include <QColorSpace>
@@ -27,15 +27,9 @@ OcrResult recognizeText(const QImage &image)
         rgbImage.setColorSpace(QColorSpace());
         rgbImage = rgbImage.convertToFormat(QImage::Format_RGBA8888);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-        CGContextRef context = CGBitmapContextCreate(
-            (void *)rgbImage.bits(),
-            rgbImage.width(),
-            rgbImage.height(),
-            8,
-            rgbImage.bytesPerLine(),
-            colorSpace,
-            kCGImageAlphaPremultipliedLast
-        );
+        CGContextRef context = CGBitmapContextCreate((void *)rgbImage.bits(), rgbImage.width(),
+                                                     rgbImage.height(), 8, rgbImage.bytesPerLine(),
+                                                     colorSpace, kCGImageAlphaPremultipliedLast);
 
         if (!context) {
             CGColorSpaceRelease(colorSpace);
@@ -63,20 +57,20 @@ OcrResult recognizeText(const QImage &image)
 
         VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc]
             initWithCompletionHandler:^(VNRequest *req, NSError *error) {
-                if (error) {
-                    qWarning() << "OcrUtils: Vision OCR error:"
-                               << QString::fromNSString(error.localizedDescription);
-                    return;
-                }
+              if (error) {
+                  qWarning() << "OcrUtils: Vision OCR error:"
+                             << QString::fromNSString(error.localizedDescription);
+                  return;
+              }
 
-                for (VNRecognizedTextObservation *observation in req.results) {
-                    VNRecognizedText *candidate = [[observation topCandidates:1] firstObject];
-                    if (candidate) {
-                        [recognizedStrings addObject:candidate.string];
-                        totalConfidence += candidate.confidence;
-                        observationCount++;
-                    }
-                }
+              for (VNRecognizedTextObservation *observation in req.results) {
+                  VNRecognizedText *candidate = [[observation topCandidates:1] firstObject];
+                  if (candidate) {
+                      [recognizedStrings addObject:candidate.string];
+                      totalConfidence += candidate.confidence;
+                      observationCount++;
+                  }
+              }
             }];
 
         request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
@@ -84,7 +78,7 @@ OcrResult recognizeText(const QImage &image)
 
         // Perform the request synchronously
         NSError *error = nil;
-        [handler performRequests:@[request] error:&error];
+        [handler performRequests:@[ request ] error:&error];
 
         CGImageRelease(cgImage);
 
@@ -106,4 +100,4 @@ OcrResult recognizeText(const QImage &image)
     return result;
 }
 
-} // namespace OcrUtils
+}  // namespace OcrUtils

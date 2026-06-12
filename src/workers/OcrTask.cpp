@@ -29,20 +29,19 @@
  */
 
 #include "OcrTask.h"
-#include "../utils/PdfUtils.h"
-#include "../utils/OcrUtils.h"
 
-#include <QImage>
-#include <QImageReader>
-#include <QSqlQuery>
-#include <QSqlError>
 #include <QDebug>
 #include <QFileInfo>
+#include <QImage>
+#include <QImageReader>
+#include <QSqlError>
+#include <QSqlQuery>
+
+#include "../utils/OcrUtils.h"
+#include "../utils/PdfUtils.h"
 
 OcrTask::OcrTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
-    : m_dbMgr(dbMgr)
-    , m_docId(docId)
-    , m_filePath(filePath)
+    : m_dbMgr(dbMgr), m_docId(docId), m_filePath(filePath)
 {
 }
 
@@ -50,9 +49,7 @@ OcrTask::OcrTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
 
 #include "../utils/MacBookmarks.h"
 
-OcrTask::~OcrTask()
-{
-}
+OcrTask::~OcrTask() {}
 
 void OcrTask::run()
 {
@@ -61,7 +58,9 @@ void OcrTask::run()
     QByteArray bookmark;
     if (db.isOpen()) {
         QSqlQuery q(db);
-        q.prepare("SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || '%' ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
+        q.prepare(
+            "SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || '%' "
+            "ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
         q.bindValue(":filePath", m_filePath);
         if (q.exec() && q.next()) {
             bookmark = q.value(0).toByteArray();
@@ -69,7 +68,8 @@ void OcrTask::run()
     }
     MacBookmarks::SandboxAccess sandboxAccess(bookmark);
     if (!sandboxAccess.isValid() && !bookmark.isEmpty()) {
-        qWarning() << "OcrTask: Failed to acquire security-scoped sandbox access for file:" << m_filePath;
+        qWarning() << "OcrTask: Failed to acquire security-scoped sandbox access for file:"
+                   << m_filePath;
     }
 #endif
 
@@ -114,12 +114,13 @@ void OcrTask::run()
             alphaNumericCount++;
         }
     }
-    double alphanumericRatio = totalNonSpaceCount > 0 ? static_cast<double>(alphaNumericCount) / totalNonSpaceCount : 0.0;
+    double alphanumericRatio =
+        totalNonSpaceCount > 0 ? static_cast<double>(alphaNumericCount) / totalNonSpaceCount : 0.0;
 
-    if (ocrText.isEmpty() || confidence < 50 || (totalNonSpaceCount > 0 && alphanumericRatio < 0.35)) {
+    if (ocrText.isEmpty() || confidence < 50 ||
+        (totalNonSpaceCount > 0 && alphanumericRatio < 0.35)) {
         qDebug() << "OcrTask: Rejecting OCR text for" << m_filePath
-                 << "(text length:" << ocrText.length()
-                 << ", confidence:" << confidence
+                 << "(text length:" << ocrText.length() << ", confidence:" << confidence
                  << ", alpha-ratio:" << alphanumericRatio << ")";
         emit finished(m_docId);
         return;
@@ -132,14 +133,16 @@ void OcrTask::run()
             bool success = true;
             QString existingText;
             QSqlQuery fetchQuery(db);
-            fetchQuery.prepare("SELECT text_snippet FROM document_search WHERE document_id = :docId;");
+            fetchQuery.prepare(
+                "SELECT text_snippet FROM document_search WHERE document_id = :docId;");
             fetchQuery.bindValue(":docId", m_docId);
             if (fetchQuery.exec()) {
                 if (fetchQuery.next()) {
                     existingText = fetchQuery.value(0).toString().trimmed();
                 }
             } else {
-                qWarning() << "OcrTask: Failed to fetch existing text snippet:" << fetchQuery.lastError().text();
+                qWarning() << "OcrTask: Failed to fetch existing text snippet:"
+                           << fetchQuery.lastError().text();
                 success = false;
             }
 
@@ -151,11 +154,13 @@ void OcrTask::run()
                 updatedText += ocrText;
 
                 QSqlQuery updateQuery(db);
-                updateQuery.prepare("UPDATE document_search SET text_snippet = :text WHERE document_id = :docId;");
+                updateQuery.prepare(
+                    "UPDATE document_search SET text_snippet = :text WHERE document_id = :docId;");
                 updateQuery.bindValue(":text", updatedText);
                 updateQuery.bindValue(":docId", m_docId);
                 if (!updateQuery.exec()) {
-                    qWarning() << "OcrTask: Failed to save OCR text to database:" << updateQuery.lastError().text();
+                    qWarning() << "OcrTask: Failed to save OCR text to database:"
+                               << updateQuery.lastError().text();
                     success = false;
                 }
             }
@@ -163,7 +168,8 @@ void OcrTask::run()
             if (success) {
                 QSqlQuery commitQuery(db);
                 if (!commitQuery.exec("COMMIT")) {
-                    qWarning() << "OcrTask: Failed to commit transaction:" << commitQuery.lastError().text();
+                    qWarning() << "OcrTask: Failed to commit transaction:"
+                               << commitQuery.lastError().text();
                     QSqlQuery rollbackQuery(db);
                     rollbackQuery.exec("ROLLBACK");
                 }
@@ -172,7 +178,8 @@ void OcrTask::run()
                 rollbackQuery.exec("ROLLBACK");
             }
         } else {
-            qWarning() << "OcrTask: Failed to begin immediate transaction:" << beginQuery.lastError().text();
+            qWarning() << "OcrTask: Failed to begin immediate transaction:"
+                       << beginQuery.lastError().text();
         }
     }
 

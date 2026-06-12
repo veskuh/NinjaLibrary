@@ -39,14 +39,14 @@ import "../panels"
 KaakaoWindow {
     id: window
     title: "NinjaLibrary - Local-First Document Gallery"
-    
+
     x: winSettings.x
     y: winSettings.y
     width: winSettings.width
     height: winSettings.height
     minimumWidth: 800
     minimumHeight: 500
-    
+
     visible: true
 
     Settings {
@@ -62,7 +62,8 @@ KaakaoWindow {
     property var folderNavigationMap: ({})
 
     function getRootFolderName(rootPath) {
-        if (!rootPath) return "";
+        if (!rootPath)
+            return "";
         var lastSlash = rootPath.lastIndexOf('/');
         if (lastSlash >= 0) {
             return rootPath.substring(lastSlash + 1);
@@ -71,8 +72,10 @@ KaakaoWindow {
     }
 
     function getRelativeSubfolderPath(currentPath, rootPath) {
-        if (!currentPath || !rootPath) return "";
-        if (currentPath === rootPath) return "";
+        if (!currentPath || !rootPath)
+            return "";
+        if (currentPath === rootPath)
+            return "";
         if (currentPath.startsWith(rootPath + "/")) {
             return currentPath.substring(rootPath.length + 1);
         }
@@ -83,28 +86,28 @@ KaakaoWindow {
     }
 
     function selectDocument(docId) {
-        inspector.selectedIds = [docId]
-        gridCanvas.selectId(docId)
-        tableCanvas.selectId(docId)
+        inspector.selectedIds = [docId];
+        gridCanvas.selectId(docId);
+        tableCanvas.selectId(docId);
     }
 
     function findDocIdByPath(path) {
         for (var i = 0; i < documentModel.rowCount(); i++) {
-            var idx = documentModel.index(i, 0)
-            var absPath = documentModel.data(idx, 260) // AbsolutePathRole
+            var idx = documentModel.index(i, 0);
+            var absPath = documentModel.data(idx, 260); // AbsolutePathRole
             if (absPath === path) {
-                return documentModel.data(idx, 257) // IdRole
+                return documentModel.data(idx, 257); // IdRole
             }
         }
-        return -1
+        return -1;
     }
 
     function checkPendingSelection() {
         if (pendingSelectDocPath !== "") {
-            var docId = findDocIdByPath(pendingSelectDocPath)
+            var docId = findDocIdByPath(pendingSelectDocPath);
             if (docId !== -1) {
-                selectDocument(docId)
-                pendingSelectDocPath = ""
+                selectDocument(docId);
+                pendingSelectDocPath = "";
             }
         }
     }
@@ -112,9 +115,15 @@ KaakaoWindow {
     Connections {
         target: documentModel
         ignoreUnknownSignals: true
-        function onDataChanged(topLeft, bottomRight, roles) { window.checkPendingSelection() }
-        function onModelReset() { window.checkPendingSelection() }
-        function onRowsInserted(parent, first, last) { window.checkPendingSelection() }
+        function onDataChanged(topLeft, bottomRight, roles) {
+            window.checkPendingSelection();
+        }
+        function onModelReset() {
+            window.checkPendingSelection();
+        }
+        function onRowsInserted(parent, first, last) {
+            window.checkPendingSelection();
+        }
     }
 
     Connections {
@@ -122,13 +131,13 @@ KaakaoWindow {
         ignoreUnknownSignals: true
         function onFolderAdded(folderPath) {
             if (searchField.text !== "") {
-                searchField.text = ""
+                searchField.text = "";
             }
-            proxyFilter.scopeFilter = "All"
+            proxyFilter.scopeFilter = "All";
         }
         function onFolderConflictDetected(message) {
-            conflictDialog.message = message
-            conflictDialog.open()
+            conflictDialog.message = message;
+            conflictDialog.open();
         }
     }
 
@@ -136,11 +145,11 @@ KaakaoWindow {
         target: proxyFilter
         ignoreUnknownSignals: true
         function onFolderFilterChanged() {
-            var selectedRoot = sidebar.getSelectedFolder()
+            var selectedRoot = sidebar.getSelectedFolder();
             if (selectedRoot !== "") {
-                var currentPath = proxyFilter.folderFilter
+                var currentPath = proxyFilter.folderFilter;
                 if (currentPath.startsWith(selectedRoot)) {
-                    window.folderNavigationMap[selectedRoot] = currentPath
+                    window.folderNavigationMap[selectedRoot] = currentPath;
                 }
             }
         }
@@ -148,22 +157,22 @@ KaakaoWindow {
 
     onXChanged: {
         if (window.visibility === Window.Windowed) {
-            winSettings.x = window.x
+            winSettings.x = window.x;
         }
     }
     onYChanged: {
         if (window.visibility === Window.Windowed) {
-            winSettings.y = window.y
+            winSettings.y = window.y;
         }
     }
     onWidthChanged: {
         if (window.visibility === Window.Windowed) {
-            winSettings.width = window.width
+            winSettings.width = window.width;
         }
     }
     onHeightChanged: {
         if (window.visibility === Window.Windowed) {
-            winSettings.height = window.height
+            winSettings.height = window.height;
         }
     }
 
@@ -179,17 +188,17 @@ KaakaoWindow {
         onFocusSearchRequested: searchField.forceActiveFocus()
         onToggleSidebarRequested: sidebar.collapsed = !sidebar.collapsed
         onToggleInspectorRequested: inspector.collapsed = !inspector.collapsed
-        onSetViewModeRequested: (index) => viewSegment.currentIndex = index
-        onSetFolderViewModeRequested: (mode) => {
+        onSetViewModeRequested: index => viewSegment.currentIndex = index
+        onSetFolderViewModeRequested: mode => {
             if (mode === "hierarchical") {
-                proxyFilter.includeSubfolderContents = false
-                proxyFilter.showSubfolderIcons = true
+                proxyFilter.includeSubfolderContents = false;
+                proxyFilter.showSubfolderIcons = true;
             } else if (mode === "direct") {
-                proxyFilter.includeSubfolderContents = false
-                proxyFilter.showSubfolderIcons = false
+                proxyFilter.includeSubfolderContents = false;
+                proxyFilter.showSubfolderIcons = false;
             } else if (mode === "recursive") {
-                proxyFilter.includeSubfolderContents = true
-                proxyFilter.showSubfolderIcons = false
+                proxyFilter.includeSubfolderContents = true;
+                proxyFilter.showSubfolderIcons = false;
             }
         }
         onMinimizeRequested: window.showMinimized()
@@ -202,15 +211,15 @@ KaakaoWindow {
         id: folderDialog
         title: "Select Document Directory to Watch"
         onAccepted: {
-            var urlStr = folderDialog.folder.toString()
-            var path = urlStr
+            var urlStr = folderDialog.folder.toString();
+            var path = urlStr;
             // Strip file:// prefix (on mac file:///Users/... -> /Users/...)
             if (urlStr.startsWith("file://")) {
-                path = urlStr.substring(7)
+                path = urlStr.substring(7);
                 // Decode URL-encoded characters (like spaces)
-                path = decodeURIComponent(path)
+                path = decodeURIComponent(path);
             }
-            libraryController.addWatchedFolder(path)
+            libraryController.addWatchedFolder(path);
         }
     }
 
@@ -230,17 +239,17 @@ KaakaoWindow {
         symbol: "🗑️"
         width: 380
         standardButtons: Dialog.Yes | Dialog.No
-        
+
         x: parent ? (parent.width - width) / 2 : 100
         y: parent ? (parent.height - implicitHeight) / 2 : 100
-        
+
         property int docId: -1
         property string filePath: ""
-        
+
         text: "Are you sure you want to move '" + (filePath ? filePath.substring(filePath.lastIndexOf('/') + 1) : "") + "' to the Trash?"
-        
+
         onAccepted: {
-            libraryController.moveToTrash(docId, filePath)
+            libraryController.moveToTrash(docId, filePath);
         }
     }
 
@@ -251,10 +260,10 @@ KaakaoWindow {
         symbol: "⚠️"
         width: 380
         standardButtons: Dialog.Ok
-        
+
         x: parent ? (parent.width - width) / 2 : 100
         y: parent ? (parent.height - implicitHeight) / 2 : 100
-        
+
         property string message: ""
         text: message
     }
@@ -263,16 +272,16 @@ KaakaoWindow {
         sequence: "Escape"
         onActivated: {
             if (searchField.text !== "") {
-                searchField.text = ""
+                searchField.text = "";
             }
-            window.contentItem.forceActiveFocus()
-            canvasStack.clearSelections()
+            window.contentItem.forceActiveFocus();
+            canvasStack.clearSelections();
         }
     }
 
     KaakaoMenu {
         id: gearMenu
-        
+
         KaakaoMenuItem {
             text: "Add Watched Folder..."
             onTriggered: folderDialog.open()
@@ -290,8 +299,8 @@ KaakaoWindow {
             checkable: true
             checked: !proxyFilter.includeSubfolderContents && proxyFilter.showSubfolderIcons
             onTriggered: {
-                proxyFilter.includeSubfolderContents = false
-                proxyFilter.showSubfolderIcons = true
+                proxyFilter.includeSubfolderContents = false;
+                proxyFilter.showSubfolderIcons = true;
             }
         }
         KaakaoMenuItem {
@@ -300,8 +309,8 @@ KaakaoWindow {
             checkable: true
             checked: !proxyFilter.includeSubfolderContents && !proxyFilter.showSubfolderIcons
             onTriggered: {
-                proxyFilter.includeSubfolderContents = false
-                proxyFilter.showSubfolderIcons = false
+                proxyFilter.includeSubfolderContents = false;
+                proxyFilter.showSubfolderIcons = false;
             }
         }
         KaakaoMenuItem {
@@ -310,8 +319,8 @@ KaakaoWindow {
             checkable: true
             checked: proxyFilter.includeSubfolderContents
             onTriggered: {
-                proxyFilter.includeSubfolderContents = true
-                proxyFilter.showSubfolderIcons = false
+                proxyFilter.includeSubfolderContents = true;
+                proxyFilter.showSubfolderIcons = false;
             }
         }
         KaakaoMenuSeparator {
@@ -321,9 +330,9 @@ KaakaoWindow {
             text: "Open in Finder"
             visible: sidebar.getSelectedFolder() !== ""
             onTriggered: {
-                var folderPath = sidebar.getSelectedFolder()
+                var folderPath = sidebar.getSelectedFolder();
                 if (folderPath !== "") {
-                    Qt.openUrlExternally("file://" + folderPath)
+                    Qt.openUrlExternally("file://" + folderPath);
                 }
             }
         }
@@ -331,9 +340,9 @@ KaakaoWindow {
             text: "Stop Watching Folder"
             visible: sidebar.getSelectedFolder() !== ""
             onTriggered: {
-                var folderPath = sidebar.getSelectedFolder()
+                var folderPath = sidebar.getSelectedFolder();
                 if (folderPath !== "") {
-                    libraryController.removeWatchedFolder(folderPath)
+                    libraryController.removeWatchedFolder(folderPath);
                 }
             }
         }
@@ -343,9 +352,9 @@ KaakaoWindow {
         id: itemContextMenu
         objectName: "itemContextMenu"
         onMoveToTrashRequested: (docId, filePath) => {
-            trashDialog.docId = docId
-            trashDialog.filePath = filePath
-            trashDialog.open()
+            trashDialog.docId = docId;
+            trashDialog.filePath = filePath;
+            trashDialog.open();
         }
     }
 
@@ -363,7 +372,7 @@ KaakaoWindow {
             anchors.centerIn: parent
             z: 1 // Ensure it sits on top of layout if needed
         }
-        
+
         RowLayout {
             anchors.fill: parent
             anchors.topMargin: Theme.paddingSmall / 2
@@ -373,7 +382,9 @@ KaakaoWindow {
             spacing: Theme.paddingSmall
 
             // Spacer to push the search and inspector controls to the far right
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
             // Search box firmly on the right
             KaakaoSearchField {
@@ -382,14 +393,17 @@ KaakaoWindow {
                 placeholderText: "Search documents..."
                 implicitWidth: activeFocus ? 260 : 160
                 Behavior on implicitWidth {
-                    NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+                    NumberAnimation {
+                        duration: 150
+                        easing.type: Easing.OutQuad
+                    }
                 }
                 onTextChanged: {
                     if (text === "") {
-                        searchDebounceTimer.stop()
-                        proxyFilter.filterString = ""
+                        searchDebounceTimer.stop();
+                        proxyFilter.filterString = "";
                     } else {
-                        searchDebounceTimer.restart()
+                        searchDebounceTimer.restart();
                     }
                 }
 
@@ -398,7 +412,7 @@ KaakaoWindow {
                     interval: 150
                     repeat: false
                     onTriggered: {
-                        proxyFilter.filterString = searchField.text
+                        proxyFilter.filterString = searchField.text;
                     }
                 }
             }
@@ -418,7 +432,7 @@ KaakaoWindow {
                 contentItem: Column {
                     spacing: 2
                     opacity: inspectorButton.enabled ? 1.0 : 0.4
-                    
+
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: inspectorButton.iconEmoji
@@ -447,27 +461,47 @@ KaakaoWindow {
         Item {
             id: sidebarContainer
             visible: !sidebar.collapsed || width > 0
-            
+
             states: [
                 State {
                     name: "collapsed"
                     when: sidebar.collapsed
-                    PropertyChanges { target: sidebarContainer; SplitView.minimumWidth: 0; SplitView.preferredWidth: 0; SplitView.maximumWidth: 0 }
+                    PropertyChanges {
+                        target: sidebarContainer
+                        SplitView.minimumWidth: 0
+                        SplitView.preferredWidth: 0
+                        SplitView.maximumWidth: 0
+                    }
                 },
                 State {
                     name: "expanded"
                     when: !sidebar.collapsed
-                    PropertyChanges { target: sidebarContainer; SplitView.minimumWidth: 150; SplitView.preferredWidth: 200; SplitView.maximumWidth: 300 }
+                    PropertyChanges {
+                        target: sidebarContainer
+                        SplitView.minimumWidth: 150
+                        SplitView.preferredWidth: 200
+                        SplitView.maximumWidth: 300
+                    }
                 }
             ]
             transitions: [
                 Transition {
-                    from: "expanded"; to: "collapsed"
-                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                    from: "expanded"
+                    to: "collapsed"
+                    NumberAnimation {
+                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
+                        duration: 200
+                        easing.type: Easing.InOutQuad
+                    }
                 },
                 Transition {
-                    from: "collapsed"; to: "expanded"
-                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                    from: "collapsed"
+                    to: "expanded"
+                    NumberAnimation {
+                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
+                        duration: 200
+                        easing.type: Easing.InOutQuad
+                    }
                 }
             ]
 
@@ -480,34 +514,34 @@ KaakaoWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
 
-                    onSectionSelected: (section) => {
-                        proxyFilter.folderFilter = ""
-                        proxyFilter.selectedTags = []
-                        proxyFilter.categoryFilter = section
-                        proxyFilter.scopeFilter = "All"
-                        searchField.text = ""
-                        canvasStack.clearSelections()
+                    onSectionSelected: section => {
+                        proxyFilter.folderFilter = "";
+                        proxyFilter.selectedTags = [];
+                        proxyFilter.categoryFilter = section;
+                        proxyFilter.scopeFilter = "All";
+                        searchField.text = "";
+                        canvasStack.clearSelections();
                     }
-                    onFolderSelected: (path) => {
-                        proxyFilter.categoryFilter = "All"
-                        proxyFilter.selectedTags = []
-                        proxyFilter.scopeFilter = "All"
-                        searchField.text = ""
-                        canvasStack.clearSelections()
-                        var cached = window.folderNavigationMap[path]
+                    onFolderSelected: path => {
+                        proxyFilter.categoryFilter = "All";
+                        proxyFilter.selectedTags = [];
+                        proxyFilter.scopeFilter = "All";
+                        searchField.text = "";
+                        canvasStack.clearSelections();
+                        var cached = window.folderNavigationMap[path];
                         if (cached !== undefined) {
-                            proxyFilter.folderFilter = cached
+                            proxyFilter.folderFilter = cached;
                         } else {
-                            proxyFilter.folderFilter = path
+                            proxyFilter.folderFilter = path;
                         }
                     }
-                    onTagSelected: (tag) => {
-                        proxyFilter.categoryFilter = "All"
-                        proxyFilter.folderFilter = ""
-                        proxyFilter.selectedTags = [tag]
-                        proxyFilter.scopeFilter = "All"
-                        searchField.text = ""
-                        canvasStack.clearSelections()
+                    onTagSelected: tag => {
+                        proxyFilter.categoryFilter = "All";
+                        proxyFilter.folderFilter = "";
+                        proxyFilter.selectedTags = [tag];
+                        proxyFilter.scopeFilter = "All";
+                        searchField.text = "";
+                        canvasStack.clearSelections();
                     }
                 }
 
@@ -611,23 +645,23 @@ KaakaoWindow {
                     label: "Scope:"
                     model: proxyFilter.activeScopes
                     currentIndex: {
-                        var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
-                        return idx >= 0 ? idx : 0
+                        var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter);
+                        return idx >= 0 ? idx : 0;
                     }
                     onFilterSelected: (index, name) => {
-                        proxyFilter.scopeFilter = name
+                        proxyFilter.scopeFilter = name;
                     }
 
                     Connections {
                         target: proxyFilter
                         ignoreUnknownSignals: true
                         function onScopeFilterChanged() {
-                            var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
-                            scopeBar.currentIndex = idx >= 0 ? idx : 0
+                            var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter);
+                            scopeBar.currentIndex = idx >= 0 ? idx : 0;
                         }
                         function onActiveScopesChanged() {
-                            var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter)
-                            scopeBar.currentIndex = idx >= 0 ? idx : 0
+                            var idx = proxyFilter.activeScopes.indexOf(proxyFilter.scopeFilter);
+                            scopeBar.currentIndex = idx >= 0 ? idx : 0;
                         }
                     }
                 }
@@ -646,8 +680,8 @@ KaakaoWindow {
                         anchors.rightMargin: 12
                         rootLabel: window.getRootFolderName(sidebar.getSelectedFolder())
                         path: window.getRelativeSubfolderPath(proxyFilter.folderFilter, sidebar.getSelectedFolder())
-                        onPathClicked: (targetPath) => {
-                            proxyFilter.folderFilter = sidebar.getSelectedFolder() + (targetPath !== "" ? "/" + targetPath : "")
+                        onPathClicked: targetPath => {
+                            proxyFilter.folderFilter = sidebar.getSelectedFolder() + (targetPath !== "" ? "/" + targetPath : "");
                         }
                     }
 
@@ -665,46 +699,52 @@ KaakaoWindow {
                     Layout.fillHeight: true
 
                     function clearSelections() {
-                        gridCanvas.clearSelection()
-                        tableCanvas.clearSelection()
+                        gridCanvas.clearSelection();
+                        tableCanvas.clearSelection();
                     }
 
                     GridCanvas {
                         id: gridCanvas
                         anchors.fill: parent
                         scaleFactor: zoomSlider.value
-                        onSelectionChanged: (ids) => inspector.selectedIds = ids
-                        onDoubleClicked: (path) => {
-                            Qt.openUrlExternally("file://" + path)
-                            var docId = window.findDocIdByPath(path)
+                        onSelectionChanged: ids => inspector.selectedIds = ids
+                        onDoubleClicked: path => {
+                            Qt.openUrlExternally("file://" + path);
+                            var docId = window.findDocIdByPath(path);
                             if (docId !== -1) {
-                                libraryController.markDocumentOpened(docId)
+                                libraryController.markDocumentOpened(docId);
                             }
                         }
 
                         opacity: viewSegment.currentIndex === 0 ? 1.0 : 0.0
                         visible: opacity > 0.0
                         Behavior on opacity {
-                            NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                            NumberAnimation {
+                                duration: 200
+                                easing.type: Easing.InOutQuad
+                            }
                         }
                     }
 
                     TableCanvas {
                         id: tableCanvas
                         anchors.fill: parent
-                        onSelectionChanged: (ids) => inspector.selectedIds = ids
-                        onDoubleClicked: (path) => {
-                            Qt.openUrlExternally("file://" + path)
-                            var docId = window.findDocIdByPath(path)
+                        onSelectionChanged: ids => inspector.selectedIds = ids
+                        onDoubleClicked: path => {
+                            Qt.openUrlExternally("file://" + path);
+                            var docId = window.findDocIdByPath(path);
                             if (docId !== -1) {
-                                libraryController.markDocumentOpened(docId)
+                                libraryController.markDocumentOpened(docId);
                             }
                         }
 
                         opacity: viewSegment.currentIndex === 1 ? 1.0 : 0.0
                         visible: opacity > 0.0
                         Behavior on opacity {
-                            NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                            NumberAnimation {
+                                duration: 200
+                                easing.type: Easing.InOutQuad
+                            }
                         }
                     }
                 }
@@ -731,13 +771,7 @@ KaakaoWindow {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                             visible: !libraryController.isScanning
-                            text: "Indexed: " + documentModel.totalCount + " items (" +
-                                   documentModel.pdfCount + " PDFs, " +
-                                   documentModel.imageCount + " Images, " +
-                                   documentModel.textCount + " Text/Other)  |  " +
-                                   documentModel.localCount + " Local, " +
-                                   documentModel.unavailableCount + " Unavailable  |  Selected: " +
-                                   inspector.selectedIds.length
+                            text: "Indexed: " + documentModel.totalCount + " items (" + documentModel.pdfCount + " PDFs, " + documentModel.imageCount + " Images, " + documentModel.textCount + " Text/Other)  |  " + documentModel.localCount + " Local, " + documentModel.unavailableCount + " Unavailable  |  Selected: " + inspector.selectedIds.length
                             role: KaakaoLabel.Role.Small
                             color: Theme.sidebarSectionText
                             opacity: 1.0
@@ -754,7 +788,9 @@ KaakaoWindow {
                         spacing: 8
                         visible: libraryController.isScanning
 
-                        Item { Layout.fillWidth: true } // Left spacer for centering progress bar inside center area
+                        Item {
+                            Layout.fillWidth: true
+                        } // Left spacer for centering progress bar inside center area
 
                         KaakaoLabel {
                             text: libraryController.scanStatusText
@@ -762,8 +798,12 @@ KaakaoWindow {
                             color: Theme.sidebarSectionText
                             opacity: libraryController.isScanPaused ? 0.6 : 1.0
                             Layout.alignment: Qt.AlignVCenter
-                            
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         KaakaoProgressBar {
@@ -772,8 +812,12 @@ KaakaoWindow {
                             Layout.alignment: Qt.AlignVCenter
                             value: libraryController.scanProgress
                             opacity: libraryController.isScanPaused ? 0.5 : 1.0
-                            
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         KaakaoButton {
@@ -793,7 +837,9 @@ KaakaoWindow {
                             }
                         }
 
-                        Item { Layout.fillWidth: true } // Right spacer for centering progress bar inside center area
+                        Item {
+                            Layout.fillWidth: true
+                        } // Right spacer for centering progress bar inside center area
                     }
 
                     // Right Area: holds the zoom slider (conditionally visible)
@@ -805,7 +851,9 @@ KaakaoWindow {
                         spacing: 4
                         visible: viewSegment.currentIndex === 0
 
-                        Item { Layout.fillWidth: true } // Spacer to push slider to the right side of this area
+                        Item {
+                            Layout.fillWidth: true
+                        } // Spacer to push slider to the right side of this area
 
                         KaakaoLabel {
                             text: "⚲"
@@ -833,8 +881,12 @@ KaakaoWindow {
                             Layout.alignment: Qt.AlignVCenter
                             Layout.preferredWidth: 48
                             horizontalAlignment: Text.AlignRight
-                            
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
                     }
                 }
@@ -846,27 +898,47 @@ KaakaoWindow {
             id: inspector
             visible: !collapsed || width > 0
             selectedIds: []
-            
+
             states: [
                 State {
                     name: "collapsed"
                     when: inspector.collapsed
-                    PropertyChanges { target: inspector; SplitView.minimumWidth: 0; SplitView.preferredWidth: 0; SplitView.maximumWidth: 0 }
+                    PropertyChanges {
+                        target: inspector
+                        SplitView.minimumWidth: 0
+                        SplitView.preferredWidth: 0
+                        SplitView.maximumWidth: 0
+                    }
                 },
                 State {
                     name: "expanded"
                     when: !inspector.collapsed
-                    PropertyChanges { target: inspector; SplitView.minimumWidth: 220; SplitView.preferredWidth: 260; SplitView.maximumWidth: 350 }
+                    PropertyChanges {
+                        target: inspector
+                        SplitView.minimumWidth: 220
+                        SplitView.preferredWidth: 260
+                        SplitView.maximumWidth: 350
+                    }
                 }
             ]
             transitions: [
                 Transition {
-                    from: "expanded"; to: "collapsed"
-                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                    from: "expanded"
+                    to: "collapsed"
+                    NumberAnimation {
+                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
+                        duration: 200
+                        easing.type: Easing.InOutQuad
+                    }
                 },
                 Transition {
-                    from: "collapsed"; to: "expanded"
-                    NumberAnimation { properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"; duration: 200; easing.type: Easing.InOutQuad }
+                    from: "collapsed"
+                    to: "expanded"
+                    NumberAnimation {
+                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
+                        duration: 200
+                        easing.type: Easing.InOutQuad
+                    }
                 }
             ]
         }
@@ -883,17 +955,17 @@ KaakaoWindow {
         objectName: "dropArea"
         anchors.fill: parent
         keys: ["text/uri-list"]
-        onDropped: (drop) => {
+        onDropped: drop => {
             if (drop.hasUrls) {
-                var url = drop.urls[0].toString()
-                var result = libraryController.handleDroppedUrl(url)
+                var url = drop.urls[0].toString();
+                var result = libraryController.handleDroppedUrl(url);
                 if (result.status === "success") {
-                    sidebar.selectFolder(result.watchedFolder)
+                    sidebar.selectFolder(result.watchedFolder);
                     if (!result.isFolder) {
                         if (result.docId !== -1) {
-                            window.selectDocument(result.docId)
+                            window.selectDocument(result.docId);
                         } else {
-                            window.pendingSelectDocPath = result.docPath
+                            window.pendingSelectDocPath = result.docPath;
                         }
                     }
                 }

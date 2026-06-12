@@ -35,7 +35,7 @@ import Kaakao 1.0
 
 Rectangle {
     id: card
-    
+
     property string fileName: ""
     property string absolutePath: ""
     property int fileSize: 0
@@ -48,30 +48,39 @@ Rectangle {
     property string itemCountStr: ""
 
     signal clicked(var event)
-    signal doubleClicked()
+    signal doubleClicked
 
     implicitWidth: 160
     implicitHeight: 200
     radius: 6
-    color: isSelected ? (Theme.isDarkMode ? "#2d3748" : "#e1f0ff") 
-                      : (cardMouseArea.containsMouse ? (Theme.isDarkMode ? "#2d2d2d" : "#f3f8fe") : Theme.contentBackground)
-    border.color: isSelected ? Theme.primaryAccent 
-                            : (cardMouseArea.containsMouse ? (Theme.isDarkMode ? "#666666" : "#a8cbf7") : Theme.buttonBorder)
+    color: isSelected ? (Theme.isDarkMode ? "#2d3748" : "#e1f0ff") : (cardMouseArea.containsMouse ? (Theme.isDarkMode ? "#2d2d2d" : "#f3f8fe") : Theme.contentBackground)
+    border.color: isSelected ? Theme.primaryAccent : (cardMouseArea.containsMouse ? (Theme.isDarkMode ? "#666666" : "#a8cbf7") : Theme.buttonBorder)
     border.width: isSelected ? 2 : 1
 
     scale: cardMouseArea.containsMouse ? 1.025 : 1.0
 
     Behavior on scale {
-        NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+        NumberAnimation {
+            duration: 150
+            easing.type: Easing.OutQuad
+        }
     }
-    Behavior on color { ColorAnimation { duration: 120 } }
-    Behavior on border.color { ColorAnimation { duration: 120 } }
+    Behavior on color {
+        ColorAnimation {
+            duration: 120
+        }
+    }
+    Behavior on border.color {
+        ColorAnimation {
+            duration: 120
+        }
+    }
 
     // Soft drop shadow (standard Yosemite card look)
     layer.enabled: !isSelected
-    layer.effect: ShaderEffect {
-        // Simple fallback shadow simulated by card border, layer keeps layout clean
-    }
+    layer.effect:
+    // Simple fallback shadow simulated by card border, layer keeps layout clean
+    ShaderEffect {}
 
     ColumnLayout {
         anchors.fill: parent
@@ -122,7 +131,7 @@ Rectangle {
                 radius: 7
                 color: Theme.colorError
                 visible: card.isOffline && !card.isFolder
-                
+
                 KaakaoLabel {
                     text: "!"
                     color: "white"
@@ -148,7 +157,7 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 2
             visible: !card.isFolder
-            
+
             // Stars Rating display
             Row {
                 Layout.alignment: Qt.AlignLeft
@@ -198,11 +207,11 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: (mouse) => {
-            card.clicked(mouse)
+        onClicked: mouse => {
+            card.clicked(mouse);
         }
         onDoubleClicked: {
-            card.doubleClicked()
+            card.doubleClicked();
         }
     }
 }

@@ -29,16 +29,19 @@
  */
 
 #include "DatabaseManager.h"
-#include <QFileInfo>
-#include <QStandardPaths>
-#include <QSqlRecord>
-#include <QThreadStorage>
+
 #include <QCoreApplication>
+#include <QFileInfo>
+#include <QSqlRecord>
+#include <QStandardPaths>
+#include <QThreadStorage>
 #include <QUuid>
 
-struct ConnectionHolder {
+struct ConnectionHolder
+{
     QString name;
-    ~ConnectionHolder() {
+    ~ConnectionHolder()
+    {
         if (!name.isEmpty() && QCoreApplication::instance()) {
             {
                 QSqlDatabase db = QSqlDatabase::database(name, false);
@@ -51,10 +54,9 @@ struct ConnectionHolder {
     }
 };
 
-static QThreadStorage<ConnectionHolder*> s_connectionStorage;
+static QThreadStorage<ConnectionHolder *> s_connectionStorage;
 
-DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent)
-    : QObject(parent)
+DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent) : QObject(parent)
 {
     if (dbPath.isEmpty()) {
         QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
@@ -64,7 +66,7 @@ DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent)
         m_dbPath = dataDir + "/library.db";
     } else if (dbPath == ":memory:") {
         m_dbPath = QString("file:ninjalib_shared_%1?mode=memory&cache=shared")
-                   .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+                       .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     } else {
         m_dbPath = dbPath;
     }
@@ -76,9 +78,7 @@ DatabaseManager::DatabaseManager(const QString &dbPath, QObject *parent)
     }
 }
 
-DatabaseManager::~DatabaseManager()
-{
-}
+DatabaseManager::~DatabaseManager() {}
 
 QSqlDatabase DatabaseManager::getDatabaseConnection()
 {
@@ -134,7 +134,8 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
     db.setDatabaseName(expectedDbName);
 
     if (!db.open()) {
-        qWarning() << "Failed to open database connection" << connectionName << ":" << db.lastError().text();
+        qWarning() << "Failed to open database connection" << connectionName << ":"
+                   << db.lastError().text();
     } else {
         // Run thread-specific initialization PRAGMAs
         QSqlQuery query(db);
@@ -176,8 +177,7 @@ bool DatabaseManager::initializeDatabase()
                 "    absolute_path TEXT UNIQUE NOT NULL,"
                 "    macos_bookmark BLOB,"
                 "    is_available BOOLEAN DEFAULT 1"
-                ");"
-            );
+                ");");
 
             ok &= query.exec(
                 "CREATE TABLE IF NOT EXISTS documents ("
@@ -195,8 +195,7 @@ bool DatabaseManager::initializeDatabase()
                 "    is_offline BOOLEAN DEFAULT 0,"
                 "    last_opened INTEGER DEFAULT 0,"
                 "    FOREIGN KEY(folder_id) REFERENCES watched_folders(id) ON DELETE CASCADE"
-                ");"
-            );
+                ");");
 
             // FTS5 Virtual Table for Instant Search
             ok &= query.exec(
@@ -205,16 +204,14 @@ bool DatabaseManager::initializeDatabase()
                 "    file_name,"
                 "    text_snippet,"
                 "    notes"
-                ");"
-            );
+                ");");
 
             ok &= query.exec(
                 "CREATE TABLE IF NOT EXISTS tags ("
                 "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 "    name TEXT UNIQUE COLLATE NOCASE NOT NULL,"
                 "    color_hex TEXT DEFAULT '#3498db'"
-                ");"
-            );
+                ");");
 
             ok &= query.exec(
                 "CREATE TABLE IF NOT EXISTS document_tags ("
@@ -223,16 +220,14 @@ bool DatabaseManager::initializeDatabase()
                 "    PRIMARY KEY (document_id, tag_id),"
                 "    FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,"
                 "    FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE"
-                ");"
-            );
+                ");");
 
             ok &= query.exec(
                 "CREATE TABLE IF NOT EXISTS smart_collections ("
                 "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 "    name TEXT UNIQUE NOT NULL,"
                 "    query_json TEXT NOT NULL"
-                ");"
-            );
+                ");");
 
             if (ok) {
                 ok &= query.exec("PRAGMA user_version = 3;");
@@ -261,8 +256,12 @@ bool DatabaseManager::initializeDatabase()
 
         // 1. Deduplicate tags
         {
-            QSqlQuery dupQuery("SELECT LOWER(name) as lname, MIN(id) as keep_id FROM tags GROUP BY lname HAVING COUNT(*) > 1;", db);
-            struct MergeJob {
+            QSqlQuery dupQuery(
+                "SELECT LOWER(name) as lname, MIN(id) as keep_id FROM tags GROUP BY lname HAVING "
+                "COUNT(*) > 1;",
+                db);
+            struct MergeJob
+            {
                 int keepId;
                 QString lname;
             };
@@ -273,7 +272,8 @@ bool DatabaseManager::initializeDatabase()
 
             for (const auto &job : jobs) {
                 QSqlQuery findDups(db);
-                findDups.prepare("SELECT id FROM tags WHERE name = :lname COLLATE NOCASE AND id != :keepId;");
+                findDups.prepare(
+                    "SELECT id FROM tags WHERE name = :lname COLLATE NOCASE AND id != :keepId;");
                 findDups.bindValue(":lname", job.lname);
                 findDups.bindValue(":keepId", job.keepId);
                 if (findDups.exec()) {
@@ -281,12 +281,15 @@ bool DatabaseManager::initializeDatabase()
                         int dupId = findDups.value(0).toInt();
 
                         QSqlQuery mergeDocs(db);
-                        mergeDocs.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) "
-                                          "SELECT document_id, :keepId FROM document_tags WHERE tag_id = :dupId;");
+                        mergeDocs.prepare(
+                            "INSERT OR IGNORE INTO document_tags (document_id, tag_id) "
+                            "SELECT document_id, :keepId FROM document_tags WHERE tag_id = "
+                            ":dupId;");
                         mergeDocs.bindValue(":keepId", job.keepId);
                         mergeDocs.bindValue(":dupId", dupId);
                         if (!mergeDocs.exec()) {
-                            qWarning() << "Migration: mergeDocs failed:" << mergeDocs.lastError().text();
+                            qWarning()
+                                << "Migration: mergeDocs failed:" << mergeDocs.lastError().text();
                             ok = false;
                         }
 
@@ -294,7 +297,8 @@ bool DatabaseManager::initializeDatabase()
                         deleteDupLinks.prepare("DELETE FROM document_tags WHERE tag_id = :dupId;");
                         deleteDupLinks.bindValue(":dupId", dupId);
                         if (!deleteDupLinks.exec()) {
-                            qWarning() << "Migration: deleteDupLinks failed:" << deleteDupLinks.lastError().text();
+                            qWarning() << "Migration: deleteDupLinks failed:"
+                                       << deleteDupLinks.lastError().text();
                             ok = false;
                         }
 
@@ -302,7 +306,8 @@ bool DatabaseManager::initializeDatabase()
                         deleteDupTag.prepare("DELETE FROM tags WHERE id = :dupId;");
                         deleteDupTag.bindValue(":dupId", dupId);
                         if (!deleteDupTag.exec()) {
-                            qWarning() << "Migration: deleteDupTag failed:" << deleteDupTag.lastError().text();
+                            qWarning() << "Migration: deleteDupTag failed:"
+                                       << deleteDupTag.lastError().text();
                             ok = false;
                         }
                     }
@@ -318,7 +323,8 @@ bool DatabaseManager::initializeDatabase()
             QSqlQuery debugQ(db);
             if (debugQ.exec("SELECT id, name FROM tags;")) {
                 while (debugQ.next()) {
-                    qDebug() << "MIGRATION BEFORE RECREATE:" << debugQ.value(0).toInt() << debugQ.value(1).toString();
+                    qDebug() << "MIGRATION BEFORE RECREATE:" << debugQ.value(0).toInt()
+                             << debugQ.value(1).toString();
                 }
             }
         }
@@ -330,7 +336,8 @@ bool DatabaseManager::initializeDatabase()
             qWarning() << "Migration: CREATE TABLE tags_new failed:" << q.lastError().text();
             ok = false;
         }
-        if (ok && !q.exec("INSERT INTO tags_new (id, name, color_hex) SELECT id, name, color_hex FROM tags;")) {
+        if (ok && !q.exec("INSERT INTO tags_new (id, name, color_hex) SELECT id, name, color_hex "
+                          "FROM tags;")) {
             qWarning() << "Migration: INSERT INTO tags_new failed:" << q.lastError().text();
             ok = false;
         }
@@ -391,7 +398,8 @@ bool DatabaseManager::initializeDatabase()
     // Ensure active_scans table exists for interrupted scan tracking
     {
         QSqlQuery query(db);
-        if (!query.exec("CREATE TABLE IF NOT EXISTS active_scans (folder_path TEXT PRIMARY KEY);")) {
+        if (!query.exec(
+                "CREATE TABLE IF NOT EXISTS active_scans (folder_path TEXT PRIMARY KEY);")) {
             qWarning() << "Failed to create active_scans table:" << query.lastError().text();
         }
     }
@@ -399,7 +407,4 @@ bool DatabaseManager::initializeDatabase()
     return true;
 }
 
-QString DatabaseManager::databasePath() const
-{
-    return m_dbPath;
-}
+QString DatabaseManager::databasePath() const { return m_dbPath; }

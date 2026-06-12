@@ -35,9 +35,9 @@ import Kaakao 1.0
 Rectangle {
     id: overlay
     objectName: "dragOverlay"
-    
+
     property bool containsDrag: false
-    
+
     anchors.fill: parent
     color: Theme.isDarkMode ? Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.15) : Qt.rgba(Theme.primaryAccent.r, Theme.primaryAccent.g, Theme.primaryAccent.b, 0.04)
     border.color: Theme.primaryAccent
@@ -48,7 +48,10 @@ Rectangle {
     opacity: containsDrag ? 1.0 : 0.0
     visible: opacity > 0.0
     Behavior on opacity {
-        NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+        NumberAnimation {
+            duration: 150
+            easing.type: Easing.OutQuad
+        }
     }
 
     Rectangle {
@@ -68,9 +71,19 @@ Rectangle {
             origin.y: dropCard.height / 2
             xScale: overlay.containsDrag ? 1.0 : 0.9
             yScale: overlay.containsDrag ? 1.0 : 0.9
-            
-            Behavior on xScale { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
-            Behavior on yScale { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
+
+            Behavior on xScale {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutBack
+                }
+            }
+            Behavior on yScale {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutBack
+                }
+            }
         }
 
         ColumnLayout {

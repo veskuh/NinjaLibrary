@@ -32,14 +32,15 @@
 #define DOCUMENTMODEL_H
 
 #include <QAbstractListModel>
-#include <QStringList>
 #include <QDateTime>
 #include <QList>
-#include "../database/DatabaseManager.h"
-
+#include <QStringList>
 #include <QTimer>
 
-struct DocumentInfo {
+#include "../database/DatabaseManager.h"
+
+struct DocumentInfo
+{
     int id;
     int folderId;
     QString fileName;
@@ -71,7 +72,8 @@ class DocumentModel : public QAbstractListModel
     Q_PROPERTY(int localCount READ localCount NOTIFY countsChanged)
     Q_PROPERTY(int unavailableCount READ unavailableCount NOTIFY countsChanged)
 public:
-    enum DocumentRoles {
+    enum DocumentRoles
+    {
         IdRole = Qt::UserRole + 1,
         FolderIdRole,
         FileNameRole,
@@ -132,4 +134,4 @@ private:
     int m_unavailableCount = 0;
 };
 
-#endif // DOCUMENTMODEL_H
+#endif  // DOCUMENTMODEL_H

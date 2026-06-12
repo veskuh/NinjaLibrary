@@ -28,49 +28,51 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "PdfUtils.h"
 #include <poppler-qt6.h>
-#include <memory>
+
 #include <QDebug>
+#include <memory>
+
+#include "PdfUtils.h"
 
 namespace PdfUtils {
 
-    QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth)
-    {
-        std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
-        if (!doc || doc->isLocked() || doc->numPages() == 0) {
-            return QImage();
-        }
-        std::unique_ptr<Poppler::Page> page(doc->page(0));
-        if (!page) return QImage();
-
-        QSize pageSize = page->pageSize();
-        if (pageSize.width() <= 0) return QImage();
-
-        double dpi = 72.0 * targetWidth / pageSize.width();
-        return page->renderToImage(dpi, dpi);
+QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth)
+{
+    std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
+    if (!doc || doc->isLocked() || doc->numPages() == 0) {
+        return QImage();
     }
+    std::unique_ptr<Poppler::Page> page(doc->page(0));
+    if (!page) return QImage();
 
-    QString extractPdfText(const QString &pdfPath)
-    {
-        std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
-        if (!doc || doc->isLocked()) return QString();
+    QSize pageSize = page->pageSize();
+    if (pageSize.width() <= 0) return QImage();
 
-        QString text;
-        int pages = doc->numPages();
-        for (int i = 0; i < pages; ++i) {
-            std::unique_ptr<Poppler::Page> page(doc->page(i));
-            if (page) {
-                text += page->text(QRectF()) + "\n";
-            }
-        }
-        return text;
-    }
-
-    int getPdfPageCount(const QString &pdfPath)
-    {
-        std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
-        if (!doc || doc->isLocked()) return 0;
-        return doc->numPages();
-    }
+    double dpi = 72.0 * targetWidth / pageSize.width();
+    return page->renderToImage(dpi, dpi);
 }
+
+QString extractPdfText(const QString &pdfPath)
+{
+    std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
+    if (!doc || doc->isLocked()) return QString();
+
+    QString text;
+    int pages = doc->numPages();
+    for (int i = 0; i < pages; ++i) {
+        std::unique_ptr<Poppler::Page> page(doc->page(i));
+        if (page) {
+            text += page->text(QRectF()) + "\n";
+        }
+    }
+    return text;
+}
+
+int getPdfPageCount(const QString &pdfPath)
+{
+    std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
+    if (!doc || doc->isLocked()) return 0;
+    return doc->numPages();
+}
+}  // namespace PdfUtils

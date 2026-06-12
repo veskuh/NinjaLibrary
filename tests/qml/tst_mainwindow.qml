@@ -16,67 +16,81 @@ TestCase {
 
     // Helper to find a child by type name (e.g. "Sidebar" or "Inspector")
     function findChildByType(parent, typeName) {
-        if (!parent) return null;
-        if (parent.toString().indexOf(typeName) >= 0) return parent;
+        if (!parent)
+            return null;
+        if (parent.toString().indexOf(typeName) >= 0)
+            return parent;
         if (parent.children) {
             for (let i = 0; i < parent.children.length; ++i) {
                 let found = findChildByType(parent.children[i], typeName);
-                if (found) return found;
+                if (found)
+                    return found;
             }
         }
         if (parent.contentItem) {
             let found = findChildByType(parent.contentItem, typeName);
-            if (found) return found;
+            if (found)
+                return found;
         }
         return null;
     }
 
     // Helper to find a child by objectName
     function findChildByName(parent, name) {
-        if (!parent) return null;
-        if (parent.objectName === name) return parent;
+        if (!parent)
+            return null;
+        if (parent.objectName === name)
+            return parent;
         if (parent.header) {
             let found = findChildByName(parent.header, name);
-            if (found) return found;
+            if (found)
+                return found;
         }
         if (parent.children) {
             for (let i = 0; i < parent.children.length; ++i) {
                 let found = findChildByName(parent.children[i], name);
-                if (found) return found;
+                if (found)
+                    return found;
             }
         }
         if (parent.resources) {
             for (let i = 0; i < parent.resources.length; ++i) {
                 let found = findChildByName(parent.resources[i], name);
-                if (found) return found;
+                if (found)
+                    return found;
             }
         }
         if (parent.contentItem) {
             let found = findChildByName(parent.contentItem, name);
-            if (found) return found;
+            if (found)
+                return found;
         }
         return null;
     }
 
     // Helper to recursively find a KaakaoToolButton by its text label
     function findToolButtonByText(parent, text) {
-        if (!parent) return null;
+        if (!parent)
+            return null;
         if (parent.toString().indexOf("KaakaoToolButton") >= 0 && parent.text === text) {
             return parent;
         }
         if (parent.children) {
             for (let i = 0; i < parent.children.length; ++i) {
                 let found = findToolButtonByText(parent.children[i], text);
-                if (found) return found;
+                if (found)
+                    return found;
             }
         }
         if (parent.header) {
             let found = findToolButtonByText(parent.header, text);
-            if (found) return found;
+            if (found)
+                return found;
         }
         if (parent.contentItem) {
             let found = findToolButtonByText(parent.contentItem, text);
-            if (found) return found;
+            if (found)
+                return found;
         }
         return null;
     }
@@ -84,7 +98,7 @@ TestCase {
     function test_toolbar_button_properties() {
         let win = mainWindowComponent.createObject(this);
         verify(win !== null, "MainWindow should be instantiated");
-        
+
         // Wait for rendering and completed callbacks
         wait(200);
 
@@ -150,7 +164,6 @@ TestCase {
         win.destroy();
     }
 
-
     function test_inspector_toggling() {
         let win = mainWindowComponent.createObject(this);
         verify(win !== null, "MainWindow should be instantiated");
@@ -169,12 +182,12 @@ TestCase {
         // Click to collapse
         mouseClick(inspectorBtn);
         compare(inspector.collapsed, true, "Inspector should be collapsed after click");
-        tryCompare(inspector, "visible", false, 5000, "Inspector should be invisible after click")
+        tryCompare(inspector, "visible", false, 5000, "Inspector should be invisible after click");
 
         // Click again to expand
         mouseClick(inspectorBtn);
         compare(inspector.collapsed, false, "Inspector should not be collapsed after second click");
-        tryCompare(inspector, "visible", true, 5000, "Inspector should be visible after second click")
+        tryCompare(inspector, "visible", true, 5000, "Inspector should be visible after second click");
 
         win.destroy();
     }
@@ -270,7 +283,7 @@ TestCase {
         // 1. Select document 42
         inspector.selectedIds = [42];
         compare(inspector.selectedId, 42, "Document 42 should be selected");
-        
+
         // Find notesArea
         let notesArea = findChildByName(inspector, "notesArea");
         verify(notesArea !== null, "notesArea should exist inside Inspector");
@@ -364,16 +377,34 @@ TestCase {
         // Clear and populate model
         documentModel.clear();
         proxyFilter.clear();
-        let doc1 = { "257": 101, "id": 101, "docId": 101, "fileName": "doc1.pdf", "absolutePath": "/path/1" };
-        let doc2 = { "257": 102, "id": 102, "docId": 102, "fileName": "doc2.pdf", "absolutePath": "/path/2" };
-        let doc3 = { "257": 103, "id": 103, "docId": 103, "fileName": "doc3.pdf", "absolutePath": "/path/3" };
+        let doc1 = {
+            "257": 101,
+            "id": 101,
+            "docId": 101,
+            "fileName": "doc1.pdf",
+            "absolutePath": "/path/1"
+        };
+        let doc2 = {
+            "257": 102,
+            "id": 102,
+            "docId": 102,
+            "fileName": "doc2.pdf",
+            "absolutePath": "/path/2"
+        };
+        let doc3 = {
+            "257": 103,
+            "id": 103,
+            "docId": 103,
+            "fileName": "doc3.pdf",
+            "absolutePath": "/path/3"
+        };
         documentModel.append(doc1);
         proxyFilter.append(doc1);
         documentModel.append(doc2);
         proxyFilter.append(doc2);
         documentModel.append(doc3);
         proxyFilter.append(doc3);
-        
+
         wait(100);
 
         console.log("DEBUG: proxyFilter rowCount =", proxyFilter.rowCount());
@@ -462,7 +493,7 @@ TestCase {
         compare(documentModel.textCount, 1, "textCount should be 1");
         compare(documentModel.localCount, 2, "localCount should be 2");
         compare(documentModel.unavailableCount, 1, "unavailableCount should be 1");
- 
+
         // Verify status bar text reflects these counts
         let expectedText = "Indexed: 3 items (1 PDFs, 1 Images, 1 Text/Other)  |  2 Local, 1 Unavailable  |  Selected: 0";
         compare(statusLabel.text, expectedText, "Status bar text should match expected breakdown");
@@ -530,8 +561,20 @@ TestCase {
         // Clear and populate model
         documentModel.clear();
         proxyFilter.clear();
-        let doc1 = { "257": 101, "id": 101, "docId": 101, "fileName": "doc1.pdf", "absolutePath": "/path/1" };
-        let doc2 = { "257": 102, "id": 102, "docId": 102, "fileName": "doc2.pdf", "absolutePath": "/path/2" };
+        let doc1 = {
+            "257": 101,
+            "id": 101,
+            "docId": 101,
+            "fileName": "doc1.pdf",
+            "absolutePath": "/path/1"
+        };
+        let doc2 = {
+            "257": 102,
+            "id": 102,
+            "docId": 102,
+            "fileName": "doc2.pdf",
+            "absolutePath": "/path/2"
+        };
         documentModel.append(doc1);
         proxyFilter.append(doc1);
         documentModel.append(doc2);
@@ -546,7 +589,7 @@ TestCase {
         viewSegment.currentIndex = 0; // Grid
         gridCanvas.selectedIds = [101];
         gridCanvas.selectId(101);
-        
+
         let gridView = findChildByType(gridCanvas, "KaakaoGridView");
         verify(gridView !== null, "KaakaoGridView should be found");
         gridView.gridView.forceActiveFocus();
@@ -561,10 +604,10 @@ TestCase {
         // 2. TableView Enter key test
         viewSegment.currentIndex = 1; // Table
         tableCanvas.selectId(102);
-        
+
         let tableView = findChildByType(tableCanvas, "KaakaoTableView");
         verify(tableView !== null, "KaakaoTableView should be found");
-        
+
         // Find inner ListView
         let innerListView = tableCanvas.innerListView;
         verify(innerListView !== null, "Inner table ListView should be found");
@@ -601,7 +644,7 @@ TestCase {
         // 2. Context Menu "Copy File Path" action verification
         let contextMenu = win.itemContextMenu;
         verify(contextMenu !== null, "itemContextMenu should exist");
-        
+
         // Setup spy for pathCopied
         let copySpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
         copySpy.target = libraryController;
@@ -609,7 +652,7 @@ TestCase {
 
         contextMenu.targetPath = "/some/test/file.pdf";
         contextMenu.targetDocId = 123;
-        
+
         let copyItem = null;
         for (var i = 0; i < contextMenu.count; i++) {
             var item = contextMenu.itemAt(i);
@@ -624,7 +667,7 @@ TestCase {
 
         compare(copySpy.count, 1, "Copy File Path trigger should copy path to clipboard");
         compare(copySpy.signalArguments[0][0], "/some/test/file.pdf", "Copied path should match target path");
-        
+
         copySpy.destroy();
 
         // 3. Context Menu "Rate" action verification

@@ -1,14 +1,14 @@
 // Copyright (c) 2026 NinjaLibrary. All rights reserved.
 // Licensed under the BSD-3-Clause License.
 
-#include "OcrUtils.h"
-
 #include <tesseract/baseapi.h>
-#include <QDebug>
-#include <QCoreApplication>
-#include <QFile>
 
 #include <QColorSpace>
+#include <QCoreApplication>
+#include <QDebug>
+#include <QFile>
+
+#include "OcrUtils.h"
 
 namespace OcrUtils {
 
@@ -52,4 +52,4 @@ OcrResult recognizeText(const QImage &image)
     return result;
 }
 
-} // namespace OcrUtils
+}  // namespace OcrUtils

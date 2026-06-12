@@ -9,15 +9,16 @@
 
 namespace OcrUtils {
 
-    struct OcrResult {
-        QString text;
-        int confidence; // 0-100, matching Tesseract convention
-    };
+struct OcrResult
+{
+    QString text;
+    int confidence;  // 0-100, matching Tesseract convention
+};
 
-    // Perform OCR on a pre-processed grayscale QImage.
-    // Uses macOS Vision framework on Apple platforms, Tesseract on Linux.
-    OcrResult recognizeText(const QImage &image);
+// Perform OCR on a pre-processed grayscale QImage.
+// Uses macOS Vision framework on Apple platforms, Tesseract on Linux.
+OcrResult recognizeText(const QImage &image);
 
-}
+}  // namespace OcrUtils
 
-#endif // OCRUTILS_H
+#endif  // OCRUTILS_H

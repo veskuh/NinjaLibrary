@@ -39,7 +39,7 @@ KaakaoDialog {
     modal: true
     width: 340
     height: 240
-    
+
     x: parent ? (parent.width - width) / 2 : 100
     y: parent ? (parent.height - height) / 2 : 100
 
@@ -51,7 +51,9 @@ KaakaoDialog {
             role: KaakaoLabel.Role.Header
         }
 
-        KaakaoSeparator { Layout.fillWidth: true }
+        KaakaoSeparator {
+            Layout.fillWidth: true
+        }
 
         KaakaoCheckBox {
             id: sidecarCheckbox
@@ -67,7 +69,9 @@ KaakaoDialog {
             Layout.fillWidth: true
         }
 
-        Item { Layout.fillHeight: true }
+        Item {
+            Layout.fillHeight: true
+        }
     }
 
     footer: DialogButtonBox {
@@ -75,19 +79,19 @@ KaakaoDialog {
         alignment: Qt.AlignRight
         padding: 16
         spacing: 12
-        
+
         KaakaoButton {
             text: "Force Library Scan"
             DialogButtonBox.buttonRole: DialogButtonBox.ResetRole
             onClicked: {
-                var folders = libraryController.watchedFolders
+                var folders = libraryController.watchedFolders;
                 for (var i = 0; i < folders.length; ++i) {
-                    libraryController.scanRequested(folders[i])
+                    libraryController.scanRequested(folders[i]);
                 }
-                prefsDialog.close()
+                prefsDialog.close();
             }
         }
-        
+
         KaakaoButton {
             text: "Done"
             DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole

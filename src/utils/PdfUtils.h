@@ -35,14 +35,14 @@
 #include <QString>
 
 namespace PdfUtils {
-    // Renders the first page of the PDF at path as a QImage.
-    QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth = 256);
+// Renders the first page of the PDF at path as a QImage.
+QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth = 256);
 
-    // Extracts text from all pages of the PDF.
-    QString extractPdfText(const QString &pdfPath);
+// Extracts text from all pages of the PDF.
+QString extractPdfText(const QString &pdfPath);
 
-    // Gets page count.
-    int getPdfPageCount(const QString &pdfPath);
-}
+// Gets page count.
+int getPdfPageCount(const QString &pdfPath);
+}  // namespace PdfUtils
 
-#endif // PDFUTILS_H
+#endif  // PDFUTILS_H

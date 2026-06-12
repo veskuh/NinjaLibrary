@@ -1,0 +1,23 @@
+BasedOnStyle: Google
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AccessModifierOffset: -4
+ConstructorInitializerIndentWidth: 4
+AlignAfterOpenBracket: Align
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: false
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: true
+  AfterUnion: true
+  BeforeElse: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true

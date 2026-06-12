@@ -29,32 +29,28 @@
  */
 
 #include "ThumbnailTask.h"
-#include "../utils/PdfUtils.h"
 
 #include <QColorSpace>
+#include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QImageReader>
-#include <QCryptographicHash>
-#include <QFileInfo>
-#include <QDebug>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QStandardPaths>
 
-#include <QSqlQuery>
-#include <QSqlDatabase>
 #include "../utils/MacBookmarks.h"
+#include "../utils/PdfUtils.h"
 
 ThumbnailTask::ThumbnailTask(DatabaseManager *dbMgr, int docId, const QString &filePath)
-    : m_dbMgr(dbMgr)
-    , m_docId(docId)
-    , m_filePath(filePath)
+    : m_dbMgr(dbMgr), m_docId(docId), m_filePath(filePath)
 {
 }
 
-ThumbnailTask::~ThumbnailTask()
-{
-}
+ThumbnailTask::~ThumbnailTask() {}
 
 void ThumbnailTask::run()
 {
@@ -64,7 +60,9 @@ void ThumbnailTask::run()
         QSqlDatabase db = m_dbMgr->getDatabaseConnection();
         if (db.isOpen()) {
             QSqlQuery q(db);
-            q.prepare("SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || '%' ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
+            q.prepare(
+                "SELECT macos_bookmark FROM watched_folders WHERE :filePath LIKE absolute_path || "
+                "'%' ORDER BY LENGTH(absolute_path) DESC LIMIT 1;");
             q.bindValue(":filePath", m_filePath);
             if (q.exec() && q.next()) {
                 bookmark = q.value(0).toByteArray();
@@ -73,7 +71,8 @@ void ThumbnailTask::run()
     }
     MacBookmarks::SandboxAccess sandboxAccess(bookmark);
     if (!sandboxAccess.isValid() && !bookmark.isEmpty()) {
-        qWarning() << "ThumbnailTask: Failed to acquire security-scoped sandbox access for file:" << m_filePath;
+        qWarning() << "ThumbnailTask: Failed to acquire security-scoped sandbox access for file:"
+                   << m_filePath;
     }
 #endif
 
@@ -106,7 +105,8 @@ void ThumbnailTask::run()
         reader.setAutoTransform(true);
         QImage srcImg;
         if (reader.read(&srcImg)) {
-            // Workaround: Clear color space metadata to prevent non-thread-safe color space conversions
+            // Workaround: Clear color space metadata to prevent non-thread-safe color space
+            // conversions
             srcImg.setColorSpace(QColorSpace());
             img = srcImg.scaled(256, 256, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }

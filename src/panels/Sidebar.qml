@@ -35,7 +35,7 @@ import Kaakao 1.0
 
 KaakaoSidebar {
     id: sidebar
-    
+
     sidebarWidth: 200
 
     signal folderSelected(string path)
@@ -49,47 +49,90 @@ KaakaoSidebar {
     property bool rebuilding: false
 
     function rebuildModel() {
-        var prevIndex = sidebar.currentIndex
-        var prevTarget = ""
-        var prevType = ""
-        
+        var prevIndex = sidebar.currentIndex;
+        var prevTarget = "";
+        var prevType = "";
+
         if (prevIndex >= 0 && prevIndex < sidebarModel.count) {
-            var prevItem = sidebarModel.get(prevIndex)
-            prevTarget = prevItem.target
-            prevType = prevItem.type
+            var prevItem = sidebarModel.get(prevIndex);
+            prevTarget = prevItem.target;
+            prevType = prevItem.type;
         }
 
-        sidebar.rebuilding = true
-        sidebarModel.clear()
-        
+        sidebar.rebuilding = true;
+        sidebarModel.clear();
+
         // Add Library items
-        sidebarModel.append({ "name": "All Documents", "icon": "📄", "category": "Library", "type": "section", "target": "All" })
-        sidebarModel.append({ "name": "Recent", "icon": "🕒", "category": "Library", "type": "section", "target": "Recent" })
-        sidebarModel.append({ "name": "Favorites", "icon": "⭐", "category": "Library", "type": "section", "target": "Favorites" })
-        sidebarModel.append({ "name": "Duplicates", "icon": "👥", "category": "Library", "type": "section", "target": "Duplicates" })
-        sidebarModel.append({ "name": "Unavailable", "icon": "⚠️", "category": "Library", "type": "section", "target": "Unavailable" })
-        
+        sidebarModel.append({
+            "name": "All Documents",
+            "icon": "📄",
+            "category": "Library",
+            "type": "section",
+            "target": "All"
+        });
+        sidebarModel.append({
+            "name": "Recent",
+            "icon": "🕒",
+            "category": "Library",
+            "type": "section",
+            "target": "Recent"
+        });
+        sidebarModel.append({
+            "name": "Favorites",
+            "icon": "⭐",
+            "category": "Library",
+            "type": "section",
+            "target": "Favorites"
+        });
+        sidebarModel.append({
+            "name": "Duplicates",
+            "icon": "👥",
+            "category": "Library",
+            "type": "section",
+            "target": "Duplicates"
+        });
+        sidebarModel.append({
+            "name": "Unavailable",
+            "icon": "⚠️",
+            "category": "Library",
+            "type": "section",
+            "target": "Unavailable"
+        });
+
         // Add Watched Folders
-        var folders = libraryController.watchedFolders
+        var folders = libraryController.watchedFolders;
         for (var i = 0; i < folders.length; i++) {
-            var path = folders[i]
-            var name = path.substring(path.lastIndexOf('/') + 1)
-            if (name === "") name = path
-            sidebarModel.append({ "name": name, "icon": "📁", "category": "Folders", "type": "folder", "target": path })
+            var path = folders[i];
+            var name = path.substring(path.lastIndexOf('/') + 1);
+            if (name === "")
+                name = path;
+            sidebarModel.append({
+                "name": name,
+                "icon": "📁",
+                "category": "Folders",
+                "type": "folder",
+                "target": path
+            });
         }
 
         // Add Tags
-        var tags = libraryController.getUniqueTags()
+        var tags = libraryController.getUniqueTags();
         for (var k = 0; k < tags.length; k++) {
-            var tag = tags[k]
-            sidebarModel.append({ "name": tag, "icon": "🏷️", "category": "Tags", "type": "tag", "target": tag })
+            var tag = tags[k];
+            sidebarModel.append({
+                "name": tag,
+                "icon": "🏷️",
+                "category": "Tags",
+                "type": "tag",
+                "target": tag
+            });
         }
 
         // Restore selection
-        var restored = false
+        var restored = false;
         if (prevTarget !== "") {
             for (var j = 0; j < sidebarModel.count; j++) {
-                var item = sidebarModel.get(j)
+                var item = sidebarModel.get(j);
                 if (item.target === prevTarget && item.type === prevType) {
                     sidebar.currentIndex = j;
                     restored = true;
@@ -97,69 +140,73 @@ KaakaoSidebar {
                 }
             }
         }
-        
+
         // Fallback to select first item (All Documents)
         if (!restored && sidebarModel.count > 0) {
-            sidebar.currentIndex = 0
+            sidebar.currentIndex = 0;
         }
 
-        sidebar.rebuilding = false
+        sidebar.rebuilding = false;
 
         // Only fire selection change signals if the target or type actually changed
-        var currentItem = currentIndex >= 0 ? sidebarModel.get(currentIndex) : null
+        var currentItem = currentIndex >= 0 ? sidebarModel.get(currentIndex) : null;
         if (currentItem) {
             if (currentItem.target !== prevTarget || currentItem.type !== prevType) {
                 if (currentItem.type === "section") {
-                    sidebar.sectionSelected(currentItem.target)
+                    sidebar.sectionSelected(currentItem.target);
                 } else if (currentItem.type === "folder") {
-                    sidebar.folderSelected(currentItem.target)
+                    sidebar.folderSelected(currentItem.target);
                 } else if (currentItem.type === "tag") {
-                    sidebar.tagSelected(currentItem.target)
+                    sidebar.tagSelected(currentItem.target);
                 }
             }
         }
     }
 
     Component.onCompleted: {
-        rebuildModel()
+        rebuildModel();
         if (typeof libraryController !== "undefined" && libraryController) {
             if (libraryController.watchedFoldersChanged) {
-                libraryController.watchedFoldersChanged.connect(rebuildModel)
+                libraryController.watchedFoldersChanged.connect(rebuildModel);
             }
             if (libraryController.libraryChanged) {
-                libraryController.libraryChanged.connect(rebuildModel)
+                libraryController.libraryChanged.connect(rebuildModel);
             }
         }
     }
 
     onCurrentIndexChanged: {
-        if (rebuilding) return
-        if (currentIndex < 0 || currentIndex >= sidebarModel.count) return
-        var item = sidebarModel.get(currentIndex)
+        if (rebuilding)
+            return;
+        if (currentIndex < 0 || currentIndex >= sidebarModel.count)
+            return;
+        var item = sidebarModel.get(currentIndex);
         if (item.type === "section") {
-            sidebar.sectionSelected(item.target)
+            sidebar.sectionSelected(item.target);
         } else if (item.type === "folder") {
-            sidebar.folderSelected(item.target)
+            sidebar.folderSelected(item.target);
         } else if (item.type === "tag") {
-            sidebar.tagSelected(item.target)
+            sidebar.tagSelected(item.target);
         }
     }
 
     onContextMenu: (index, globalPos) => {
-        if (index < 0 || index >= sidebarModel.count) return
-        var item = sidebarModel.get(index)
+        if (index < 0 || index >= sidebarModel.count)
+            return;
+        var item = sidebarModel.get(index);
         if (item.type === "folder" && item.target !== "") {
-            var localPos = folderContextMenu.parent.mapFromItem(null, globalPos.x, globalPos.y)
-            folderContextMenu.targetPath = item.target
-            folderContextMenu.popup(localPos.x, localPos.y)
+            var localPos = folderContextMenu.parent.mapFromItem(null, globalPos.x, globalPos.y);
+            folderContextMenu.targetPath = item.target;
+            folderContextMenu.popup(localPos.x, localPos.y);
         }
     }
 
-    onDoubleClicked: (index) => {
-        if (index < 0 || index >= sidebarModel.count) return
-        var item = sidebarModel.get(index)
+    onDoubleClicked: index => {
+        if (index < 0 || index >= sidebarModel.count)
+            return;
+        var item = sidebarModel.get(index);
         if (item.type === "folder" && item.target !== "") {
-            Qt.openUrlExternally("file://" + item.target)
+            Qt.openUrlExternally("file://" + item.target);
         }
     }
 
@@ -167,40 +214,40 @@ KaakaoSidebar {
         id: folderContextMenu
         objectName: "folderContextMenu"
         property string targetPath: ""
-        
+
         KaakaoMenuItem {
             text: "Rescan"
             onTriggered: {
-                libraryController.scanRequested(folderContextMenu.targetPath)
+                libraryController.scanRequested(folderContextMenu.targetPath);
             }
         }
 
         KaakaoMenuItem {
             text: "Stop Watching Folder"
             onTriggered: {
-                libraryController.removeWatchedFolder(folderContextMenu.targetPath)
+                libraryController.removeWatchedFolder(folderContextMenu.targetPath);
             }
         }
     }
 
     function getSelectedFolder() {
         if (currentIndex >= 0 && currentIndex < sidebarModel.count) {
-            var item = sidebarModel.get(currentIndex)
+            var item = sidebarModel.get(currentIndex);
             if (item && item.type === "folder") {
-                return item.target
+                return item.target;
             }
         }
-        return ""
+        return "";
     }
 
     function selectFolder(path) {
         for (var i = 0; i < sidebarModel.count; i++) {
-            var item = sidebarModel.get(i)
+            var item = sidebarModel.get(i);
             if (item && item.type === "folder" && item.target === path) {
-                sidebar.currentIndex = i
-                return true
+                sidebar.currentIndex = i;
+                return true;
             }
         }
-        return false
+        return false;
     }
 }

@@ -28,8 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <QTest>
 #include <QSignalSpy>
+#include <QTest>
+
 #include "../../src/database/DatabaseManager.h"
 #include "../../src/models/DocumentModel.h"
 #include "../../src/models/ProxyFilter.h"
@@ -66,27 +67,41 @@ void TestModels::initTestCase()
     int folderId = query.lastInsertId().toInt();
 
     // Doc 1: File A, size 100, hash123, rating 5, online, tags: work, important
-    QVERIFY(query.exec(QString(
-        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline, date_modified) "
-        "VALUES (%1, 'fileA.pdf', '/test/docs/fileA.pdf', 100, 'hash123', 5, 0, datetime('now'));").arg(folderId)));
+    QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
+                               "file_size, file_hash, star_rating, is_offline, date_modified) "
+                               "VALUES (%1, 'fileA.pdf', '/test/docs/fileA.pdf', 100, 'hash123', "
+                               "5, 0, datetime('now'));")
+                           .arg(folderId)));
     int docAId = query.lastInsertId().toInt();
 
     // Doc 2: File B, size 200, hash456, rating 3, online, tags: work, personal
-    QVERIFY(query.exec(QString(
-        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline, date_modified) "
-        "VALUES (%1, 'fileB.png', '/test/docs/fileB.png', 200, 'hash456', 3, 0, datetime('now'));").arg(folderId)));
+    QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
+                               "file_size, file_hash, star_rating, is_offline, date_modified) "
+                               "VALUES (%1, 'fileB.png', '/test/docs/fileB.png', 200, 'hash456', "
+                               "3, 0, datetime('now'));")
+                           .arg(folderId)));
     int docBId = query.lastInsertId().toInt();
 
-    // Doc 3: File C, size 100, hash123, rating 2, offline, tags: personal (shares hash123 with File A -> Duplicate!)
-    QVERIFY(query.exec(QString(
-        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, star_rating, is_offline, date_modified) "
-        "VALUES (%1, 'fileC.pdf', '/test/docs/fileC.pdf', 100, 'hash123', 2, 1, datetime('now'));").arg(folderId)));
+    // Doc 3: File C, size 100, hash123, rating 2, offline, tags: personal (shares hash123 with File
+    // A -> Duplicate!)
+    QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
+                               "file_size, file_hash, star_rating, is_offline, date_modified) "
+                               "VALUES (%1, 'fileC.pdf', '/test/docs/fileC.pdf', 100, 'hash123', "
+                               "2, 1, datetime('now'));")
+                           .arg(folderId)));
     int docCId = query.lastInsertId().toInt();
 
     // Insert FTS text
-    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (%1, 'fileA.pdf', 'Hello world PDF text.', 'Boss notes');").arg(docAId)));
-    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (%1, 'fileB.png', 'Scanned image content.', '');").arg(docBId)));
-    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (%1, 'fileC.pdf', 'Hello duplicate test.', 'Clone');").arg(docCId)));
+    QVERIFY(query.exec(
+        QString("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES "
+                "(%1, 'fileA.pdf', 'Hello world PDF text.', 'Boss notes');")
+            .arg(docAId)));
+    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, "
+                               "notes) VALUES (%1, 'fileB.png', 'Scanned image content.', '');")
+                           .arg(docBId)));
+    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, "
+                               "notes) VALUES (%1, 'fileC.pdf', 'Hello duplicate test.', 'Clone');")
+                           .arg(docCId)));
 
     // Insert Tags
     QVERIFY(query.exec("INSERT INTO tags (id, name) VALUES (1, 'work');"));
@@ -94,19 +109,21 @@ void TestModels::initTestCase()
     QVERIFY(query.exec("INSERT INTO tags (id, name) VALUES (3, 'personal');"));
 
     // Link Tags
-    QVERIFY(query.exec(QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 1);").arg(docAId)));
-    QVERIFY(query.exec(QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 2);").arg(docAId)));
+    QVERIFY(query.exec(
+        QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 1);").arg(docAId)));
+    QVERIFY(query.exec(
+        QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 2);").arg(docAId)));
 
-    QVERIFY(query.exec(QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 1);").arg(docBId)));
-    QVERIFY(query.exec(QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 3);").arg(docBId)));
+    QVERIFY(query.exec(
+        QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 1);").arg(docBId)));
+    QVERIFY(query.exec(
+        QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 3);").arg(docBId)));
 
-    QVERIFY(query.exec(QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 3);").arg(docCId)));
+    QVERIFY(query.exec(
+        QString("INSERT INTO document_tags (document_id, tag_id) VALUES (%1, 3);").arg(docCId)));
 }
 
-void TestModels::cleanupTestCase()
-{
-    delete m_dbMgr;
-}
+void TestModels::cleanupTestCase() { delete m_dbMgr; }
 
 void TestModels::testModelFiltering()
 {
@@ -124,7 +141,7 @@ void TestModels::testModelFiltering()
 
     // Test offline hiding
     proxyFilter.setShowUnavailable(false);
-    QCOMPARE(proxyFilter.rowCount(), 2); // File A & B are online
+    QCOMPARE(proxyFilter.rowCount(), 2);  // File A & B are online
     proxyFilter.setShowUnavailable(true);
 
     // Test tag intersection (AND filtering)
@@ -135,7 +152,8 @@ void TestModels::testModelFiltering()
     // Filter tags "work" AND "important" (matches File A only)
     proxyFilter.setSelectedTags(QStringList{"work", "important"});
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
 
     // Reset tags filter
     proxyFilter.setSelectedTags(QStringList{});
@@ -144,7 +162,8 @@ void TestModels::testModelFiltering()
     // Test Rating filter >= 4 (File A = 5, matches)
     proxyFilter.setMinRating(4);
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
     proxyFilter.setMinRating(0);
 
     // Test Duplicate filter (File A and C share 'hash123')
@@ -156,12 +175,14 @@ void TestModels::testModelFiltering()
     // Search "world" (matches File A)
     proxyFilter.setFilterString("world");
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
 
     // Search "duplicate" (matches File C)
     proxyFilter.setFilterString("duplicate");
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileC.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileC.pdf"));
 
     proxyFilter.setFilterString("");
     QCOMPARE(proxyFilter.rowCount(), 3);
@@ -199,7 +220,8 @@ void TestModels::testProxyFilterGet()
     QVERIFY(names.contains("fileB.png"));
     QVERIFY(names.contains("fileC.pdf"));
 
-    // Verify each row returns its own unique data (the Table View bug was all rows showing same data)
+    // Verify each row returns its own unique data (the Table View bug was all rows showing same
+    // data)
     QSet<QString> uniqueNames(names.begin(), names.end());
     QCOMPARE(uniqueNames.size(), 3);
 
@@ -272,23 +294,26 @@ void TestModels::testMultiTermSearch()
     // Let's search "boss work" -> should match fileA.pdf
     proxyFilter.setFilterString("boss work");
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
 
     // Case-insensitivity check: "BoSs WoRk"
     proxyFilter.setFilterString("BoSs WoRk");
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
 
     // Non-matching term: "boss play" -> no match
     proxyFilter.setFilterString("boss play");
     QCOMPARE(proxyFilter.rowCount(), 0);
 
     // Matches notes, content, filename, tag
-    // fileA has filename "fileA.pdf", text "Hello world PDF text.", notes "Boss notes", tags "work", "important"
-    // Search "fileA important pdf" -> should match fileA.pdf
+    // fileA has filename "fileA.pdf", text "Hello world PDF text.", notes "Boss notes", tags
+    // "work", "important" Search "fileA important pdf" -> should match fileA.pdf
     proxyFilter.setFilterString("fileA important pdf");
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
 
     // Multi-document matches
     // "work" tag is on File A and File B
@@ -296,11 +321,12 @@ void TestModels::testMultiTermSearch()
     proxyFilter.setFilterString("work");
     QCOMPARE(proxyFilter.rowCount(), 2);
 
-    // "work hello" -> "work" on File A/B, but "hello" is only on File A ("Hello world...") and File C ("Hello duplicate...")
-    // So "work hello" matches only File A
+    // "work hello" -> "work" on File A/B, but "hello" is only on File A ("Hello world...") and File
+    // C ("Hello duplicate...") So "work hello" matches only File A
     proxyFilter.setFilterString("work hello");
     QCOMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(), QString("fileA.pdf"));
+    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
+             QString("fileA.pdf"));
 
     // Reset filter
     proxyFilter.setFilterString("");
@@ -314,7 +340,8 @@ void TestModels::testScopeFiltering()
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
-    // Initial check: activeScopes should contain All, Today, This Week, This Month, current year, Local, Unavailable, PDF, PNG
+    // Initial check: activeScopes should contain All, Today, This Week, This Month, current year,
+    // Local, Unavailable, PDF, PNG
     QStringList active = proxyFilter.activeScopes();
     QVERIFY(active.contains("All"));
     QVERIFY(active.contains("Today"));
@@ -328,7 +355,7 @@ void TestModels::testScopeFiltering()
 
     // Test PDF filtering
     proxyFilter.setScopeFilter("PDF");
-    QCOMPARE(proxyFilter.rowCount(), 2); // fileA.pdf and fileC.pdf
+    QCOMPARE(proxyFilter.rowCount(), 2);  // fileA.pdf and fileC.pdf
     for (int i = 0; i < proxyFilter.rowCount(); ++i) {
         QString name = proxyFilter.get(i, "fileName").toString();
         QVERIFY(name.endsWith(".pdf"));
@@ -336,19 +363,19 @@ void TestModels::testScopeFiltering()
 
     // Test PNG filtering
     proxyFilter.setScopeFilter("PNG");
-    QCOMPARE(proxyFilter.rowCount(), 1); // fileB.png
+    QCOMPARE(proxyFilter.rowCount(), 1);  // fileB.png
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileB.png");
 
     // Test Online filtering
     proxyFilter.setScopeFilter("Local");
-    QCOMPARE(proxyFilter.rowCount(), 2); // fileA.pdf and fileB.png
+    QCOMPARE(proxyFilter.rowCount(), 2);  // fileA.pdf and fileB.png
     for (int i = 0; i < proxyFilter.rowCount(); ++i) {
         QVERIFY(!proxyFilter.get(i, "isOffline").toBool());
     }
 
     // Test Offline filtering
     proxyFilter.setScopeFilter("Unavailable");
-    QCOMPARE(proxyFilter.rowCount(), 1); // fileC.pdf
+    QCOMPARE(proxyFilter.rowCount(), 1);  // fileC.pdf
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileC.pdf");
     QVERIFY(proxyFilter.get(0, "isOffline").toBool());
 
@@ -360,7 +387,7 @@ void TestModels::testScopeFiltering()
     // Set min rating to 4. Only fileA.pdf (PDF, Local, Rating 5) matches.
     // fileB.png (rating 3) and fileC.pdf (rating 2) are filtered out by rating.
     proxyFilter.setMinRating(4);
-    
+
     // Active scopes should now NOT contain Unavailable or PNG
     QStringList active2 = proxyFilter.activeScopes();
     QVERIFY(active2.contains("All"));
@@ -400,15 +427,15 @@ void TestModels::testSorting()
     // 3. Sort by StarRatingRole (267) Ascending
     proxyFilter.setSortRole(267);
     proxyFilter.sort(0, Qt::AscendingOrder);
-    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileC.pdf")); // Rating 2
-    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png")); // Rating 3
-    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileA.pdf")); // Rating 5
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileC.pdf"));  // Rating 2
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png"));  // Rating 3
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileA.pdf"));  // Rating 5
 
     // 4. Sort by StarRatingRole (267) Descending
     proxyFilter.sort(0, Qt::DescendingOrder);
-    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileA.pdf")); // Rating 5
-    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png")); // Rating 3
-    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileC.pdf")); // Rating 2
+    QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileA.pdf"));  // Rating 5
+    QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png"));  // Rating 3
+    QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileC.pdf"));  // Rating 2
 
     // 5. Sort by FileSizeRole (261) Ascending
     proxyFilter.setSortRole(261);
@@ -440,7 +467,8 @@ void TestModels::testRecentCategory()
     // Should show 2 documents (File A and File B, but not File C)
     QCOMPARE(proxyFilter.rowCount(), 2);
 
-    // They must be sorted by last_opened DESC: fileB.png (200) should be first, then fileA.pdf (100)
+    // They must be sorted by last_opened DESC: fileB.png (200) should be first, then fileA.pdf
+    // (100)
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileB.png"));
     QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileA.pdf"));
 

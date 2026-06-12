@@ -28,20 +28,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "DocUtils.h"
+#include <QClipboard>
 #include <QFile>
-#include <QTextStream>
 #include <QFileInfo>
 #include <QGuiApplication>
-#include <QClipboard>
+#include <QTextStream>
+
+#include "DocUtils.h"
 
 namespace DocUtils {
 
 bool isSupportedTextDocument(const QString &filePath)
 {
     QString ext = QFileInfo(filePath).suffix().toLower();
-    return ext == "txt" || ext == "md" || ext == "doc" || ext == "docx" ||
-           ext == "xls" || ext == "xlsx" || ext == "ppt" || ext == "pptx";
+    return ext == "txt" || ext == "md" || ext == "doc" || ext == "docx" || ext == "xls" ||
+           ext == "xlsx" || ext == "ppt" || ext == "pptx";
 }
 
 QString extractText(const QString &filePath)
@@ -55,14 +56,11 @@ QString extractText(const QString &filePath)
         QTextStream stream(&file);
         return stream.readAll();
     }
-    
+
     // doc/docx not natively supported on Linux without external dependencies, return empty
     return QString();
 }
 
-void copyToClipboard(const QString &text)
-{
-    QGuiApplication::clipboard()->setText(text);
-}
+void copyToClipboard(const QString &text) { QGuiApplication::clipboard()->setText(text); }
 
-} // namespace DocUtils
+}  // namespace DocUtils

@@ -28,27 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "DocUtils.h"
-#import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
-#include <QFile>
-#include <QTextStream>
-#include <QFileInfo>
+#import <Foundation/Foundation.h>
 #include <QDebug>
+#include <QFile>
+#include <QFileInfo>
+#include <QTextStream>
+#include "DocUtils.h"
 
 namespace DocUtils {
 
 bool isSupportedTextDocument(const QString &filePath)
 {
     QString ext = QFileInfo(filePath).suffix().toLower();
-    return ext == "txt" || ext == "md" || ext == "doc" || ext == "docx" ||
-           ext == "xls" || ext == "xlsx" || ext == "ppt" || ext == "pptx";
+    return ext == "txt" || ext == "md" || ext == "doc" || ext == "docx" || ext == "xls" ||
+           ext == "xlsx" || ext == "ppt" || ext == "pptx";
 }
 
 QString extractText(const QString &filePath)
 {
     QString ext = QFileInfo(filePath).suffix().toLower();
-    
+
     if (ext == "txt" || ext == "md") {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -57,14 +57,14 @@ QString extractText(const QString &filePath)
         QTextStream stream(&file);
         return stream.readAll();
     }
-    
+
     if (ext == "doc" || ext == "docx") {
         @autoreleasepool {
             NSString *nsPath = filePath.toNSString();
             NSURL *url = [NSURL fileURLWithPath:nsPath];
             NSError *error = nil;
             NSDictionary *docAttrs = nil;
-            
+
             NSAttributedString *attrStr = [[NSAttributedString alloc] initWithURL:url
                                                                           options:@{}
                                                                documentAttributes:&docAttrs
@@ -73,8 +73,8 @@ QString extractText(const QString &filePath)
                 NSString *plainText = [attrStr string];
                 return QString::fromNSString(plainText);
             } else {
-                qWarning() << "DocUtils: Failed to extract text from" << filePath
-                           << ":" << (error ? [error localizedDescription].UTF8String : "Unknown error");
+                qWarning() << "DocUtils: Failed to extract text from" << filePath << ":"
+                           << (error ? [error localizedDescription].UTF8String : "Unknown error");
                 return QString();
             }
         }
@@ -92,4 +92,4 @@ void copyToClipboard(const QString &text)
     }
 }
 
-} // namespace DocUtils
+}  // namespace DocUtils

@@ -29,27 +29,29 @@
  */
 
 #include "ProxyFilter.h"
-#include "DocumentModel.h"
-#include <QSqlQuery>
-#include <QSqlError>
+
+#include <QDate>
 #include <QDateTime>
 #include <QDebug>
 #include <QFileInfo>
-#include <QDate>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <algorithm>
 
+#include "DocumentModel.h"
+
 ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
-    : QSortFilterProxyModel(parent)
-    , m_dbMgr(dbMgr)
-    , m_minRating(0)
-    , m_showUnavailable(true)
-    , m_duplicatesOnly(false)
-    , m_categoryFilter("All")
-    , m_scopeFilter("All")
-    , m_activeScopes(QStringList{"All"})
-    , m_searchActive(false)
-    , m_includeSubfolderContents(false)
-    , m_showSubfolderIcons(true)
+    : QSortFilterProxyModel(parent),
+      m_dbMgr(dbMgr),
+      m_minRating(0),
+      m_showUnavailable(true),
+      m_duplicatesOnly(false),
+      m_categoryFilter("All"),
+      m_scopeFilter("All"),
+      m_activeScopes(QStringList{"All"}),
+      m_searchActive(false),
+      m_includeSubfolderContents(false),
+      m_showSubfolderIcons(true)
 {
     setDynamicSortFilter(true);
     // Sort by file name ascending by default
@@ -57,29 +59,32 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     sort(0, Qt::AscendingOrder);
 }
 
-void ProxyFilter::setSortRole(int role)
-{
-    QSortFilterProxyModel::setSortRole(role);
-}
+void ProxyFilter::setSortRole(int role) { QSortFilterProxyModel::setSortRole(role); }
 
-ProxyFilter::~ProxyFilter()
-{
-}
+ProxyFilter::~ProxyFilter() {}
 
 void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
 {
     if (this->sourceModel()) {
-        disconnect(this->sourceModel(), &QAbstractItemModel::modelReset, this, &ProxyFilter::updateSearchMatches);
-        disconnect(this->sourceModel(), &QAbstractItemModel::rowsInserted, this, &ProxyFilter::updateSearchMatches);
-        disconnect(this->sourceModel(), &QAbstractItemModel::rowsRemoved, this, &ProxyFilter::updateSearchMatches);
-        disconnect(this->sourceModel(), &QAbstractItemModel::dataChanged, this, &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::modelReset, this,
+                   &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::rowsInserted, this,
+                   &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::rowsRemoved, this,
+                   &ProxyFilter::updateSearchMatches);
+        disconnect(this->sourceModel(), &QAbstractItemModel::dataChanged, this,
+                   &ProxyFilter::updateSearchMatches);
     }
     QSortFilterProxyModel::setSourceModel(sourceModel);
     if (sourceModel) {
-        connect(sourceModel, &QAbstractItemModel::modelReset, this, &ProxyFilter::updateSearchMatches);
-        connect(sourceModel, &QAbstractItemModel::rowsInserted, this, &ProxyFilter::updateSearchMatches);
-        connect(sourceModel, &QAbstractItemModel::rowsRemoved, this, &ProxyFilter::updateSearchMatches);
-        connect(sourceModel, &QAbstractItemModel::dataChanged, this, &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::modelReset, this,
+                &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::rowsInserted, this,
+                &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::rowsRemoved, this,
+                &ProxyFilter::updateSearchMatches);
+        connect(sourceModel, &QAbstractItemModel::dataChanged, this,
+                &ProxyFilter::updateSearchMatches);
     }
     updateSearchMatches();
 }
@@ -187,7 +192,10 @@ void ProxyFilter::updateDuplicateHashes()
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return;
 
-    QSqlQuery query("SELECT file_hash FROM documents WHERE file_hash IS NOT NULL AND file_hash != '' GROUP BY file_hash HAVING count(*) > 1;", db);
+    QSqlQuery query(
+        "SELECT file_hash FROM documents WHERE file_hash IS NOT NULL AND file_hash != '' GROUP BY "
+        "file_hash HAVING count(*) > 1;",
+        db);
     while (query.next()) {
         m_duplicateHashes.insert(query.value(0).toString());
     }
@@ -257,12 +265,13 @@ void ProxyFilter::updateSearchMatches()
     invalidateAndRecalculate();
 }
 
-bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex &source_parent) const
+bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row,
+                                               const QModelIndex &source_parent) const
 {
     if (!sourceModel()) return false;
 
     QModelIndex idx = sourceModel()->index(source_row, 0, source_parent);
-    
+
     bool isFolder = sourceModel()->data(idx, DocumentModel::IsFolderRole).toBool();
     if (isFolder && (!m_filterString.isEmpty() || m_folderFilter.isEmpty())) {
         return false;
@@ -330,7 +339,7 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row, const QModelIndex
     // 7. Folder filter
     if (!m_folderFilter.isEmpty()) {
         QString absolutePath = sourceModel()->data(idx, DocumentModel::AbsolutePathRole).toString();
-        
+
         if (m_includeSubfolderContents) {
             if (isFolder) {
                 return false;
@@ -381,7 +390,8 @@ bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_par
         return days >= 0 && days < 7;
     } else if (m_scopeFilter == "This Month") {
         QDate today = QDate::currentDate();
-        return dateModified.date().year() == today.year() && dateModified.date().month() == today.month();
+        return dateModified.date().year() == today.year() &&
+               dateModified.date().month() == today.month();
     } else if (m_scopeFilter == "Local") {
         return !isOffline;
     } else if (m_scopeFilter == "Unavailable") {

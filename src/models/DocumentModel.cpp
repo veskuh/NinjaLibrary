@@ -29,18 +29,18 @@
  */
 
 #include "DocumentModel.h"
-#include <QSqlQuery>
-#include <QSqlRecord>
-#include <QSqlError>
-#include <QDir>
-#include <QFile>
+
 #include <QCryptographicHash>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QSqlRecord>
 #include <QStandardPaths>
 
 DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
-    : QAbstractListModel(parent)
-    , m_dbMgr(dbMgr)
+    : QAbstractListModel(parent), m_dbMgr(dbMgr)
 {
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
@@ -49,9 +49,7 @@ DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     forceRefresh();
 }
 
-DocumentModel::~DocumentModel()
-{
-}
+DocumentModel::~DocumentModel() {}
 
 int DocumentModel::rowCount(const QModelIndex &parent) const
 {
@@ -66,22 +64,38 @@ QVariant DocumentModel::data(const QModelIndex &index, int role) const
     const DocumentInfo &doc = m_documents.at(index.row());
 
     switch (role) {
-        case IdRole: return doc.id;
-        case FolderIdRole: return doc.folderId;
-        case FileNameRole: return doc.fileName;
-        case AbsolutePathRole: return doc.absolutePath;
-        case FileSizeRole: return doc.fileSize;
-        case FileHashRole: return doc.fileHash;
-        case DateCreatedRole: return doc.dateCreated;
-        case DateModifiedRole: return doc.dateModified;
-        case DateAddedRole: return doc.dateAdded;
-        case PageCountRole: return doc.pageCount;
-        case StarRatingRole: return doc.starRating;
-        case IsOfflineRole: return doc.isOffline;
-        case TagsRole: return doc.tags;
-        case TextSnippetRole: return doc.textSnippet;
-        case NotesRole: return doc.notes;
-        case ThumbnailPathRole: return doc.thumbnailPath;
+        case IdRole:
+            return doc.id;
+        case FolderIdRole:
+            return doc.folderId;
+        case FileNameRole:
+            return doc.fileName;
+        case AbsolutePathRole:
+            return doc.absolutePath;
+        case FileSizeRole:
+            return doc.fileSize;
+        case FileHashRole:
+            return doc.fileHash;
+        case DateCreatedRole:
+            return doc.dateCreated;
+        case DateModifiedRole:
+            return doc.dateModified;
+        case DateAddedRole:
+            return doc.dateAdded;
+        case PageCountRole:
+            return doc.pageCount;
+        case StarRatingRole:
+            return doc.starRating;
+        case IsOfflineRole:
+            return doc.isOffline;
+        case TagsRole:
+            return doc.tags;
+        case TextSnippetRole:
+            return doc.textSnippet;
+        case NotesRole:
+            return doc.notes;
+        case ThumbnailPathRole:
+            return doc.thumbnailPath;
         case FileSizeStrRole: {
             qint64 kb = doc.fileSize / 1024;
             if (kb > 1024) {
@@ -105,14 +119,18 @@ QVariant DocumentModel::data(const QModelIndex &index, int role) const
         case TagsStrRole: {
             return doc.tags.join(", ");
         }
-        case LastOpenedRole: return doc.lastOpened;
-        case IsFolderRole: return doc.isFolder;
-        case ItemCountRole: return doc.itemCount;
+        case LastOpenedRole:
+            return doc.lastOpened;
+        case IsFolderRole:
+            return doc.isFolder;
+        case ItemCountRole:
+            return doc.itemCount;
         case ItemCountStrRole: {
             if (!doc.isFolder) return QString();
             return QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
         }
-        default: return QVariant();
+        default:
+            return QVariant();
     }
 }
 
@@ -149,7 +167,7 @@ QHash<int, QByteArray> DocumentModel::roleNames() const
 
 void DocumentModel::refresh()
 {
-    m_refreshTimer->start(200); // Debounce by 200ms
+    m_refreshTimer->start(200);  // Debounce by 200ms
 }
 
 void DocumentModel::forceRefresh()
@@ -163,13 +181,15 @@ void DocumentModel::forceRefresh()
     {
         QSqlQuery query(
             "SELECT d.id, d.folder_id, d.file_name, d.absolute_path, d.file_size, d.file_hash, "
-            "       d.date_created, d.date_modified, d.date_added, d.page_count, d.star_rating, d.is_offline, "
+            "       d.date_created, d.date_modified, d.date_added, d.page_count, d.star_rating, "
+            "d.is_offline, "
             "       d.last_opened, "
-            "       (SELECT group_concat(t.name, ',') FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = d.id) as tags_list, "
+            "       (SELECT group_concat(t.name, ',') FROM tags t JOIN document_tags dt ON t.id = "
+            "dt.tag_id WHERE dt.document_id = d.id) as tags_list, "
             "       (SELECT text_snippet FROM document_search WHERE document_id = d.id) as text, "
             "       (SELECT notes FROM document_search WHERE document_id = d.id) as notes "
-            "FROM documents d;", db
-        );
+            "FROM documents d;",
+            db);
         while (query.next()) {
             records.append(query.record());
         }
@@ -289,16 +309,16 @@ void DocumentModel::forceRefresh()
         QString ext = doc.fileName.split('.').last().toLower();
         if (ext == "pdf") {
             tempPdf++;
-        } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "bmp" || ext == "tiff") {
+        } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "bmp" ||
+                   ext == "tiff") {
             tempImage++;
         } else {
             tempText++;
         }
     }
 
-    bool changed = (m_pdfCount != tempPdf || m_imageCount != tempImage ||
-                    m_textCount != tempText || m_localCount != tempLocal ||
-                    m_unavailableCount != tempUnavailable);
+    bool changed = (m_pdfCount != tempPdf || m_imageCount != tempImage || m_textCount != tempText ||
+                    m_localCount != tempLocal || m_unavailableCount != tempUnavailable);
 
     m_pdfCount = tempPdf;
     m_imageCount = tempImage;
@@ -340,24 +360,19 @@ void DocumentModel::forceRefresh()
                 const DocumentInfo &newDoc = newMap.value(path);
                 const DocumentInfo &oldDoc = m_documents.at(i);
 
-                bool itemChanged = (oldDoc.id != newDoc.id ||
-                                oldDoc.folderId != newDoc.folderId ||
-                                oldDoc.fileName != newDoc.fileName ||
-                                oldDoc.fileSize != newDoc.fileSize ||
-                                oldDoc.fileHash != newDoc.fileHash ||
-                                oldDoc.dateCreated != newDoc.dateCreated ||
-                                oldDoc.dateModified != newDoc.dateModified ||
-                                oldDoc.dateAdded != newDoc.dateAdded ||
-                                oldDoc.pageCount != newDoc.pageCount ||
-                                oldDoc.starRating != newDoc.starRating ||
-                                oldDoc.isOffline != newDoc.isOffline ||
-                                oldDoc.tags != newDoc.tags ||
-                                oldDoc.textSnippet != newDoc.textSnippet ||
-                                oldDoc.notes != newDoc.notes ||
-                                oldDoc.thumbnailPath != newDoc.thumbnailPath ||
-                                oldDoc.lastOpened != newDoc.lastOpened ||
-                                oldDoc.isFolder != newDoc.isFolder ||
-                                oldDoc.itemCount != newDoc.itemCount);
+                bool itemChanged =
+                    (oldDoc.id != newDoc.id || oldDoc.folderId != newDoc.folderId ||
+                     oldDoc.fileName != newDoc.fileName || oldDoc.fileSize != newDoc.fileSize ||
+                     oldDoc.fileHash != newDoc.fileHash ||
+                     oldDoc.dateCreated != newDoc.dateCreated ||
+                     oldDoc.dateModified != newDoc.dateModified ||
+                     oldDoc.dateAdded != newDoc.dateAdded || oldDoc.pageCount != newDoc.pageCount ||
+                     oldDoc.starRating != newDoc.starRating ||
+                     oldDoc.isOffline != newDoc.isOffline || oldDoc.tags != newDoc.tags ||
+                     oldDoc.textSnippet != newDoc.textSnippet || oldDoc.notes != newDoc.notes ||
+                     oldDoc.thumbnailPath != newDoc.thumbnailPath ||
+                     oldDoc.lastOpened != newDoc.lastOpened || oldDoc.isFolder != newDoc.isFolder ||
+                     oldDoc.itemCount != newDoc.itemCount);
 
                 if (itemChanged) {
                     m_documents[i] = newDoc;

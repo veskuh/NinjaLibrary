@@ -39,7 +39,7 @@ KaakaoDialog {
     modal: true
     width: 380
     height: 480
-    
+
     x: parent ? (parent.width - width) / 2 : 100
     y: parent ? (parent.height - height) / 2 : 100
 
@@ -74,7 +74,9 @@ KaakaoDialog {
             Layout.alignment: Qt.AlignHCenter
         }
 
-        KaakaoSeparator { Layout.fillWidth: true }
+        KaakaoSeparator {
+            Layout.fillWidth: true
+        }
 
         KaakaoLabel {
             text: "Attributions & Dependencies:"
@@ -86,15 +88,10 @@ KaakaoDialog {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            
+
             KaakaoLabel {
                 width: availableWidth
-                text: "• SQLite 3 - Local-first database indexing.\n" +
-                      "• Tesseract OCR - Scanned document OCR fallback.\n" +
-                      "• Kaakao QML Library - macOS-styled components.\n" +
-                      "• Cocoa PDFKit / AppKit - Native macOS rendering.\n" +
-                      "• Poppler-Qt6 - Native Linux rendering.\n" +
-                      "• Catch2 & QTest - Automated test harnesses."
+                text: "• SQLite 3 - Local-first database indexing.\n" + "• Tesseract OCR - Scanned document OCR fallback.\n" + "• Kaakao QML Library - macOS-styled components.\n" + "• Cocoa PDFKit / AppKit - Native macOS rendering.\n" + "• Poppler-Qt6 - Native Linux rendering.\n" + "• Catch2 & QTest - Automated test harnesses."
                 role: KaakaoLabel.Role.Small
                 wrapMode: Text.WordWrap
             }

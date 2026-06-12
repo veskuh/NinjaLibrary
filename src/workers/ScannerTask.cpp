@@ -29,29 +29,29 @@
  */
 
 #include "ScannerTask.h"
-#include <QList>
-#include <QPair>
-#include "../utils/HashUtils.h"
-#include "../utils/PdfUtils.h"
-#include "../utils/DocUtils.h"
 
+#include <QCryptographicHash>
+#include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
-#include <QDateTime>
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QRegularExpression>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QCryptographicHash>
+#include <QList>
+#include <QPair>
+#include <QRegularExpression>
 #include <QSet>
-#include <QDebug>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <QStandardPaths>
-
-#include "../utils/MacBookmarks.h"
 #include <QStorageInfo>
+
+#include "../utils/DocUtils.h"
+#include "../utils/HashUtils.h"
+#include "../utils/MacBookmarks.h"
+#include "../utils/PdfUtils.h"
 
 std::atomic<bool> ScannerTask::s_scanPaused{false};
 QMutex ScannerTask::s_pauseMutex;
@@ -59,14 +59,11 @@ QWaitCondition ScannerTask::s_pauseCondition;
 std::atomic<bool> ScannerTask::s_lowDiskSpace{false};
 
 ScannerTask::ScannerTask(DatabaseManager *dbMgr, const QString &folderPath)
-    : m_dbMgr(dbMgr)
-    , m_folderPath(folderPath)
+    : m_dbMgr(dbMgr), m_folderPath(folderPath)
 {
 }
 
-ScannerTask::~ScannerTask()
-{
-}
+ScannerTask::~ScannerTask() {}
 
 void ScannerTask::run()
 {
@@ -81,7 +78,8 @@ void ScannerTask::run()
     QByteArray bookmark;
     {
         QSqlQuery query(db);
-        query.prepare("SELECT id, macos_bookmark FROM watched_folders WHERE absolute_path = :path;");
+        query.prepare(
+            "SELECT id, macos_bookmark FROM watched_folders WHERE absolute_path = :path;");
         query.bindValue(":path", m_folderPath);
         if (query.exec() && query.next()) {
             folderId = query.value(0).toInt();
@@ -98,7 +96,8 @@ void ScannerTask::run()
     // Access security-scoped resources on the current background thread
     MacBookmarks::SandboxAccess sandboxAccess(bookmark);
     if (!sandboxAccess.isValid() && !bookmark.isEmpty()) {
-        qWarning() << "ScannerTask: Failed to acquire security-scoped sandbox access for folder:" << m_folderPath;
+        qWarning() << "ScannerTask: Failed to acquire security-scoped sandbox access for folder:"
+                   << m_folderPath;
     }
 #endif
 
@@ -142,7 +141,8 @@ void ScannerTask::run()
             checkWatched.prepare("SELECT id FROM watched_folders WHERE id = :id;");
             checkWatched.bindValue(":id", folderId);
             if (!checkWatched.exec() || !checkWatched.next()) {
-                qDebug() << "ScannerTask: Folder was unwatched during scan, aborting immediately:" << m_folderPath;
+                qDebug() << "ScannerTask: Folder was unwatched during scan, aborting immediately:"
+                         << m_folderPath;
                 emit finished(m_folderPath);
                 return;
             }
@@ -156,7 +156,9 @@ void ScannerTask::run()
 
         // Check if document exists in DB
         QSqlQuery checkQuery(db);
-        checkQuery.prepare("SELECT id, file_size, date_modified, is_offline FROM documents WHERE absolute_path = :path;");
+        checkQuery.prepare(
+            "SELECT id, file_size, date_modified, is_offline FROM documents WHERE absolute_path = "
+            ":path;");
         checkQuery.bindValue(":path", filePath);
 
         if (!checkQuery.exec()) {
@@ -190,7 +192,8 @@ void ScannerTask::run()
                 QStringList tags;
                 int rating = 0;
                 QString notes;
-                QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+                QString dataDir =
+                    QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
                 if (dataDir.isEmpty()) {
                     dataDir = QDir::homePath() + "/.local/share/NinjaLibrary";
                 }
@@ -220,7 +223,10 @@ void ScannerTask::run()
                 if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
                     bool ok = true;
                     QSqlQuery updateQuery(db);
-                    updateQuery.prepare("UPDATE documents SET file_size = :size, date_modified = :modified, file_hash = :hash, page_count = :pageCount, is_offline = 0 WHERE id = :id;");
+                    updateQuery.prepare(
+                        "UPDATE documents SET file_size = :size, date_modified = :modified, "
+                        "file_hash = :hash, page_count = :pageCount, is_offline = 0 WHERE id = "
+                        ":id;");
                     updateQuery.bindValue(":size", currentSize);
                     updateQuery.bindValue(":modified", currentModified);
                     updateQuery.bindValue(":hash", fileHash);
@@ -235,7 +241,9 @@ void ScannerTask::run()
                     ok &= deleteSearch.exec();
 
                     QSqlQuery insertSearch(db);
-                    insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:docId, :fileName, :text, :notes);");
+                    insertSearch.prepare(
+                        "INSERT INTO document_search (document_id, file_name, text_snippet, notes) "
+                        "VALUES (:docId, :fileName, :text, :notes);");
                     insertSearch.bindValue(":docId", docId);
                     insertSearch.bindValue(":fileName", fileInfo.fileName());
                     insertSearch.bindValue(":text", extractedText);
@@ -245,7 +253,8 @@ void ScannerTask::run()
                     // Apply sidecar attributes to document record
                     if (rating > 0) {
                         QSqlQuery updateRating(db);
-                        updateRating.prepare("UPDATE documents SET star_rating = :rating WHERE id = :docId;");
+                        updateRating.prepare(
+                            "UPDATE documents SET star_rating = :rating WHERE id = :docId;");
                         updateRating.bindValue(":rating", rating);
                         updateRating.bindValue(":docId", docId);
                         ok &= updateRating.exec();
@@ -263,7 +272,9 @@ void ScannerTask::run()
                         if (getTagId.exec() && getTagId.next()) {
                             int tagId = getTagId.value(0).toInt();
                             QSqlQuery linkTag(db);
-                            linkTag.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+                            linkTag.prepare(
+                                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES "
+                                "(:docId, :tagId);");
                             linkTag.bindValue(":docId", docId);
                             linkTag.bindValue(":tagId", tagId);
                             ok &= linkTag.exec();
@@ -275,20 +286,25 @@ void ScannerTask::run()
                     if (ok) {
                         QSqlQuery commitWrite(db);
                         if (!commitWrite.exec("COMMIT")) {
-                            qWarning() << "ScannerTask: Commit failed on modified, rolling back:" << commitWrite.lastError().text();
+                            qWarning() << "ScannerTask: Commit failed on modified, rolling back:"
+                                       << commitWrite.lastError().text();
                             QSqlQuery rollbackWrite(db);
                             rollbackWrite.exec("ROLLBACK");
                         }
                     } else {
-                        qWarning() << "ScannerTask: Modified document updates failed, rolling back:" << updateQuery.lastError().text();
+                        qWarning() << "ScannerTask: Modified document updates failed, rolling back:"
+                                   << updateQuery.lastError().text();
                         QSqlQuery rollbackWrite(db);
                         rollbackWrite.exec("ROLLBACK");
                     }
                 } else {
-                    qWarning() << "ScannerTask: Failed to begin immediate transaction for modified document:" << beginWrite.lastError().text();
+                    qWarning() << "ScannerTask: Failed to begin immediate transaction for modified "
+                                  "document:"
+                               << beginWrite.lastError().text();
                 }
 
-                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
+                                ext == "bmp");
                 if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
                     pendingOcr.append({docId, filePath});
                 }
@@ -305,7 +321,8 @@ void ScannerTask::run()
                     if (updateOffline.exec()) {
                         QSqlQuery commitWrite(db);
                         if (!commitWrite.exec("COMMIT")) {
-                            qWarning() << "ScannerTask: Commit failed on online, rolling back:" << commitWrite.lastError().text();
+                            qWarning() << "ScannerTask: Commit failed on online, rolling back:"
+                                       << commitWrite.lastError().text();
                             QSqlQuery rollbackWrite(db);
                             rollbackWrite.exec("ROLLBACK");
                         }
@@ -314,7 +331,8 @@ void ScannerTask::run()
                         rollbackWrite.exec("ROLLBACK");
                     }
                 }
-                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
+                                ext == "bmp");
                 if (isImage || ext == "pdf") {
                     pendingThumbnails.append({docId, filePath});
                 }
@@ -346,7 +364,8 @@ void ScannerTask::run()
             QStringList tags;
             int rating = 0;
             QString notes;
-            QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+            QString dataDir =
+                QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
             if (dataDir.isEmpty()) {
                 dataDir = QDir::homePath() + "/.local/share/NinjaLibrary";
             }
@@ -377,8 +396,11 @@ void ScannerTask::run()
                 bool ok = true;
 
                 QSqlQuery insertDoc(db);
-                insertDoc.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, file_hash, date_created, date_modified, page_count, is_offline) "
-                                  "VALUES (:folderId, :fileName, :absPath, :size, :hash, :created, :modified, :pageCount, 0);");
+                insertDoc.prepare(
+                    "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, "
+                    "file_hash, date_created, date_modified, page_count, is_offline) "
+                    "VALUES (:folderId, :fileName, :absPath, :size, :hash, :created, :modified, "
+                    ":pageCount, 0);");
                 insertDoc.bindValue(":folderId", folderId);
                 insertDoc.bindValue(":fileName", fileInfo.fileName());
                 insertDoc.bindValue(":absPath", filePath);
@@ -396,7 +418,9 @@ void ScannerTask::run()
 
                 if (ok && docId != -1) {
                     QSqlQuery insertSearch(db);
-                    insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:docId, :fileName, :text, :notes);");
+                    insertSearch.prepare(
+                        "INSERT INTO document_search (document_id, file_name, text_snippet, notes) "
+                        "VALUES (:docId, :fileName, :text, :notes);");
                     insertSearch.bindValue(":docId", docId);
                     insertSearch.bindValue(":fileName", fileInfo.fileName());
                     insertSearch.bindValue(":text", extractedText);
@@ -405,7 +429,8 @@ void ScannerTask::run()
 
                     if (rating > 0) {
                         QSqlQuery updateRating(db);
-                        updateRating.prepare("UPDATE documents SET star_rating = :rating WHERE id = :docId;");
+                        updateRating.prepare(
+                            "UPDATE documents SET star_rating = :rating WHERE id = :docId;");
                         updateRating.bindValue(":rating", rating);
                         updateRating.bindValue(":docId", docId);
                         ok &= updateRating.exec();
@@ -423,7 +448,9 @@ void ScannerTask::run()
                         if (getTagId.exec() && getTagId.next()) {
                             int tagId = getTagId.value(0).toInt();
                             QSqlQuery linkTag(db);
-                            linkTag.prepare("INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, :tagId);");
+                            linkTag.prepare(
+                                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES "
+                                "(:docId, :tagId);");
                             linkTag.bindValue(":docId", docId);
                             linkTag.bindValue(":tagId", tagId);
                             ok &= linkTag.exec();
@@ -438,11 +465,13 @@ void ScannerTask::run()
                 if (ok && docId != -1) {
                     QSqlQuery commitWrite(db);
                     if (!commitWrite.exec("COMMIT")) {
-                        qWarning() << "ScannerTask: Commit failed on new, rolling back:" << commitWrite.lastError().text();
+                        qWarning() << "ScannerTask: Commit failed on new, rolling back:"
+                                   << commitWrite.lastError().text();
                         QSqlQuery rollbackWrite(db);
                         rollbackWrite.exec("ROLLBACK");
                     } else {
-                        bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp");
+                        bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" ||
+                                        ext == "tiff" || ext == "bmp");
                         if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
                             pendingOcr.append({docId, filePath});
                         }
@@ -451,17 +480,19 @@ void ScannerTask::run()
                         }
                     }
                 } else {
-                    qWarning() << "Failed to insert document" << filePath << ":" << insertDoc.lastError().text();
+                    qWarning() << "Failed to insert document" << filePath << ":"
+                               << insertDoc.lastError().text();
                     QSqlQuery rollbackWrite(db);
                     rollbackWrite.exec("ROLLBACK");
                 }
             } else {
-                qWarning() << "ScannerTask: Failed to begin immediate transaction for new document:" << beginWrite.lastError().text();
+                qWarning() << "ScannerTask: Failed to begin immediate transaction for new document:"
+                           << beginWrite.lastError().text();
             }
         }
         processedCount++;
         if (processedCount % 5 == 0 || processedCount == totalFiles) {
-                            emit progress(m_folderPath, processedCount, totalFiles);
+            emit progress(m_folderPath, processedCount, totalFiles);
         }
     }
 
@@ -469,7 +500,8 @@ void ScannerTask::run()
     bool folderExists = QDir(m_folderPath).exists();
 
     QSqlQuery fetchDocs(db);
-    fetchDocs.prepare("SELECT id, absolute_path, is_offline FROM documents WHERE folder_id = :folderId;");
+    fetchDocs.prepare(
+        "SELECT id, absolute_path, is_offline FROM documents WHERE folder_id = :folderId;");
     fetchDocs.bindValue(":folderId", folderId);
     if (fetchDocs.exec()) {
         QList<int> docsToMarkOffline;
@@ -517,7 +549,8 @@ void ScannerTask::run()
 
                     if (ok) {
                         // D. Clean up sidecar file if exists
-                        QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+                        QString dataDir =
+                            QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
                         QString sidecarDir = dataDir + "/sidecars/";
                         QCryptographicHash hash(QCryptographicHash::Sha256);
                         hash.addData(docPath.toUtf8());
@@ -528,7 +561,9 @@ void ScannerTask::run()
                         }
 
                         // E. Clean up cached thumbnail
-                        QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbnails/";
+                        QString cacheDir =
+                            QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+                            "/thumbnails/";
                         QString thumbPath = cacheDir + hashStr + ".png";
                         if (QFile::exists(thumbPath)) {
                             QFile::remove(thumbPath);
@@ -538,7 +573,8 @@ void ScannerTask::run()
                 if (ok) {
                     QSqlQuery commitWrite(db);
                     if (!commitWrite.exec("COMMIT")) {
-                        qWarning() << "ScannerTask: Commit failed on deleting docs, rolling back:" << commitWrite.lastError().text();
+                        qWarning() << "ScannerTask: Commit failed on deleting docs, rolling back:"
+                                   << commitWrite.lastError().text();
                         QSqlQuery rollbackWrite(db);
                         rollbackWrite.exec("ROLLBACK");
                     }
@@ -563,7 +599,8 @@ void ScannerTask::run()
                 if (ok) {
                     QSqlQuery commitWrite(db);
                     if (!commitWrite.exec("COMMIT")) {
-                        qWarning() << "ScannerTask: Commit failed on marking offline, rolling back:" << commitWrite.lastError().text();
+                        qWarning() << "ScannerTask: Commit failed on marking offline, rolling back:"
+                                   << commitWrite.lastError().text();
                         QSqlQuery rollbackWrite(db);
                         rollbackWrite.exec("ROLLBACK");
                     }
@@ -587,7 +624,8 @@ void ScannerTask::run()
 
 bool ScannerTask::isSupportedDocument(const QString &filePath) const
 {
-    // Filter out files inside macOS package directory structures and other ignore-listed directories
+    // Filter out files inside macOS package directory structures and other ignore-listed
+    // directories
     QFileInfo fileInfo(filePath);
     QString dirPath = fileInfo.absolutePath();
     QStringList segments = dirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
@@ -606,16 +644,15 @@ bool ScannerTask::isSupportedDocument(const QString &filePath) const
             segment.endsWith(".plugin", Qt::CaseInsensitive) ||
             segment.endsWith(".appex", Qt::CaseInsensitive) ||
             segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
-            segment.endsWith(".xcassets", Qt::CaseInsensitive) ||
-            segment == ".git" ||
-            segment == ".svn" ||
-            segment.toLower() == ".trash") {
+            segment.endsWith(".xcassets", Qt::CaseInsensitive) || segment == ".git" ||
+            segment == ".svn" || segment.toLower() == ".trash") {
             return false;
         }
     }
 
     QString ext = fileInfo.suffix().toLower();
-    return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" || ext == "bmp" || DocUtils::isSupportedTextDocument(filePath);
+    return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
+           ext == "bmp" || DocUtils::isSupportedTextDocument(filePath);
 }
 
 int ScannerTask::countWords(const QString &text) const

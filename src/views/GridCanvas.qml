@@ -35,40 +35,40 @@ import "../components"
 
 Item {
     id: gridCanvas
-    
+
     property real scaleFactor: 160 // Bound to bottom toolbar zoom slider
     property var selectedIds: []
-    
+
     signal selectionChanged(var ids)
     signal doubleClicked(string path)
 
     function selectId(docId) {
-        selectedIds = [docId]
-        selectionChanged(selectedIds)
+        selectedIds = [docId];
+        selectionChanged(selectedIds);
         for (var i = 0; i < proxyFilter.rowCount(); i++) {
-            var idx = proxyFilter.index(i, 0)
+            var idx = proxyFilter.index(i, 0);
             if (proxyFilter.data(idx, 257) === docId) {
-                gridView.currentIndex = i
-                break
+                gridView.currentIndex = i;
+                break;
             }
         }
     }
 
     function clearSelection() {
-        selectedIds = []
-        selectionChanged(selectedIds)
-        gridView.currentIndex = -1
+        selectedIds = [];
+        selectionChanged(selectedIds);
+        gridView.currentIndex = -1;
     }
 
     KaakaoGridView {
         id: gridView
         anchors.fill: parent
-        
+
         gridView.topMargin: Theme.paddingMedium
         gridView.leftMargin: Theme.paddingMedium
         gridView.rightMargin: Theme.paddingMedium
         gridView.bottomMargin: Theme.paddingMedium
-        
+
         model: proxyFilter
         cellWidth: scaleFactor + Theme.paddingMedium
         cellHeight: scaleFactor * 1.25 + Theme.paddingMedium
@@ -77,34 +77,32 @@ Item {
             target: gridView.gridView.Keys
             function onPressed(event) {
                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    var idx = gridView.currentIndex
+                    var idx = gridView.currentIndex;
                     if (idx >= 0 && idx < proxyFilter.rowCount()) {
-                        var isFolder = proxyFilter.get(idx, "isFolder")
-                        var path = proxyFilter.get(idx, "absolutePath")
+                        var isFolder = proxyFilter.get(idx, "isFolder");
+                        var path = proxyFilter.get(idx, "absolutePath");
                         if (isFolder) {
-                            proxyFilter.folderFilter = path
+                            proxyFilter.folderFilter = path;
                         } else {
-                            gridCanvas.doubleClicked(path)
+                            gridCanvas.doubleClicked(path);
                         }
-                        event.accepted = true
+                        event.accepted = true;
                     }
-                } else if (event.key === Qt.Key_Backspace || 
-                           (event.key === Qt.Key_Up && (event.modifiers & Qt.MetaModifier || event.modifiers & Qt.ControlModifier))) {
-                    var current = proxyFilter.folderFilter
-                    var selectedRoot = sidebar.getSelectedFolder()
+                } else if (event.key === Qt.Key_Backspace || (event.key === Qt.Key_Up && (event.modifiers & Qt.MetaModifier || event.modifiers & Qt.ControlModifier))) {
+                    var current = proxyFilter.folderFilter;
+                    var selectedRoot = sidebar.getSelectedFolder();
                     if (current !== "" && current !== selectedRoot) {
-                        var lastSlash = current.lastIndexOf('/')
+                        var lastSlash = current.lastIndexOf('/');
                         if (lastSlash > 0) {
-                            var parentPath = current.substring(0, lastSlash)
+                            var parentPath = current.substring(0, lastSlash);
                             if (parentPath.length >= selectedRoot.length) {
-                                proxyFilter.folderFilter = parentPath
-                                event.accepted = true
+                                proxyFilter.folderFilter = parentPath;
+                                event.accepted = true;
                             }
                         }
                     }
                 } else if (gridCanvas.selectedIds.length !== 1) {
-                    if (event.key === Qt.Key_Up || event.key === Qt.Key_Down ||
-                        event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                    if (event.key === Qt.Key_Up || event.key === Qt.Key_Down || event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
                         event.accepted = true;
                     }
                 }
@@ -113,10 +111,10 @@ Item {
 
         onCurrentIndexChanged: {
             if (gridCanvas.selectedIds.length === 1 && currentIndex >= 0 && currentIndex < gridView.gridView.count) {
-                var docId = model.get(currentIndex, "docId")
+                var docId = model.get(currentIndex, "docId");
                 if (docId !== undefined) {
-                    gridCanvas.selectedIds = [docId]
-                    gridCanvas.selectionChanged(gridCanvas.selectedIds)
+                    gridCanvas.selectedIds = [docId];
+                    gridCanvas.selectionChanged(gridCanvas.selectedIds);
                 }
             }
         }
@@ -137,7 +135,7 @@ Item {
                 isFolder: model.isFolder !== undefined ? model.isFolder : false
                 itemCount: model.itemCount !== undefined ? model.itemCount : 0
                 itemCountStr: model.itemCountStr !== undefined ? model.itemCountStr : ""
-                
+
                 width: scaleFactor
                 height: scaleFactor * 1.25
 
@@ -147,59 +145,58 @@ Item {
                 Component.onCompleted: {
                     if (!model.isFolder && model.thumbnailPath === "" && !model.isOffline) {
                         var ext = model.fileName.substring(model.fileName.lastIndexOf('.') + 1).toLowerCase();
-                        var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" ||
-                                         ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
+                        var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" || ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
                         if (!isTextDoc) {
-                            libraryController.requestThumbnail(model.docId, model.absolutePath, false)
+                            libraryController.requestThumbnail(model.docId, model.absolutePath, false);
                         }
                     }
                 }
 
-                onClicked: (event) => {
-                    var docId = model.docId
-                    var isCtrl = (event.modifiers & Qt.ControlModifier) || (event.modifiers & Qt.MetaModifier)
-                    
+                onClicked: event => {
+                    var docId = model.docId;
+                    var isCtrl = (event.modifiers & Qt.ControlModifier) || (event.modifiers & Qt.MetaModifier);
+
                     if (event.button === Qt.RightButton) {
                         if (gridCanvas.selectedIds.indexOf(docId) < 0) {
-                            gridCanvas.selectedIds = [docId]
-                            gridView.currentIndex = index
-                            gridView.gridView.forceActiveFocus()
-                            gridCanvas.selectionChanged(gridCanvas.selectedIds)
+                            gridCanvas.selectedIds = [docId];
+                            gridView.currentIndex = index;
+                            gridView.gridView.forceActiveFocus();
+                            gridCanvas.selectionChanged(gridCanvas.selectedIds);
                         }
-                        var popupPos = docCard.mapToItem(itemContextMenu.parent, event.x, event.y)
+                        var popupPos = docCard.mapToItem(itemContextMenu.parent, event.x, event.y);
                         if (typeof itemContextMenu !== "undefined") {
-                            itemContextMenu.targetDocId = docId
-                            itemContextMenu.targetPath = model.absolutePath
-                            itemContextMenu.targetRating = model.starRating
-                            itemContextMenu.targetIsOffline = model.isOffline
-                            itemContextMenu.popup(popupPos.x, popupPos.y)
+                            itemContextMenu.targetDocId = docId;
+                            itemContextMenu.targetPath = model.absolutePath;
+                            itemContextMenu.targetRating = model.starRating;
+                            itemContextMenu.targetIsOffline = model.isOffline;
+                            itemContextMenu.popup(popupPos.x, popupPos.y);
                         }
-                        return
+                        return;
                     }
-                    
+
                     if (isCtrl) {
-                        var idx = gridCanvas.selectedIds.indexOf(docId)
-                        var currentList = gridCanvas.selectedIds.slice() // copy array
+                        var idx = gridCanvas.selectedIds.indexOf(docId);
+                        var currentList = gridCanvas.selectedIds.slice(); // copy array
                         if (idx >= 0) {
-                            currentList.splice(idx, 1)
+                            currentList.splice(idx, 1);
                         } else {
-                            currentList.push(docId)
+                            currentList.push(docId);
                         }
-                        gridCanvas.selectedIds = currentList
+                        gridCanvas.selectedIds = currentList;
                     } else {
-                        gridCanvas.selectedIds = [docId]
+                        gridCanvas.selectedIds = [docId];
                     }
-                    
-                    gridView.currentIndex = index
-                    gridView.gridView.forceActiveFocus()
-                    gridCanvas.selectionChanged(gridCanvas.selectedIds)
+
+                    gridView.currentIndex = index;
+                    gridView.gridView.forceActiveFocus();
+                    gridCanvas.selectionChanged(gridCanvas.selectedIds);
                 }
 
                 onDoubleClicked: {
                     if (model.isFolder) {
-                        proxyFilter.folderFilter = model.absolutePath
+                        proxyFilter.folderFilter = model.absolutePath;
                     } else {
-                        gridCanvas.doubleClicked(model.absolutePath)
+                        gridCanvas.doubleClicked(model.absolutePath);
                     }
                 }
             }
@@ -211,7 +208,7 @@ Item {
         anchors.fill: parent
         z: -1 // place behind gridView items
         onClicked: {
-            gridCanvas.clearSelection()
+            gridCanvas.clearSelection();
         }
     }
 }

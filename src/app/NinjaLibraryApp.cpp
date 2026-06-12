@@ -32,8 +32,9 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
-#include "../database/DatabaseManager.h"
+
 #include "../controllers/LibraryController.h"
+#include "../database/DatabaseManager.h"
 #include "../models/DocumentModel.h"
 #include "../models/ProxyFilter.h"
 
@@ -63,9 +64,12 @@ int main(int argc, char *argv[])
     proxyFilter->setSourceModel(docModel);
 
     // Connect controller signals to model slots
-    QObject::connect(controller, &LibraryController::libraryChanged, docModel, &DocumentModel::refresh, Qt::QueuedConnection);
-    QObject::connect(controller, &LibraryController::libraryUpdated, docModel, &DocumentModel::refresh, Qt::QueuedConnection);
-    QObject::connect(controller, &LibraryController::thumbnailGenerated, docModel, &DocumentModel::updateThumbnail);
+    QObject::connect(controller, &LibraryController::libraryChanged, docModel,
+                     &DocumentModel::refresh, Qt::QueuedConnection);
+    QObject::connect(controller, &LibraryController::libraryUpdated, docModel,
+                     &DocumentModel::refresh, Qt::QueuedConnection);
+    QObject::connect(controller, &LibraryController::thumbnailGenerated, docModel,
+                     &DocumentModel::updateThumbnail);
 
     QQmlApplicationEngine engine;
 
@@ -79,9 +83,9 @@ int main(int argc, char *argv[])
     engine.addImportPath("qrc:/qt/qml");
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/NinjaLibrary/src/views/MainWindow.qml"));
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
-        &app, []() { QCoreApplication::exit(-1); },
-        Qt::QueuedConnection);
+    QObject::connect(
+        &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
+        []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
     engine.load(url);
 
     return app.exec();

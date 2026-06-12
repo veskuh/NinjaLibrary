@@ -34,31 +34,31 @@ import Kaakao 1.0
 
 KaakaoMenu {
     id: menu
-    
+
     property int targetDocId: -1
     property string targetPath: ""
     property int targetRating: 0
     property bool targetIsOffline: false
 
     signal moveToTrashRequested(int docId, string filePath)
-    
+
     KaakaoMenuItem {
         text: "Open"
         onTriggered: {
             if (menu.targetPath !== "") {
-                Qt.openUrlExternally("file://" + menu.targetPath)
+                Qt.openUrlExternally("file://" + menu.targetPath);
                 if (menu.targetDocId !== -1) {
-                    libraryController.markDocumentOpened(menu.targetDocId)
+                    libraryController.markDocumentOpened(menu.targetDocId);
                 }
             }
         }
     }
-    
+
     KaakaoMenuItem {
         text: "Show in Finder"
         onTriggered: {
             if (menu.targetPath !== "") {
-                libraryController.showInFinder(menu.targetPath)
+                libraryController.showInFinder(menu.targetPath);
             }
         }
     }
@@ -67,11 +67,11 @@ KaakaoMenu {
         text: "Copy File Path"
         onTriggered: {
             if (menu.targetPath !== "") {
-                libraryController.copyToClipboard(menu.targetPath)
+                libraryController.copyToClipboard(menu.targetPath);
             }
         }
     }
-    
+
     KaakaoMenuSeparator {
         visible: menu.targetPath !== "" && !menu.targetIsOffline
     }
@@ -80,16 +80,16 @@ KaakaoMenu {
         text: "Move to Trash"
         visible: menu.targetPath !== "" && !menu.targetIsOffline
         onTriggered: {
-            menu.moveToTrashRequested(menu.targetDocId, menu.targetPath)
+            menu.moveToTrashRequested(menu.targetDocId, menu.targetPath);
         }
     }
-    
+
     KaakaoMenuSeparator {}
-    
+
     KaakaoMenu {
         id: rateMenu
         title: "Rate"
-        
+
         KaakaoMenuItem {
             text: "★☆☆☆☆"
             checkable: true

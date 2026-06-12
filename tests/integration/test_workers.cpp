@@ -27,24 +27,25 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <QTest>
-#include <QSignalSpy>
-#include <QTemporaryDir>
-#include <QFile>
-#include <QDir>
-#include <QPdfWriter>
-#include <QPainter>
-#include <QPageSize>
 #include <QCryptographicHash>
-#include <QJsonObject>
+#include <QDir>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include "../../src/database/DatabaseManager.h"
+#include <QJsonObject>
+#include <QPageSize>
+#include <QPainter>
+#include <QPdfWriter>
+#include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QTest>
+
 #include "../../src/controllers/LibraryController.h"
-#include "../../src/workers/ScannerTask.h"
-#include "../../src/workers/OcrTask.h"
-#include "../../src/workers/ThumbnailTask.h"
+#include "../../src/database/DatabaseManager.h"
 #include "../../src/utils/MacBookmarks.h"
+#include "../../src/workers/OcrTask.h"
+#include "../../src/workers/ScannerTask.h"
+#include "../../src/workers/ThumbnailTask.h"
 
 class TestWorkers : public QObject
 {
@@ -93,17 +94,16 @@ void TestWorkers::testIngestionAndOfflineDetection()
     QString filePath = QDir(tempPath).filePath("documentA.png");
     QFile file(filePath);
     QVERIFY(file.open(QIODevice::WriteOnly));
-    
+
     // Write standard tiny 1x1 PNG data to make it a valid image
     static const unsigned char pngData[] = {
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
-        0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-        0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
-        0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
-    };
-    QCOMPARE(file.write(reinterpret_cast<const char*>(pngData), sizeof(pngData)), (qint64)sizeof(pngData));
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48,
+        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+        0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78,
+        0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    QCOMPARE(file.write(reinterpret_cast<const char *>(pngData), sizeof(pngData)),
+             (qint64)sizeof(pngData));
     file.close();
 
     // Resolve canonical file path to match DB
@@ -117,7 +117,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     QSignalSpy spyLibrary(m_controller, &LibraryController::libraryChanged);
     QVERIFY(spyLibrary.wait(5000));
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Check if file was inserted
     {
@@ -138,7 +140,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Check if document was deleted from database
     {
@@ -146,13 +150,14 @@ void TestWorkers::testIngestionAndOfflineDetection()
         QSqlQuery query(db);
         QVERIFY(query.exec("SELECT COUNT(*) FROM documents;"));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toInt(), 0); // Should be removed from database/index
+        QCOMPARE(query.value(0).toInt(), 0);  // Should be removed from database/index
     }
 
     // Re-create the file to ingest it again
     QFile file2(filePath);
     QVERIFY(file2.open(QIODevice::WriteOnly));
-    QCOMPARE(file2.write(reinterpret_cast<const char*>(pngData), sizeof(pngData)), (qint64)sizeof(pngData));
+    QCOMPARE(file2.write(reinterpret_cast<const char *>(pngData), sizeof(pngData)),
+             (qint64)sizeof(pngData));
     file2.close();
 
     // Run scanner again to ingest
@@ -160,7 +165,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Check that it's back in DB online
     int newDocId = -1;
@@ -182,7 +189,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Check if marked offline (not deleted, because folder was missing)
     {
@@ -191,7 +200,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
         QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toInt(), newDocId);
-        QCOMPARE(query.value(1).toInt(), 1); // should be offline
+        QCOMPARE(query.value(1).toInt(), 1);  // should be offline
     }
 
     // Rename back to simulate volume reconnect
@@ -202,7 +211,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Check if back online
     {
@@ -211,7 +222,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
         QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toInt(), newDocId);
-        QCOMPARE(query.value(1).toInt(), 0); // should be online again
+        QCOMPARE(query.value(1).toInt(), 0);  // should be online again
     }
 
     // Now simulate volume disconnect again
@@ -222,7 +233,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Confirm it's offline again
     {
@@ -230,7 +243,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
         QSqlQuery query(db);
         QVERIFY(query.exec("SELECT id, is_offline FROM documents;"));
         QVERIFY(query.next());
-        QCOMPARE(query.value(1).toInt(), 1); // should be offline
+        QCOMPARE(query.value(1).toInt(), 1);  // should be offline
     }
 
     // Now remove the file while volume is offline
@@ -246,7 +259,9 @@ void TestWorkers::testIngestionAndOfflineDetection()
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
     QThreadPool::globalInstance()->waitForDone();
-    while (m_controller->isScanning()) { QTest::qWait(50); }
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
 
     // Check if document was deleted from database
     {
@@ -254,7 +269,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
         QSqlQuery query(db);
         QVERIFY(query.exec("SELECT COUNT(*) FROM documents;"));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toInt(), 0); // Should be completely removed from database/index
+        QCOMPARE(query.value(0).toInt(), 0);  // Should be completely removed from database/index
     }
 }
 
@@ -289,7 +304,7 @@ void TestWorkers::testPdfAndOcr()
         QCryptographicHash hasher(QCryptographicHash::Sha256);
         hasher.addData(pdfPath.toUtf8());
         QString sidecarPath = sidecarDir + hasher.result().toHex() + ".ninja";
-        
+
         QFile file(sidecarPath);
         QVERIFY(file.open(QIODevice::WriteOnly));
         QJsonObject obj;
@@ -335,7 +350,8 @@ void TestWorkers::testPdfAndOcr()
     // Check that scanner inserted the PDF
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     QSqlQuery query(db);
-    query.prepare("SELECT id, absolute_path, page_count FROM documents WHERE file_name = 'documentB.pdf';");
+    query.prepare(
+        "SELECT id, absolute_path, page_count FROM documents WHERE file_name = 'documentB.pdf';");
     QVERIFY(query.exec());
     QVERIFY(query.next());
     int docId = query.value(0).toInt();
@@ -370,7 +386,7 @@ void TestWorkers::testPdfAndOcr()
     }
 
     // Modify documentB.pdf to trigger modification detection in ScannerTask
-    QTest::qWait(2000); // wait so file modification time is different
+    QTest::qWait(2000);  // wait so file modification time is different
     {
         QPdfWriter pdfWriter(pdfPath);
         pdfWriter.setPageSize(QPageSize(QPageSize::A4));
@@ -426,7 +442,9 @@ void TestWorkers::testLibraryControllerAPIs()
     QVERIFY(m_controller->batchUpdateTags({docId}, tags));
 
     // Verify in DB
-    query.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :id;");
+    query.prepare(
+        "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id "
+        "= :id;");
     query.bindValue(":id", docId);
     QVERIFY(query.exec());
     QStringList dbTags;
@@ -435,7 +453,7 @@ void TestWorkers::testLibraryControllerAPIs()
     }
     QVERIFY(dbTags.contains("tagA"));
     QVERIFY(dbTags.contains("tagB"));
-    QVERIFY(!dbTags.contains("")); // empty tag skipped
+    QVERIFY(!dbTags.contains(""));  // empty tag skipped
 
     // Test batchUpdateTags empty inputs (graceful return)
     QVERIFY(m_controller->batchUpdateTags({}, {"tagC"}));
@@ -445,8 +463,9 @@ void TestWorkers::testLibraryControllerAPIs()
     int docId2 = -1;
     {
         QSqlQuery insertDoc2(db);
-        insertDoc2.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
-                           "VALUES (1, 'image2.jpg', :path, 100, 0);");
+        insertDoc2.prepare(
+            "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+            "VALUES (1, 'image2.jpg', :path, 100, 0);");
         insertDoc2.bindValue(":path", tempPath + "/image2.jpg");
         QVERIFY(insertDoc2.exec());
         docId2 = insertDoc2.lastInsertId().toInt();
@@ -461,19 +480,25 @@ void TestWorkers::testLibraryControllerAPIs()
     QVERIFY(m_controller->batchAddTags({docId, docId2}, {"tagB", "tagC"}));
 
     // Verify tags in DB
-    query.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = :id;");
+    query.prepare(
+        "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id "
+        "= :id;");
     query.bindValue(":id", docId);
     QVERIFY(query.exec());
     QStringList doc1Tags;
-    while (query.next()) { doc1Tags << query.value(0).toString(); }
-    QVERIFY(doc1Tags.contains("tagA")); // preserved!
+    while (query.next()) {
+        doc1Tags << query.value(0).toString();
+    }
+    QVERIFY(doc1Tags.contains("tagA"));  // preserved!
     QVERIFY(doc1Tags.contains("tagB"));
     QVERIFY(doc1Tags.contains("tagC"));
 
     query.bindValue(":id", docId2);
     QVERIFY(query.exec());
     QStringList doc2Tags;
-    while (query.next()) { doc2Tags << query.value(0).toString(); }
+    while (query.next()) {
+        doc2Tags << query.value(0).toString();
+    }
     QVERIFY(!doc2Tags.contains("tagA"));
     QVERIFY(doc2Tags.contains("tagB"));
     QVERIFY(doc2Tags.contains("tagC"));
@@ -484,18 +509,23 @@ void TestWorkers::testLibraryControllerAPIs()
     query.bindValue(":id", docId);
     QVERIFY(query.exec());
     doc1Tags.clear();
-    while (query.next()) { doc1Tags << query.value(0).toString(); }
+    while (query.next()) {
+        doc1Tags << query.value(0).toString();
+    }
     QVERIFY(!doc1Tags.contains("tagB"));
     QVERIFY(doc1Tags.contains("tagC"));
 
     query.bindValue(":id", docId2);
     QVERIFY(query.exec());
     doc2Tags.clear();
-    while (query.next()) { doc2Tags << query.value(0).toString(); }
+    while (query.next()) {
+        doc2Tags << query.value(0).toString();
+    }
     QVERIFY(!doc2Tags.contains("tagB"));
     QVERIFY(doc2Tags.contains("tagC"));
 
-    // Verify getUniqueTags contains tagC and tagA, but not tagB (since it was removed from all documents)
+    // Verify getUniqueTags contains tagC and tagA, but not tagB (since it was removed from all
+    // documents)
     uniqueTags = m_controller->getUniqueTags();
     QVERIFY(uniqueTags.contains("tagA"));
     QVERIFY(uniqueTags.contains("tagC"));
@@ -537,7 +567,8 @@ void TestWorkers::testLibraryControllerAPIs()
     QStringList dummyTags;
     int dummyRating = 0;
     QString dummyNotes;
-    QVERIFY(!m_controller->readSidecar("/no/such/document/path.pdf", dummyTags, dummyRating, dummyNotes));
+    QVERIFY(!m_controller->readSidecar("/no/such/document/path.pdf", dummyTags, dummyRating,
+                                       dummyNotes));
 
     // 7. Test handleDroppedUrl
     // A. Dropping a folder URL
@@ -573,12 +604,13 @@ void TestWorkers::testLibraryControllerAPIs()
     QCOMPARE(newFileResult["isFolder"].toBool(), false);
     QCOMPARE(newFileResult["watchedFolder"].toString(), newFolderPath);
     QCOMPARE(newFileResult["docPath"].toString(), newFilePath);
-    QCOMPARE(newFileResult["docId"].toInt(), -1); // not in database yet because background scanner hasn't run for it
+    QCOMPARE(newFileResult["docId"].toInt(),
+             -1);  // not in database yet because background scanner hasn't run for it
 
     // 8. Test markDocumentOpened
     spyLibrary.clear();
     QVERIFY(m_controller->markDocumentOpened(docId));
-    QCOMPARE(spyLibrary.count(), 1); // should emit libraryChanged
+    QCOMPARE(spyLibrary.count(), 1);  // should emit libraryChanged
 
     // Verify last_opened updated in DB
     query.prepare("SELECT last_opened FROM documents WHERE id = :id;");
@@ -588,7 +620,7 @@ void TestWorkers::testLibraryControllerAPIs()
     qint64 lastOpenedVal = query.value(0).toLongLong();
     QVERIFY(lastOpenedVal > 0);
     qint64 nowSecs = QDateTime::currentSecsSinceEpoch();
-    QVERIFY(qAbs(nowSecs - lastOpenedVal) < 5); // within 5 seconds
+    QVERIFY(qAbs(nowSecs - lastOpenedVal) < 5);  // within 5 seconds
 
     query.finish();
 
@@ -603,8 +635,9 @@ void TestWorkers::testLibraryControllerAPIs()
     int trashDocId = -1;
     {
         QSqlQuery insertTrashDoc(db);
-        insertTrashDoc.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
-                               "VALUES (1, 'trash_test.pdf', :path, 100, 0);");
+        insertTrashDoc.prepare(
+            "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+            "VALUES (1, 'trash_test.pdf', :path, 100, 0);");
         insertTrashDoc.bindValue(":path", testTrashPath);
         QVERIFY(insertTrashDoc.exec());
         trashDocId = insertTrashDoc.lastInsertId().toInt();
@@ -616,7 +649,9 @@ void TestWorkers::testLibraryControllerAPIs()
     // Insert FTS search record manually
     {
         QSqlQuery ftsQuery(db);
-        ftsQuery.prepare("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES (:id, 'trash_test.pdf', 'dummy text', 'trash-notes');");
+        ftsQuery.prepare(
+            "INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES "
+            "(:id, 'trash_test.pdf', 'dummy text', 'trash-notes');");
         ftsQuery.bindValue(":id", trashDocId);
         QVERIFY(ftsQuery.exec());
     }
@@ -632,7 +667,7 @@ void TestWorkers::testLibraryControllerAPIs()
     // Call moveToTrash
     spyLibrary.clear();
     QVERIFY(m_controller->moveToTrash(trashDocId, testTrashPath));
-    QCOMPARE(spyLibrary.count(), 1); // should emit libraryChanged
+    QCOMPARE(spyLibrary.count(), 1);  // should emit libraryChanged
 
     // Verify physical file is gone (moved to trash)
     QVERIFY(!QFile::exists(testTrashPath));
@@ -642,7 +677,8 @@ void TestWorkers::testLibraryControllerAPIs()
     int checkTrashRating = 0;
     QString checkTrashNotes;
     QStringList dummyTagsList;
-    QVERIFY(!m_controller->readSidecar(testTrashPath, dummyTagsList, checkTrashRating, checkTrashNotes));
+    QVERIFY(!m_controller->readSidecar(testTrashPath, dummyTagsList, checkTrashRating,
+                                       checkTrashNotes));
 
     // Verify DB records are deleted
     {
@@ -722,7 +758,7 @@ void TestWorkers::testLibraryControllerAPIs()
 
         // Clean up
         QVERIFY(m_controller->removeWatchedFolder(parentDir));
-        
+
         QCoreApplication::processEvents();
         QThreadPool::globalInstance()->waitForDone();
     }
@@ -731,15 +767,16 @@ void TestWorkers::testLibraryControllerAPIs()
     {
         ScannerTask::s_lowDiskSpace = true;
         ScannerTask::s_scanPaused = true;
-        
+
         QTemporaryDir testDiskSpaceDir;
         QVERIFY(testDiskSpaceDir.isValid());
         QString diskSpacePath = QFileInfo(testDiskSpaceDir.path()).canonicalFilePath();
-        
+
         QVERIFY(m_controller->addWatchedFolder(diskSpacePath));
         QVERIFY(m_controller->isScanning());
-        QCOMPARE(m_controller->scanStatusText(), QString("Scanning Paused: Low Disk Space (< 500MB)"));
-        
+        QCOMPARE(m_controller->scanStatusText(),
+                 QString("Scanning Paused: Low Disk Space (< 500MB)"));
+
         // Reset and clean up
         ScannerTask::s_lowDiskSpace = false;
         ScannerTask::s_scanPaused = false;
@@ -747,12 +784,12 @@ void TestWorkers::testLibraryControllerAPIs()
             QMutexLocker locker(&ScannerTask::s_pauseMutex);
             ScannerTask::s_pauseCondition.wakeAll();
         }
-        
+
         QCoreApplication::processEvents();
         QThreadPool::globalInstance()->waitForDone();
-        
+
         QVERIFY(m_controller->removeWatchedFolder(diskSpacePath));
-        
+
         QCoreApplication::processEvents();
         QThreadPool::globalInstance()->waitForDone();
     }
@@ -825,23 +862,27 @@ void TestWorkers::testTextAndDocIngestion()
 
     // Run ScannerTask synchronously
     ScannerTask scanner(m_dbMgr, tempPath);
-    
+
     QSignalSpy spyFinished(&scanner, &ScannerTask::finished);
     QSignalSpy spyOcr(&scanner, &ScannerTask::ocrRequested);
     QSignalSpy spyThumb(&scanner, &ScannerTask::thumbnailRequested);
 
     scanner.run();
-    
+
     QCOMPARE(spyFinished.size(), 1);
 
-    // Verify that NO ocr or thumbnail tasks were requested for the txt, md, doc, xlsx, or pptx files
+    // Verify that NO ocr or thumbnail tasks were requested for the txt, md, doc, xlsx, or pptx
+    // files
     QCOMPARE(spyOcr.size(), 0);
     QCOMPARE(spyThumb.size(), 0);
 
     // Verify that the files were ingested correctly
     {
         QSqlQuery query(db);
-        query.prepare("SELECT d.file_name, s.text_snippet FROM documents d JOIN document_search s ON d.id = s.document_id WHERE d.folder_id = (SELECT id FROM watched_folders WHERE absolute_path = :path);");
+        query.prepare(
+            "SELECT d.file_name, s.text_snippet FROM documents d JOIN document_search s ON d.id = "
+            "s.document_id WHERE d.folder_id = (SELECT id FROM watched_folders WHERE absolute_path "
+            "= :path);");
         query.bindValue(":path", tempPath);
         QVERIFY(query.exec());
 
@@ -864,15 +905,16 @@ void TestWorkers::testTextAndDocIngestion()
             } else if (name == "document.doc") {
                 foundDoc = true;
 #ifdef Q_OS_MAC
-                // On macOS, NSAttributedString should successfully parse the RTF text inside document.doc
+                // On macOS, NSAttributedString should successfully parse the RTF text inside
+                // document.doc
                 QVERIFY(text.contains("applepie"));
 #endif
             } else if (name == "spreadsheet.xlsx") {
                 foundXlsx = true;
-                QVERIFY(text.isEmpty()); // should have no extracted text
+                QVERIFY(text.isEmpty());  // should have no extracted text
             } else if (name == "slides.pptx") {
                 foundPptx = true;
-                QVERIFY(text.isEmpty()); // should have no extracted text
+                QVERIFY(text.isEmpty());  // should have no extracted text
             }
         }
 
@@ -894,7 +936,7 @@ void TestWorkers::testMacBookmarksAndEdgeCases()
         QString resolved;
         MacBookmarks::resolveBookmark(bookmark, resolved);
     }
-    
+
     // Test invalid bookmark resolution
     QString resolved;
     QByteArray invalidBookmark("invalid-bookmark-data-here-1234");
@@ -921,18 +963,21 @@ void TestWorkers::testOcrNonsenseRejection()
     imgPath = QFileInfo(imgPath).canonicalFilePath();
 
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    
+
     // Insert a mock document record
     QSqlQuery query(db);
-    query.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
-                       "VALUES (1, 'blank.jpg', :path, 100, 0);");
+    query.prepare(
+        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+        "VALUES (1, 'blank.jpg', :path, 100, 0);");
     query.bindValue(":path", imgPath);
     QVERIFY(query.exec());
     int docId = query.lastInsertId().toInt();
 
     // Insert empty search snippet
     QSqlQuery insertSearch(db);
-    insertSearch.prepare("INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, 'blank.jpg', '');");
+    insertSearch.prepare(
+        "INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, "
+        "'blank.jpg', '');");
     insertSearch.bindValue(":docId", docId);
     QVERIFY(insertSearch.exec());
 
@@ -979,15 +1024,18 @@ void TestWorkers::testOcrNonsenseRejection()
 
     // Insert mock document record for text image
     QSqlQuery query2(db);
-    query2.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
-                        "VALUES (1, 'text_image.png', :path, 100, 0);");
+    query2.prepare(
+        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+        "VALUES (1, 'text_image.png', :path, 100, 0);");
     query2.bindValue(":path", textImgPath);
     QVERIFY(query2.exec());
     int docId2 = query2.lastInsertId().toInt();
 
     // Insert empty search snippet
     QSqlQuery insertSearch2(db);
-    insertSearch2.prepare("INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, 'text_image.png', '');");
+    insertSearch2.prepare(
+        "INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, "
+        "'text_image.png', '');");
     insertSearch2.bindValue(":docId", docId2);
     QVERIFY(insertSearch2.exec());
 
@@ -1062,7 +1110,8 @@ void TestWorkers::testPackageDirectorySkipping()
 
     // Insert tempPath into watched_folders table so ScannerTask doesn't skip it
     QSqlQuery insertFolderQuery(db);
-    insertFolderQuery.prepare("INSERT OR IGNORE INTO watched_folders (absolute_path) VALUES (:path);");
+    insertFolderQuery.prepare(
+        "INSERT OR IGNORE INTO watched_folders (absolute_path) VALUES (:path);");
     insertFolderQuery.bindValue(":path", tempPath);
     QVERIFY(insertFolderQuery.exec());
 
@@ -1073,14 +1122,14 @@ void TestWorkers::testPackageDirectorySkipping()
     // Check DB to verify only valid_doc.txt was ingested, and the others were skipped
     QSqlQuery query(db);
     QVERIFY(query.exec("SELECT file_name FROM documents;"));
-    
+
     QStringList filenames;
     while (query.next()) {
         filenames << query.value(0).toString();
     }
-    
+
     qDebug() << "Ingested filenames:" << filenames;
-    
+
     QVERIFY(filenames.contains("valid_doc.txt"));
     QVERIFY(!filenames.contains("packaged_doc.txt"));
     QVERIFY(!filenames.contains("photo_doc.png"));
@@ -1111,19 +1160,20 @@ void TestWorkers::testImageThumbnailAndOcrWithExif()
 
     // Insert mock document record
     QSqlQuery query(db);
-    query.prepare("INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
-                  "VALUES (1, 'test_exif.jpg', :path, 100, 0);");
+    query.prepare(
+        "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, is_offline) "
+        "VALUES (1, 'test_exif.jpg', :path, 100, 0);");
     query.bindValue(":path", imgPath);
     QVERIFY(query.exec());
     int docId = query.lastInsertId().toInt();
 
     // Run ThumbnailTask synchronously
     ThumbnailTask thumbTask(m_dbMgr, docId, imgPath);
-    
+
     // We spy on the finished signal
     QSignalSpy spyThumb(&thumbTask, &ThumbnailTask::finished);
     thumbTask.run();
-    
+
     QCOMPARE(spyThumb.count(), 1);
     QList<QVariant> thumbArgs = spyThumb.takeFirst();
     QCOMPARE(thumbArgs.at(0).toInt(), docId);
@@ -1170,17 +1220,16 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     QString filePath = QDir(subDirPath).filePath("subdocument.png");
     QFile file(filePath);
     QVERIFY(file.open(QIODevice::WriteOnly));
-    
+
     // Write tiny PNG data
     static const unsigned char pngData[] = {
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
-        0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-        0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
-        0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
-    };
-    QCOMPARE(file.write(reinterpret_cast<const char*>(pngData), sizeof(pngData)), (qint64)sizeof(pngData));
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48,
+        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+        0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78,
+        0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    QCOMPARE(file.write(reinterpret_cast<const char *>(pngData), sizeof(pngData)),
+             (qint64)sizeof(pngData));
     file.close();
 
     // Canonicalize paths
@@ -1224,7 +1273,7 @@ void TestWorkers::testSubdirectoryDeletionDetection()
         QSqlQuery query(db);
         QVERIFY(query.exec("SELECT COUNT(*) FROM documents;"));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toInt(), 0); // Should be removed from database
+        QCOMPARE(query.value(0).toInt(), 0);  // Should be removed from database
     }
 
     // Clean up watched folder

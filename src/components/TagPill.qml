@@ -40,13 +40,13 @@ Rectangle {
     property bool isMixed: false
     property color tagColor: "#3498db"
 
-    signal clicked()
-    signal removeRequested()
+    signal clicked
+    signal removeRequested
 
     implicitWidth: labelRow.width + 12
     implicitHeight: 20
     radius: 4
-    
+
     opacity: 0.0
     color: isSelected ? Theme.primaryAccent : (hoverArea.containsMouse ? Theme.toolButtonHovered : Theme.contentBackground)
     border.color: isSelected ? Theme.accentBorder : (isMixed ? Theme.sidebarSectionText : Theme.buttonBorder)
@@ -54,14 +54,33 @@ Rectangle {
 
     scale: 0.0
 
-    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-    Behavior on opacity { NumberAnimation { duration: 150 } }
-    Behavior on color { ColorAnimation { duration: 120 } }
-    Behavior on border.color { ColorAnimation { duration: 120 } }
+    Behavior on scale {
+        NumberAnimation {
+            duration: 150
+            easing.type: Easing.OutQuad
+        }
+    }
+    Behavior on opacity {
+        NumberAnimation {
+            duration: 150
+        }
+    }
+    Behavior on color {
+        ColorAnimation {
+            duration: 120
+        }
+    }
+    Behavior on border.color {
+        ColorAnimation {
+            duration: 120
+        }
+    }
 
     Component.onCompleted: {
-        scale = 1.0
-        opacity = Qt.binding(function() { return isMixed ? 0.7 : 1.0 })
+        scale = 1.0;
+        opacity = Qt.binding(function () {
+            return isMixed ? 0.7 : 1.0;
+        });
     }
 
     MouseArea {
@@ -104,8 +123,12 @@ Rectangle {
             opacity: deleteMouse.containsMouse ? 1.0 : 0.6
             visible: pill.showDelete
             anchors.verticalCenter: parent.verticalCenter
-            
-            Behavior on opacity { NumberAnimation { duration: 100 } }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 100
+                }
+            }
 
             MouseArea {
                 id: deleteMouse
@@ -113,7 +136,7 @@ Rectangle {
                 anchors.margins: -4
                 hoverEnabled: true
                 onClicked: {
-                    pill.removeRequested()
+                    pill.removeRequested();
                 }
             }
         }
