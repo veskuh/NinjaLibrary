@@ -18,14 +18,9 @@ on:
       - 'LICENSE'
 
 jobs:
-  build-and-test:
-    name: Build & Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-14]
+  build-macos:
+    name: Build & Test (macOS)
+    runs-on: macos-14
 
     steps:
     - name: Checkout Source Code
@@ -33,46 +28,85 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Setup Compiler & System Dependencies (Linux)
-      if: matrix.os == 'ubuntu-24.04'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          cmake \
-          ninja-build \
-          libgl1-mesa-dev \
-          libpoppler-qt6-dev \
-          tesseract-ocr \
-          libtesseract-dev \
-          libxkbcommon-dev \
-          libxkbcommon-x11-0 \
-          libxcb-cursor0 \
-          libxcb-xinerama0 \
-          libxcb-icccm4 \
-          libxcb-image0 \
-          libxcb-keysyms1 \
-          libxcb-render-util0 \
-          libxcb-xkb1 \
-          libegl1-mesa-dev \
-            xvfb \
-            openbox
-
     - name: Install Qt 6.8 Core Frameworks
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.8.3'
-        host: ${{ matrix.os == 'ubuntu-24.04' && 'linux' || 'mac' }}
+        host: 'mac'
         target: 'desktop'
         modules: 'qt5compat qtshadertools qtimageformats'
         cache: true
+
+    - name: Configure CMake & Build
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DENABLE_TESTING=ON
+        cmake --build build
+
+    - name: Execute Automated Unit & Integration Tests (CTest)
+      run: |
+        cd build
+        ctest --output-on-failure --parallel 4
+
+    - name: Package Release Binary (macOS)
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        cd build
+        zip -r ../ninja-library-macos.zip NinjaLibrary.app
+
+    - name: Create GitHub Release (macOS)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ninja-library-macos.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build & Package Linux (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.distro }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ['ubuntu:rolling', 'fedora:rawhide']
+
+    steps:
+    - name: Install Git & Package Managers (Ubuntu Container)
+      if: startsWith(matrix.distro, 'ubuntu')
+      run: |
+        apt-get update
+        apt-get install -y git tar gzip build-essential cmake ninja-build \
+          qt6-base-dev qt6-declarative-dev qt6-5compat-dev qt6-shadertools-dev \
+          qml6-module-qtquick-controls qml6-module-qt5compat-graphicaleffects \
+          libpoppler-qt6-dev libtesseract-dev tesseract-ocr \
+          dpkg-dev file xvfb openbox zip
+
+    - name: Install Git & Package Managers (Fedora Container)
+      if: startsWith(matrix.distro, 'fedora')
+      run: |
+        dnf install -y git tar gzip gcc-c++ cmake ninja-build \
+          qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qt5compat-devel qt6-qtshadertools-devel \
+          qt6-qtimageformats poppler-qt6-devel tesseract-devel \
+          rpm-build file findutils xorg-x11-server-Xvfb openbox zip
+
+    - name: Configure Git Safe Directory
+      run: |
+        git config --global --add safe.directory '*'
+
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Configure CMake & Activate Profiling Code Coverage
       run: |
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Debug \
           -DENABLE_TESTING=ON \
-          -DENABLE_COVERAGE=${{ matrix.os == 'ubuntu-24.04' && 'ON' || 'OFF' }}
+          -DENABLE_COVERAGE=${{ startsWith(matrix.distro, 'ubuntu') && 'ON' || 'OFF' }}
 
     - name: Compile Application & Test Binaries
       run: cmake --build build
@@ -80,37 +114,42 @@ jobs:
     - name: Execute Automated Unit & Integration Tests (CTest)
       run: |
         cd build
-        if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
-          xvfb-run -s "-screen 0 1024x768x24" bash -c "openbox & sleep 1 && ctest --output-on-failure --parallel 4"
-        else
-          ctest --output-on-failure --parallel 4
-        fi
+        xvfb-run -s "-screen 0 1024x768x24" bash -c "openbox & sleep 1 && ctest --output-on-failure --parallel 4"
 
-    - name: Generate Code Coverage Diagnostics Dashboard (Linux Only)
-      if: matrix.os == 'ubuntu-24.04'
+    - name: Generate Code Coverage (Ubuntu Only)
+      if: startsWith(matrix.distro, 'ubuntu')
       run: |
-        sudo apt-get install -y lcov
+        apt-get install -y lcov
         lcov --directory . --capture --output-file coverage.info
         lcov --remove coverage.info '/usr/*' '*/tests/*' '*/moc_*' '*/qrc_*' --output-file coverage.info
         lcov --list coverage.info
 
-    - name: Package Release Binary (macOS)
-      if: matrix.os == 'macos-14' && startsWith(github.ref, 'refs/tags/v')
+    - name: Package Linux Binary (DEB)
+      if: startsWith(matrix.distro, 'ubuntu')
       run: |
         cd build
-        zip -r ../ninja-library-macos.zip NinjaLibrary.app
+        cpack -G DEB
 
-    - name: Package Release Binary (Linux)
-      if: matrix.os == 'ubuntu-24.04' && startsWith(github.ref, 'refs/tags/v')
+    - name: Package Linux Binary (RPM)
+      if: startsWith(matrix.distro, 'fedora')
       run: |
         cd build
-        zip -j ../ninja-library-linux.zip NinjaLibrary libNinjaLibrary.so 3rdparty/Kaakao/src/libKaakaoplugin.so || zip -j ../ninja-library-linux.zip NinjaLibrary libNinjaLibrary.so
+        cpack -G RPM
 
-    - name: Create GitHub Release
+    - name: Upload Linux Packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: packages-${{ startsWith(matrix.distro, 'ubuntu') && 'deb' || 'rpm' }}
+        path: |
+          build/*.deb
+          build/*.rpm
+
+    - name: Create GitHub Release (Linux)
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          ninja-library-*.zip
+          build/*.deb
+          build/*.rpm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

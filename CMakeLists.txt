@@ -227,3 +227,54 @@ target_compile_definitions(NinjaLibraryApp PRIVATE
 if(ENABLE_TESTING)
     add_subdirectory(tests)
 endif()
+
+# Installation and CPack Packaging Configuration
+if(NOT APPLE)
+    install(TARGETS NinjaLibraryApp
+        RUNTIME DESTINATION bin
+    )
+    install(TARGETS NinjaLibrary NinjaLibraryplugin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+    )
+    install(TARGETS Kaakao Kaakaoplugin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+    )
+
+    if(NOT DEFINED QML_INSTALL_DIR)
+        set(QML_INSTALL_DIR "lib/qt6/qml")
+    endif()
+
+    install(FILES
+        "${CMAKE_BINARY_DIR}/qmldir"
+        "${CMAKE_BINARY_DIR}/NinjaLibrary.qmltypes"
+        DESTINATION ${QML_INSTALL_DIR}/NinjaLibrary
+    )
+
+    install(FILES
+        "${CMAKE_BINARY_DIR}/3rdparty/Kaakao/src/qmldir"
+        "${CMAKE_BINARY_DIR}/3rdparty/Kaakao/src/Kaakao.qmltypes"
+        DESTINATION ${QML_INSTALL_DIR}/Kaakao
+    )
+
+    # CPack config
+    set(CPACK_PACKAGE_NAME "ninjalibrary")
+    set(CPACK_PACKAGE_VERSION "26.6.0")
+    set(CPACK_PACKAGE_RELEASE "1")
+    set(CPACK_PACKAGE_VENDOR "NinjaLibrary Project")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "NinjaLibrary document search and management tool")
+    set(CPACK_PACKAGE_CONTACT "veskuh@users.noreply.github.com")
+
+    # DEB specific generator settings
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+
+    # RPM specific generator settings
+    set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+    set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
+    set(CPACK_RPM_PACKAGE_GROUP "Applications/System")
+
+    include(CPack)
+endif()
