@@ -223,6 +223,10 @@ add_compile_definitions(
     VERSION_STRING="26.6.0"
 )
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+    add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor)
+endif()
+
 # Add tests directory
 if(ENABLE_TESTING)
     add_subdirectory(tests)

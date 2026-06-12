@@ -107,7 +107,7 @@ class MockDocumentModel : public QAbstractListModel
 public:
     explicit MockDocumentModel(QObject *parent = nullptr) : QAbstractListModel(parent) {}
 
-    int rowCount(const QModelIndex &parent = QModelIndex()) const override { return m_rows.size(); }
+    int rowCount(const QModelIndex & = QModelIndex()) const override { return m_rows.size(); }
 
     int totalCount() const { return m_rows.size(); }
 
@@ -292,7 +292,7 @@ public:
     {
     }
 
-    int rowCount(const QModelIndex &parent = QModelIndex()) const override { return m_rows.size(); }
+    int rowCount(const QModelIndex & = QModelIndex()) const override { return m_rows.size(); }
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override
     {
@@ -432,7 +432,7 @@ public:
         }
     }
     Q_INVOKABLE void setSortRole(int) {}
-    Q_INVOKABLE void sort(int, int) {}
+    Q_INVOKABLE void sort(int, Qt::SortOrder = Qt::AscendingOrder) override {}
 signals:
     void filterStringChanged();
     void selectedTagsChanged();

@@ -49,9 +49,9 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
       m_categoryFilter("All"),
       m_scopeFilter("All"),
       m_activeScopes(QStringList{"All"}),
-      m_searchActive(false),
       m_includeSubfolderContents(false),
-      m_showSubfolderIcons(true)
+      m_showSubfolderIcons(true),
+      m_searchActive(false)
 {
     setDynamicSortFilter(true);
     // Sort by file name ascending by default

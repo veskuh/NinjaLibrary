@@ -878,13 +878,13 @@ void TestWorkers::testTextAndDocIngestion()
 
     // Verify that the files were ingested correctly
     {
-        QSqlQuery query(db);
-        query.prepare(
+        QSqlQuery verifyQuery(db);
+        verifyQuery.prepare(
             "SELECT d.file_name, s.text_snippet FROM documents d JOIN document_search s ON d.id = "
             "s.document_id WHERE d.folder_id = (SELECT id FROM watched_folders WHERE absolute_path "
             "= :path);");
-        query.bindValue(":path", tempPath);
-        QVERIFY(query.exec());
+        verifyQuery.bindValue(":path", tempPath);
+        QVERIFY(verifyQuery.exec());
 
         bool foundTxt = false;
         bool foundMd = false;
@@ -892,9 +892,9 @@ void TestWorkers::testTextAndDocIngestion()
         bool foundXlsx = false;
         bool foundPptx = false;
 
-        while (query.next()) {
-            QString name = query.value(0).toString();
-            QString text = query.value(1).toString();
+        while (verifyQuery.next()) {
+            QString name = verifyQuery.value(0).toString();
+            QString text = verifyQuery.value(1).toString();
 
             if (name == "notes.txt") {
                 foundTxt = true;
