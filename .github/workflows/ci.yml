@@ -57,6 +57,8 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
         cd build
+        mkdir -p NinjaLibrary.app/Contents/Resources
+        cp ../packaging/macos/NinjaLibrary.icns NinjaLibrary.app/Contents/Resources/
         macdeployqt NinjaLibrary.app -qmldir=.. -verbose=1
         codesign --force --deep --sign - NinjaLibrary.app
         zip -r ../ninja-library-macos.zip NinjaLibrary.app
