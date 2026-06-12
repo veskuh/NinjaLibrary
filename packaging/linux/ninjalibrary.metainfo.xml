@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.veskuh.NinjaLibrary</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <name>NinjaLibrary</name>
+  <summary>Document search and management tool</summary>
+  <description>
+    <p>
+      NinjaLibrary is a local-first search, indexing, and management utility for documents.
+      It enables high-performance content search and OCR capabilities for PDFs and images.
+    </p>
+  </description>
+  <launchable type="desktop-id">ninjalibrary.desktop</launchable>
+  <url type="homepage">https://github.com/veskuh/NinjaLibrary</url>
+  <provides>
+    <binary>ninjalibrary</binary>
+  </provides>
+</component>

@@ -271,9 +271,12 @@ if(NOT APPLE)
         INSTALL_RPATH "$ORIGIN/../.."
     )
 
-    # Desktop Launcher and Icons Installation
+    # Desktop Launcher, AppStream Metainfo and Icons Installation
     install(FILES "packaging/linux/ninjalibrary.desktop"
         DESTINATION "share/applications"
+    )
+    install(FILES "packaging/linux/ninjalibrary.metainfo.xml"
+        DESTINATION "share/metainfo"
     )
     install(FILES "assets/ninjalibrary.png"
         DESTINATION "share/pixmaps"
@@ -291,11 +294,16 @@ if(NOT APPLE)
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
     set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+    set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/postrm"
+    )
 
     # RPM specific generator settings
     set(CPACK_RPM_PACKAGE_AUTOREQ ON)
     set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/System")
+    set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/rpm_post.sh")
+    set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/rpm_postun.sh")
 
     include(CPack)
 endif()
