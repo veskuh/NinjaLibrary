@@ -448,6 +448,9 @@ class Setup : public QObject
 public slots:
     void qmlEngineAvailable(QQmlEngine *engine)
     {
+#ifdef VERSION_STRING
+        QCoreApplication::setApplicationVersion(VERSION_STRING);
+#endif
         engine->addImportPath("qrc:/qt/qml");
         engine->addImportPath("qrc:/");
         

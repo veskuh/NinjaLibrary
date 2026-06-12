@@ -45,6 +45,7 @@ int main(int argc, char *argv[])
 
     app.setOrganizationName("net.veskuh");
     app.setApplicationName("NinjaLibrary");
+    app.setApplicationVersion(VERSION_STRING);
 
     // Initialize Database
     DatabaseManager *dbMgr = new DatabaseManager(QString(), &app);

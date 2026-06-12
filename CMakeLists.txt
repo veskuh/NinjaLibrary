@@ -219,7 +219,7 @@ if(HAVE_VISION)
 endif()
 
 # Add standard compile options
-target_compile_definitions(NinjaLibraryApp PRIVATE
+add_compile_definitions(
     VERSION_STRING="26.6.0"
 )
 

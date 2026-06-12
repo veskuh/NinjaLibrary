@@ -63,7 +63,7 @@ KaakaoDialog {
         }
 
         KaakaoLabel {
-            text: "Version 26.6.0 (June 2026 Release)"
+            text: "Version " + Qt.application.version + " (June 2026 Release)"
             role: KaakaoLabel.Role.Small
             Layout.alignment: Qt.AlignHCenter
         }
