@@ -12,7 +12,7 @@ namespace OcrUtils {
 struct OcrResult
 {
     QString text;
-    int confidence;  // 0-100, matching Tesseract convention
+    int confidence = 0;  // 0-100, matching Tesseract convention
 };
 
 // Perform OCR on a pre-processed grayscale QImage.

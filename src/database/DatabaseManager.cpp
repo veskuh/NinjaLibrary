@@ -262,7 +262,7 @@ bool DatabaseManager::initializeDatabase()
                 db);
             struct MergeJob
             {
-                int keepId;
+                int keepId = 0;
                 QString lname;
             };
             QList<MergeJob> jobs;
