@@ -17,6 +17,9 @@ on:
       - 'packaging/**'
       - 'LICENSE'
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     name: Build & Test (macOS)
