@@ -230,32 +230,53 @@ endif()
 
 # Installation and CPack Packaging Configuration
 if(NOT APPLE)
+    set(PRIVATE_INSTALL_DIR "lib/ninjalibrary")
+    set(PRIVATE_QML_DIR "${PRIVATE_INSTALL_DIR}/qml")
+
     install(TARGETS NinjaLibraryApp
         RUNTIME DESTINATION bin
     )
     install(TARGETS NinjaLibrary NinjaLibraryplugin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION ${PRIVATE_INSTALL_DIR}
+        ARCHIVE DESTINATION ${PRIVATE_INSTALL_DIR}
     )
     install(TARGETS Kaakao Kaakaoplugin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION ${PRIVATE_INSTALL_DIR}
+        ARCHIVE DESTINATION ${PRIVATE_INSTALL_DIR}
     )
-
-    if(NOT DEFINED QML_INSTALL_DIR)
-        set(QML_INSTALL_DIR "lib/qt6/qml")
-    endif()
 
     install(FILES
         "${CMAKE_BINARY_DIR}/qmldir"
         "${CMAKE_BINARY_DIR}/NinjaLibrary.qmltypes"
-        DESTINATION ${QML_INSTALL_DIR}/NinjaLibrary
+        DESTINATION ${PRIVATE_QML_DIR}/NinjaLibrary
     )
 
     install(FILES
         "${CMAKE_BINARY_DIR}/3rdparty/Kaakao/src/qmldir"
         "${CMAKE_BINARY_DIR}/3rdparty/Kaakao/src/Kaakao.qmltypes"
-        DESTINATION ${QML_INSTALL_DIR}/Kaakao
+        DESTINATION ${PRIVATE_QML_DIR}/Kaakao
+    )
+
+    # Set up RPATH on Linux for relocatable/isolated libraries
+    set_target_properties(NinjaLibraryApp PROPERTIES
+        INSTALL_RPATH "$ORIGIN/../${PRIVATE_INSTALL_DIR}"
+    )
+    set_target_properties(NinjaLibrary PROPERTIES
+        INSTALL_RPATH "$ORIGIN"
+    )
+    set_target_properties(NinjaLibraryplugin PROPERTIES
+        INSTALL_RPATH "$ORIGIN/../.."
+    )
+    set_target_properties(Kaakaoplugin PROPERTIES
+        INSTALL_RPATH "$ORIGIN/../.."
+    )
+
+    # Desktop Launcher and Icons Installation
+    install(FILES "packaging/linux/ninjalibrary.desktop"
+        DESTINATION "share/applications"
+    )
+    install(FILES "assets/ninjalibrary.png"
+        DESTINATION "share/pixmaps"
     )
 
     # CPack config

@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("proxyFilter", proxyFilter);
 
     // Add Kaakao import path so it is resolved properly
+    engine.addImportPath(QCoreApplication::applicationDirPath() + "/../lib/ninjalibrary/qml");
     engine.addImportPath("qrc:/qt/qml");
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/NinjaLibrary/src/views/MainWindow.qml"));

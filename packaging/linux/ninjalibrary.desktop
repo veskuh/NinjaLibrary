@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=NinjaLibrary
+Comment=Document search and management tool
+Exec=NinjaLibrary
+Icon=ninjalibrary
+Terminal=false
+Type=Application
+Categories=Office;Utility;Database;
