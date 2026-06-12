@@ -44,6 +44,7 @@ jobs:
       run: |
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
           -DENABLE_TESTING=ON
         cmake --build build
 
