@@ -141,15 +141,32 @@ NinjaLibrary is supports keyboard-centric:
 
 ---
 
-## Coding convetions
+## Coding Conventions & Code Quality
 
-1. **Code Formatting**: Format C++ code using standard style rules (ClangFormat). Ensure QML files are clean and follow standard spacing convention.
-2. **Adding Tests**: Any new features should be accompanied by comprehensive tests under the `tests/` directory (either C++ unit tests or QML QuickTests).
-3. **Running Verification**: Before submitting, run the local verification suite:
+1. **Code Formatting**: Ensure all code is cleanly formatted before committing. A local `.clang-format` configuration is provided in the repository root.
+   - **Format C++ files**:
+     ```bash
+     find src tests -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.mm" \) -not -path "*/3rdparty/*" -exec clang-format -i {} +
+     ```
+   - **Format QML files**:
+     ```bash
+     find src tests -type f -name "*.qml" -not -path "*/3rdparty/*" -exec qmlformat -i {} +
+     ```
+2. **Static Code Analysis**: Run static checkers locally to check for bugs, memory leaks, and type issues:
+   - **Run C++ static analysis (cppcheck)**:
+     ```bash
+     cppcheck --enable=warning,performance,portability --inconclusive --quiet --suppress=missingIncludeSystem src
+     ```
+   - **Run QML static linting (qmllint)**:
+     ```bash
+     find src -name "*.qml" -not -path "*/3rdparty/*" -exec qmllint {} +
+     ```
+3. **Adding Tests**: Any new features should be accompanied by comprehensive tests under the `tests/` directory (either C++ unit tests or QML QuickTests).
+4. **Running Verification**: Before submitting, run the local verification suite:
    ```bash
    ./scripts/build_and_run.sh
    ```
-   Ensure 100% test pass rate and that code coverage remains above the **80%** threshold.
+   Ensure a 100% test pass rate and that code coverage remains above the **80%** threshold.
 
 ---
 
