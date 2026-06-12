@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=NinjaLibrary
 Comment=Document search and management tool
-Exec=NinjaLibrary
+Exec=ninjalibrary
 Icon=ninjalibrary
 Terminal=false
 Type=Application

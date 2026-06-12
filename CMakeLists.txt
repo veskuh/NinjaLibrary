@@ -104,7 +104,7 @@ else()
         src/app/NinjaLibraryApp.cpp
     )
     set_target_properties(NinjaLibraryApp PROPERTIES
-        OUTPUT_NAME "NinjaLibrary"
+        OUTPUT_NAME "ninjalibrary"
     )
 endif()
 
