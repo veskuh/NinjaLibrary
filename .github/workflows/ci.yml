@@ -3,8 +3,19 @@ name: NinjaLibrary Continuous Integration
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'packaging/**'
+      - 'LICENSE'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'packaging/**'
+      - 'LICENSE'
 
 jobs:
   build-and-test:
@@ -82,3 +93,24 @@ jobs:
         lcov --directory . --capture --output-file coverage.info
         lcov --remove coverage.info '/usr/*' '*/tests/*' '*/moc_*' '*/qrc_*' --output-file coverage.info
         lcov --list coverage.info
+
+    - name: Package Release Binary (macOS)
+      if: matrix.os == 'macos-14' && startsWith(github.ref, 'refs/tags/v')
+      run: |
+        cd build
+        zip -r ../ninja-library-macos.zip NinjaLibrary.app
+
+    - name: Package Release Binary (Linux)
+      if: matrix.os == 'ubuntu-24.04' && startsWith(github.ref, 'refs/tags/v')
+      run: |
+        cd build
+        zip -j ../ninja-library-linux.zip NinjaLibrary libNinjaLibrary.so 3rdparty/Kaakao/src/libKaakaoplugin.so || zip -j ../ninja-library-linux.zip NinjaLibrary libNinjaLibrary.so
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ninja-library-*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
