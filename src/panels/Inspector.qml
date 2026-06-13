@@ -507,7 +507,7 @@ Rectangle {
                 Item {
                     id: previewContainer
                     Layout.fillWidth: true
-                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder) ? 110 : 0
+                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder) ? 275 : 0
                     clip: true
                     visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder)
 
@@ -521,8 +521,8 @@ Rectangle {
                     Rectangle {
                         anchors.fill: parent
                         anchors.bottomMargin: 8
-                        color: Theme.isDarkMode ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)"
-                        border.color: Theme.isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"
+                        color: Theme.alternatingRowBackgroundOdd
+                        border.color: Theme.buttonBorder
                         border.width: 1
                         radius: 6
 

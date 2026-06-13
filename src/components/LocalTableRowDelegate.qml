@@ -241,7 +241,7 @@ ItemDelegate {
                         return "gray";
                     }
                     border.width: 1
-                    border.color: Theme.isDarkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"
+                    border.color: Theme.buttonBorder
                 }
 
                 Label {
