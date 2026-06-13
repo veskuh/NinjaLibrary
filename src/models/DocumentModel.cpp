@@ -39,6 +39,31 @@
 #include <QSqlRecord>
 #include <QStandardPaths>
 
+static QString getParentDirectory(const QString &absolutePath) {
+    if (absolutePath.isEmpty()) {
+        return QString();
+    }
+    int lastSlash = absolutePath.lastIndexOf('/');
+    int lastBack = absolutePath.lastIndexOf('\\');
+    int last = (lastSlash > lastBack) ? lastSlash : lastBack;
+    if (last > 0) {
+        return absolutePath.left(last);
+    } else if (last == 0) {
+        return absolutePath.left(1);
+    }
+    return "";
+}
+
+static QString getFileName(const QString &path) {
+    int lastSlash = path.lastIndexOf('/');
+    int lastBack = path.lastIndexOf('\\');
+    int last = (lastSlash > lastBack) ? lastSlash : lastBack;
+    if (last >= 0) {
+        return path.mid(last + 1);
+    }
+    return path;
+}
+
 DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     : QAbstractListModel(parent), m_dbMgr(dbMgr)
 {
@@ -260,13 +285,13 @@ void DocumentModel::forceRefresh()
         // Track folders recursively
         QString root = watchedRoots.value(doc.folderId);
         if (!root.isEmpty()) {
-            QString parentDir = QFileInfo(doc.absolutePath).absolutePath();
+            QString parentDir = getParentDirectory(doc.absolutePath);
             QString dir = parentDir;
             while (dir.startsWith(root) && dir.length() > root.length()) {
                 uniqueFolders.insert(dir);
                 folderIdMap[dir] = doc.folderId;
                 folderFileCounts[dir]++;
-                dir = QFileInfo(dir).absolutePath();
+                dir = getParentDirectory(dir);
             }
         }
     }
@@ -277,7 +302,7 @@ void DocumentModel::forceRefresh()
         DocumentInfo folderDoc;
         folderDoc.id = virtualFolderId--;
         folderDoc.folderId = folderIdMap.value(folderPath);
-        folderDoc.fileName = QFileInfo(folderPath).fileName();
+        folderDoc.fileName = getFileName(folderPath);
         folderDoc.absolutePath = folderPath;
         folderDoc.isFolder = true;
         folderDoc.itemCount = folderFileCounts.value(folderPath, 0);
@@ -408,4 +433,57 @@ void DocumentModel::updateThumbnail(int docId, const QString &thumbnailPath)
             break;
         }
     }
+}
+
+QVariantMap DocumentModel::getDocument(int docId) const
+{
+    for (const auto &doc : m_documents) {
+        if (doc.id == docId) {
+            QVariantMap map;
+            map["docId"] = doc.id;
+            map["fileName"] = doc.fileName;
+            map["absolutePath"] = doc.absolutePath;
+            map["fileSize"] = doc.fileSize;
+            map["pageCount"] = doc.pageCount;
+            map["starRating"] = doc.starRating;
+            map["isOffline"] = doc.isOffline;
+            map["tags"] = doc.tags;
+            map["textSnippet"] = doc.textSnippet;
+            map["notes"] = doc.notes;
+            map["thumbnailPath"] = doc.thumbnailPath;
+            map["dateCreated"] = doc.dateCreated;
+            map["dateModified"] = doc.dateModified;
+            map["dateAdded"] = doc.dateAdded;
+            map["lastOpened"] = doc.lastOpened;
+            map["isFolder"] = doc.isFolder;
+            map["itemCount"] = doc.itemCount;
+
+            // Formatted fields
+            qint64 kb = doc.fileSize / 1024;
+            if (kb > 1024) {
+                map["fileSizeStr"] = QString("%1 MB").arg(double(kb) / 1024.0, 0, 'f', 1);
+            } else {
+                map["fileSizeStr"] = QString("%1 KB").arg(kb);
+            }
+
+            if (doc.isFolder) {
+                map["itemCountStr"] = QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
+            } else {
+                map["itemCountStr"] = "";
+            }
+
+            return map;
+        }
+    }
+    return QVariantMap();
+}
+
+int DocumentModel::findDocIdByPath(const QString &path) const
+{
+    for (const auto &doc : m_documents) {
+        if (doc.absolutePath == path) {
+            return doc.id;
+        }
+    }
+    return -1;
 }

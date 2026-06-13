@@ -1266,6 +1266,66 @@ TestCase {
         win.destroy();
     }
 
+    function test_empty_state_placeholders() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        // 1. Initial State: Model is empty, so placeholderView should be visible
+        let placeholderView = findChildByName(win, "placeholderView");
+        verify(placeholderView !== null, "placeholderView should exist");
+        verify(placeholderView.visible, "placeholderView should be visible initially");
+
+        // Verify the initial folder-themed texts
+        let emojiLabel = findChildByName(placeholderView, "placeholderEmojiLabel");
+        let titleLabel = findChildByName(placeholderView, "placeholderTitleLabel");
+        let subtitleLabel = findChildByName(placeholderView, "placeholderSubtitleLabel");
+        verify(emojiLabel !== null, "placeholderEmojiLabel should exist");
+        verify(titleLabel !== null, "placeholderTitleLabel should exist");
+        verify(subtitleLabel !== null, "placeholderSubtitleLabel should exist");
+
+        compare(emojiLabel.text, "📁", "Emoji should be folder icon initially");
+        compare(titleLabel.text, "This Folder is Empty", "Title should indicate empty folder");
+        compare(subtitleLabel.text, "Drag and drop files here to add them to your library", "Subtitle should give drop instructions");
+
+        // 2. Add a document: placeholder should hide
+        documentModel.clear();
+        proxyFilter.clear();
+        let doc = {
+            "257": 1,
+            "id": 1,
+            "docId": 1,
+            "fileName": "test.txt",
+            "absolutePath": "/path/to/test.txt",
+            "isOffline": false,
+            "isFolder": false
+        };
+        documentModel.append(doc);
+        proxyFilter.append(doc);
+        wait(100);
+
+        verify(!win.isModelEmpty, "isModelEmpty should be false when model is populated");
+        verify(!placeholderView.visible, "placeholderView should be hidden when model is populated");
+
+        // 3. Perform a search: clear the model and set search query
+        proxyFilter.clear();
+        let searchField = findChildByName(win, "searchField");
+        verify(searchField !== null, "searchField should exist");
+        searchField.text = "nonexistent";
+        wait(100);
+
+        verify(win.isModelEmpty, "isModelEmpty should be true when model is empty due to search");
+        verify(placeholderView.visible, "placeholderView should be visible again");
+
+        compare(emojiLabel.text, "🔍", "Emoji should be magnifying glass for empty search results");
+        compare(titleLabel.text, "No Search Results", "Title should indicate no search results");
+        compare(subtitleLabel.text, "No documents match 'nonexistent'", "Subtitle should contain the search query");
+
+        // Restore search field and destroy window
+        searchField.text = "";
+        wait(100);
+        win.destroy();
+    }
 
     function test_quick_look_text_preview() {
         let win = mainWindowComponent.createObject(this);

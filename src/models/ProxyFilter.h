@@ -77,6 +77,8 @@ public:
     bool showSubfolderIcons() const { return m_showSubfolderIcons; }
 
     Q_INVOKABLE QVariant get(int row, const QString &roleName) const;
+    Q_INVOKABLE void setFilters(const QString &category, const QString &folder, const QStringList &tags, const QString &scope);
+    Q_INVOKABLE int rowOfDocId(int docId) const;
     Q_INVOKABLE void setSortRole(int role);
     void setSourceModel(QAbstractItemModel *sourceModel) override;
 
@@ -131,6 +133,7 @@ private:
     QSet<int> m_matchedDocIds;
     QSet<QString> m_duplicateHashes;
     bool m_searchActive;
+    mutable QHash<QString, int> m_roleNameToKey;
 
     void invalidateAndRecalculate();
 };

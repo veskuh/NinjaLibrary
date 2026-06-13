@@ -72,12 +72,9 @@ Item {
     }
 
     function selectId(docId) {
-        for (var i = 0; i < proxyFilter.rowCount(); i++) {
-            var idx = proxyFilter.index(i, 0);
-            if (proxyFilter.data(idx, 257) === docId) {
-                tableView.currentIndex = i;
-                return;
-            }
+        var row = proxyFilter.rowOfDocId(docId);
+        if (row !== -1) {
+            tableView.currentIndex = row;
         }
     }
 

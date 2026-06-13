@@ -33,12 +33,39 @@
 #include <QDate>
 #include <QDateTime>
 #include <QDebug>
-#include <QFileInfo>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <algorithm>
 
 #include "DocumentModel.h"
+
+static QString getParentDirectory(const QString &absolutePath) {
+    if (absolutePath.isEmpty()) {
+        return QString();
+    }
+    int lastSlash = absolutePath.lastIndexOf('/');
+    int lastBack = absolutePath.lastIndexOf('\\');
+    int last = (lastSlash > lastBack) ? lastSlash : lastBack;
+    if (last > 0) {
+        return absolutePath.left(last);
+    } else if (last == 0) {
+        return absolutePath.left(1);
+    }
+    return "";
+}
+
+static QString getFileSuffix(const QString &fileName) {
+    int lastDot = fileName.lastIndexOf('.');
+    if (lastDot >= 0) {
+        int lastSlash = fileName.lastIndexOf('/');
+        int lastBack = fileName.lastIndexOf('\\');
+        int lastSeparator = (lastSlash > lastBack) ? lastSlash : lastBack;
+        if (lastDot > lastSeparator) {
+            return fileName.mid(lastDot + 1).toUpper();
+        }
+    }
+    return "";
+}
 
 ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     : QSortFilterProxyModel(parent),
@@ -270,6 +297,107 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row,
 {
     if (!sourceModel()) return false;
 
+    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    if (docModel) {
+        if (source_row < 0 || source_row >= docModel->documents().size()) return false;
+        const DocumentInfo &doc = docModel->documents().at(source_row);
+
+        bool isFolder = doc.isFolder;
+        if (isFolder && (!m_filterString.isEmpty() || m_folderFilter.isEmpty())) {
+            return false;
+        }
+
+        // 1. Offline filter
+        bool isOffline = doc.isOffline;
+        if (isOffline && !m_showUnavailable && m_categoryFilter != "Unavailable") {
+            return false;
+        }
+
+        // 2. FTS5 Search filter
+        if (m_searchActive) {
+            int docId = doc.id;
+            if (!m_matchedDocIds.contains(docId)) {
+                return false;
+            }
+        }
+
+        // 3. Min Rating filter
+        int starRating = doc.starRating;
+        if (starRating < m_minRating) {
+            return false;
+        }
+
+        // 4. Tags intersection filter (AND)
+        if (!m_selectedTags.isEmpty()) {
+            const QStringList &rowTags = doc.tags;
+            for (const QString &tag : m_selectedTags) {
+                bool found = false;
+                for (const QString &rt : rowTags) {
+                    if (rt.compare(tag, Qt::CaseInsensitive) == 0) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) return false;
+            }
+        }
+
+        // 5. Duplicates filter
+        if (m_duplicatesOnly) {
+            const QString &fileHash = doc.fileHash;
+            if (fileHash.isEmpty() || !m_duplicateHashes.contains(fileHash)) {
+                return false;
+            }
+        }
+
+        // 6. Category filters
+        if (m_categoryFilter == "Recent") {
+            qint64 lastOpened = doc.lastOpened;
+            if (lastOpened <= 0) {
+                return false;
+            }
+        } else if (m_categoryFilter == "Favorites") {
+            if (starRating < 4) {
+                return false;
+            }
+        } else if (m_categoryFilter == "Unavailable") {
+            if (!isOffline) {
+                return false;
+            }
+        }
+
+        // 7. Folder filter
+        if (!m_folderFilter.isEmpty()) {
+            const QString &absolutePath = doc.absolutePath;
+
+            if (m_includeSubfolderContents) {
+                if (isFolder) {
+                    return false;
+                }
+                if (!absolutePath.startsWith(m_folderFilter)) {
+                    return false;
+                }
+            } else {
+                QString parentDir = getParentDirectory(absolutePath);
+                if (isFolder) {
+                    if (!m_showSubfolderIcons) {
+                        return false;
+                    }
+                    if (parentDir != m_folderFilter) {
+                        return false;
+                    }
+                } else {
+                    if (parentDir != m_folderFilter) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Fallback slow path for tests
     QModelIndex idx = sourceModel()->index(source_row, 0, source_parent);
 
     bool isFolder = sourceModel()->data(idx, DocumentModel::IsFolderRole).toBool();
@@ -348,7 +476,7 @@ bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row,
                 return false;
             }
         } else {
-            QString parentDir = QFileInfo(absolutePath).absolutePath();
+            QString parentDir = getParentDirectory(absolutePath);
             if (isFolder) {
                 if (!m_showSubfolderIcons) {
                     return false;
@@ -377,6 +505,42 @@ bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_par
         return true;
     }
 
+    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    if (docModel) {
+        if (source_row < 0 || source_row >= docModel->documents().size()) return false;
+        const DocumentInfo &doc = docModel->documents().at(source_row);
+
+        QDateTime dateModified = doc.dateModified;
+        bool isOffline = doc.isOffline;
+        QString fileName = doc.fileName;
+
+        if (m_scopeFilter == "Today") {
+            return dateModified.date() == QDate::currentDate();
+        } else if (m_scopeFilter == "This Week") {
+            QDate today = QDate::currentDate();
+            int days = dateModified.date().daysTo(today);
+            return days >= 0 && days < 7;
+        } else if (m_scopeFilter == "This Month") {
+            QDate today = QDate::currentDate();
+            return dateModified.date().year() == today.year() &&
+                   dateModified.date().month() == today.month();
+        } else if (m_scopeFilter == "Local") {
+            return !isOffline;
+        } else if (m_scopeFilter == "Unavailable") {
+            return isOffline;
+        } else {
+            bool isYear = false;
+            int yearVal = m_scopeFilter.toInt(&isYear);
+            if (isYear && m_scopeFilter.length() == 4) {
+                return dateModified.date().year() == yearVal;
+            } else {
+                QString ext = getFileSuffix(fileName);
+                return ext == m_scopeFilter;
+            }
+        }
+    }
+
+    // Fallback slow path for tests
     QModelIndex idx = sourceModel()->index(source_row, 0, source_parent);
     QDateTime dateModified = sourceModel()->data(idx, DocumentModel::DateModifiedRole).toDateTime();
     bool isOffline = sourceModel()->data(idx, DocumentModel::IsOfflineRole).toBool();
@@ -402,7 +566,7 @@ bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_par
         if (isYear && m_scopeFilter.length() == 4) {
             return dateModified.date().year() == yearVal;
         } else {
-            QString ext = QFileInfo(fileName).suffix().toUpper();
+            QString ext = getFileSuffix(fileName);
             return ext == m_scopeFilter;
         }
     }
@@ -431,35 +595,75 @@ void ProxyFilter::recalculateScopes()
     QDate today = QDate::currentDate();
     int rows = model->rowCount();
 
-    for (int i = 0; i < rows; ++i) {
-        if (filterAcceptsRowWithoutScope(i, QModelIndex())) {
-            QModelIndex idx = model->index(i, 0);
-            QDateTime dateModified = model->data(idx, DocumentModel::DateModifiedRole).toDateTime();
-            bool isOffline = model->data(idx, DocumentModel::IsOfflineRole).toBool();
-            QString fileName = model->data(idx, DocumentModel::FileNameRole).toString();
+    DocumentModel *docModel = qobject_cast<DocumentModel*>(model);
+    if (docModel) {
+        const QList<DocumentInfo> &docs = docModel->documents();
+        for (int i = 0; i < rows; ++i) {
+            if (filterAcceptsRowWithoutScope(i, QModelIndex())) {
+                if (i >= 0 && i < docs.size()) {
+                    const DocumentInfo &doc = docs.at(i);
+                    QDateTime dateModified = doc.dateModified;
+                    bool isOffline = doc.isOffline;
+                    QString fileName = doc.fileName;
 
-            QDate docDate = dateModified.date();
-            if (docDate == today) {
-                hasToday = true;
+                    QDate docDate = dateModified.date();
+                    if (docDate == today) {
+                        hasToday = true;
+                    }
+                    int days = docDate.daysTo(today);
+                    if (days >= 0 && days < 7) {
+                        hasThisWeek = true;
+                    }
+                    if (docDate.year() == today.year() && docDate.month() == today.month()) {
+                        hasThisMonth = true;
+                    }
+                    if (docDate.isValid()) {
+                        yearsSet.insert(docDate.year());
+                    }
+                    if (isOffline) {
+                        hasUnavailable = true;
+                    } else {
+                        hasLocal = true;
+                    }
+                    QString ext = getFileSuffix(fileName);
+                    if (!ext.isEmpty()) {
+                        docTypesSet.insert(ext);
+                    }
+                }
             }
-            int days = docDate.daysTo(today);
-            if (days >= 0 && days < 7) {
-                hasThisWeek = true;
-            }
-            if (docDate.year() == today.year() && docDate.month() == today.month()) {
-                hasThisMonth = true;
-            }
-            if (docDate.isValid()) {
-                yearsSet.insert(docDate.year());
-            }
-            if (isOffline) {
-                hasUnavailable = true;
-            } else {
-                hasLocal = true;
-            }
-            QString ext = QFileInfo(fileName).suffix().toUpper();
-            if (!ext.isEmpty()) {
-                docTypesSet.insert(ext);
+        }
+    } else {
+        // Fallback for tests using MockDocumentModel
+        for (int i = 0; i < rows; ++i) {
+            if (filterAcceptsRowWithoutScope(i, QModelIndex())) {
+                QModelIndex idx = model->index(i, 0);
+                QDateTime dateModified = model->data(idx, DocumentModel::DateModifiedRole).toDateTime();
+                bool isOffline = model->data(idx, DocumentModel::IsOfflineRole).toBool();
+                QString fileName = model->data(idx, DocumentModel::FileNameRole).toString();
+
+                QDate docDate = dateModified.date();
+                if (docDate == today) {
+                    hasToday = true;
+                }
+                int days = docDate.daysTo(today);
+                if (days >= 0 && days < 7) {
+                    hasThisWeek = true;
+                }
+                if (docDate.year() == today.year() && docDate.month() == today.month()) {
+                    hasThisMonth = true;
+                }
+                if (docDate.isValid()) {
+                    yearsSet.insert(docDate.year());
+                }
+                if (isOffline) {
+                    hasUnavailable = true;
+                } else {
+                    hasLocal = true;
+                }
+                QString ext = getFileSuffix(fileName);
+                if (!ext.isEmpty()) {
+                    docTypesSet.insert(ext);
+                }
             }
         }
     }
@@ -513,8 +717,116 @@ void ProxyFilter::invalidateAndRecalculate()
     recalculateScopes();
 }
 
+void ProxyFilter::setFilters(const QString &category, const QString &folder, const QStringList &tags, const QString &scope)
+{
+    bool changed = false;
+
+    if (m_categoryFilter != category) {
+        m_categoryFilter = category;
+        bool dupOnly = (m_categoryFilter == "Duplicates");
+        if (m_duplicatesOnly != dupOnly) {
+            m_duplicatesOnly = dupOnly;
+            if (m_duplicatesOnly) {
+                updateDuplicateHashes();
+            }
+            emit duplicatesOnlyChanged();
+        }
+
+        if (m_categoryFilter == "Recent") {
+            setSortRole(DocumentModel::LastOpenedRole);
+            sort(0, Qt::DescendingOrder);
+        } else {
+            setSortRole(DocumentModel::FileNameRole);
+            sort(0, Qt::AscendingOrder);
+        }
+        changed = true;
+        emit categoryFilterChanged();
+    }
+
+    if (m_folderFilter != folder) {
+        m_folderFilter = folder;
+        changed = true;
+        emit folderFilterChanged();
+    }
+
+    if (m_selectedTags != tags) {
+        m_selectedTags = tags;
+        changed = true;
+        emit selectedTagsChanged();
+    }
+
+    if (m_scopeFilter != scope) {
+        m_scopeFilter = scope;
+        changed = true;
+        emit scopeFilterChanged();
+    }
+
+    if (changed) {
+        invalidateAndRecalculate();
+    }
+}
+
+int ProxyFilter::rowOfDocId(int docId) const
+{
+    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    if (docModel) {
+        int rows = rowCount();
+        const QList<DocumentInfo> &docs = docModel->documents();
+        for (int i = 0; i < rows; ++i) {
+            QModelIndex srcIdx = mapToSource(index(i, 0));
+            int srcRow = srcIdx.row();
+            if (srcRow >= 0 && srcRow < docs.size()) {
+                if (docs.at(srcRow).id == docId) {
+                    return i;
+                }
+            }
+        }
+    }
+    return -1;
+}
+
 bool ProxyFilter::lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const
 {
+    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    if (docModel) {
+        const QList<DocumentInfo> &docs = docModel->documents();
+        int leftRow = source_left.row();
+        int rightRow = source_right.row();
+        if (leftRow >= 0 && leftRow < docs.size() && rightRow >= 0 && rightRow < docs.size()) {
+            const DocumentInfo &leftDoc = docs.at(leftRow);
+            const DocumentInfo &rightDoc = docs.at(rightRow);
+
+            bool leftFolder = leftDoc.isFolder;
+            bool rightFolder = rightDoc.isFolder;
+
+            if (leftFolder && !rightFolder) {
+                return sortOrder() == Qt::AscendingOrder;
+            }
+            if (!leftFolder && rightFolder) {
+                return sortOrder() == Qt::DescendingOrder;
+            }
+
+            int role = sortRole();
+            switch (role) {
+                case DocumentModel::FileNameRole:
+                    return leftDoc.fileName.compare(rightDoc.fileName, Qt::CaseInsensitive) < 0;
+                case DocumentModel::FileSizeRole:
+                    return leftDoc.fileSize < rightDoc.fileSize;
+                case DocumentModel::PageCountRole:
+                    return leftDoc.pageCount < rightDoc.pageCount;
+                case DocumentModel::StarRatingRole:
+                    return leftDoc.starRating < rightDoc.starRating;
+                case DocumentModel::DateModifiedRole:
+                    return leftDoc.dateModified < rightDoc.dateModified;
+                case DocumentModel::LastOpenedRole:
+                    return leftDoc.lastOpened < rightDoc.lastOpened;
+                default:
+                    break;
+            }
+        }
+    }
+
+    // Fallback slow path for tests and other models
     bool leftFolder = sourceModel()->data(source_left, DocumentModel::IsFolderRole).toBool();
     bool rightFolder = sourceModel()->data(source_right, DocumentModel::IsFolderRole).toBool();
 
@@ -532,15 +844,14 @@ QVariant ProxyFilter::get(int row, const QString &roleName) const
 {
     if (row < 0 || row >= rowCount()) return QVariant();
 
-    QHash<int, QByteArray> roles = roleNames();
-    int role = -1;
-    for (auto it = roles.begin(); it != roles.end(); ++it) {
-        if (it.value() == roleName) {
-            role = it.key();
-            break;
+    if (m_roleNameToKey.isEmpty()) {
+        QHash<int, QByteArray> roles = roleNames();
+        for (auto it = roles.begin(); it != roles.end(); ++it) {
+            m_roleNameToKey[QString::fromUtf8(it.value())] = it.key();
         }
     }
 
+    int role = m_roleNameToKey.value(roleName, -1);
     if (role == -1) return QVariant();
     return data(index(row, 0), role);
 }

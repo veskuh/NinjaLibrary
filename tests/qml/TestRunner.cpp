@@ -261,6 +261,40 @@ public:
         }
     }
 
+    Q_INVOKABLE QVariantMap getDocument(int docId) const
+    {
+        for (const auto &row : m_rows) {
+            bool idMatches = (row.value("id").toInt() == docId || row.value("docId").toInt() == docId);
+            if (idMatches) {
+                QVariantMap res = row;
+                if (!res.contains("docId") && res.contains("id")) {
+                    res["docId"] = res["id"];
+                }
+                if (!res.contains("fileSizeStr")) {
+                    qint64 size = res.value("fileSize").toLongLong();
+                    qint64 kb = size / 1024;
+                    if (kb > 1024) {
+                        res["fileSizeStr"] = QString("%1 MB").arg(double(kb) / 1024.0, 0, 'f', 1);
+                    } else {
+                        res["fileSizeStr"] = QString("%1 KB").arg(kb);
+                    }
+                }
+                return res;
+            }
+        }
+        return QVariantMap();
+    }
+
+    Q_INVOKABLE int findDocIdByPath(const QString &path) const
+    {
+        for (const auto &row : m_rows) {
+            if (row.value("absolutePath").toString() == path) {
+                return row.value("id").toInt();
+            }
+        }
+        return -1;
+    }
+
 signals:
     void countsChanged();
 };
@@ -370,6 +404,14 @@ public:
         return QVariant();
     }
 
+    Q_INVOKABLE void setFilters(const QString &category, const QString &folder, const QStringList &tags, const QString &scope)
+    {
+        setCategoryFilter(category);
+        setFolderFilter(folder);
+        setSelectedTags(tags);
+        setScopeFilter(scope);
+    }
+
     QString filterString() const { return m_filterString; }
     void setFilterString(const QString &s)
     {
@@ -436,6 +478,16 @@ public:
     }
     Q_INVOKABLE void setSortRole(int) {}
     Q_INVOKABLE void sort(int, Qt::SortOrder = Qt::AscendingOrder) override {}
+    Q_INVOKABLE int rowOfDocId(int docId) const
+    {
+        for (int i = 0; i < m_rows.size(); ++i) {
+            const auto &row = m_rows.at(i);
+            if (row.value("id").toInt() == docId || row.value("docId").toInt() == docId) {
+                return i;
+            }
+        }
+        return -1;
+    }
 signals:
     void filterStringChanged();
     void selectedTagsChanged();

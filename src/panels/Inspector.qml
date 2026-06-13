@@ -90,33 +90,13 @@ Rectangle {
             }
             return;
         }
-        for (var i = 0; i < documentModel.rowCount(); i++) {
-            var idx = documentModel.index(i, 0);
-            if (documentModel.data(idx, 257) === selectedId) {
-                docData = {
-                    docId: selectedId,
-                    fileName: documentModel.data(idx, 259),
-                    absolutePath: documentModel.data(idx, 260),
-                    fileSizeStr: documentModel.data(idx, 273),
-                    pageCount: documentModel.data(idx, 266),
-                    starRating: documentModel.data(idx, 267),
-                    isOffline: documentModel.data(idx, 268) === true || documentModel.data(idx, 268) === "true" || documentModel.data(idx, 268) === 1 || documentModel.data(idx, 268) === "1",
-                    tags: documentModel.data(idx, 269) || [],
-                    textSnippet: documentModel.data(idx, 270) || "",
-                    notes: documentModel.data(idx, 271) || "",
-                    thumbnailPath: documentModel.data(idx, 272) || "",
-                    dateAdded: documentModel.data(idx, 265),
-                    dateModified: documentModel.data(idx, 264),
-                    lastOpened: documentModel.data(idx, 278),
-                    isFolder: documentModel.data(idx, 279) === true || documentModel.data(idx, 279) === "true" || documentModel.data(idx, 279) === 1 || documentModel.data(idx, 279) === "1",
-                    itemCount: documentModel.data(idx, 280) || 0,
-                    itemCountStr: documentModel.data(idx, 281) || ""
-                };
-                if (notesArea) {
-                    notesArea.text = docData.notes;
-                }
-                return;
+        var data = documentModel.getDocument(selectedId);
+        if (data && data.docId !== undefined) {
+            docData = data;
+            if (notesArea) {
+                notesArea.text = docData.notes;
             }
+            return;
         }
         docData = null;
         if (notesArea) {
@@ -132,18 +112,15 @@ Rectangle {
         var temp = [];
         for (var k = 0; k < selectedIds.length; k++) {
             var targetId = selectedIds[k];
-            for (var i = 0; i < documentModel.rowCount(); i++) {
-                var idx = documentModel.index(i, 0);
-                if (documentModel.data(idx, 257) === targetId) {
-                    temp.push({
-                        docId: targetId,
-                        fileName: documentModel.data(idx, 259),
-                        tags: documentModel.data(idx, 269) || [],
-                        notes: documentModel.data(idx, 271) || "",
-                        starRating: documentModel.data(idx, 267) || 0
-                    });
-                    break;
-                }
+            var data = documentModel.getDocument(targetId);
+            if (data && data.docId !== undefined) {
+                temp.push({
+                    docId: targetId,
+                    fileName: data.fileName,
+                    tags: data.tags,
+                    notes: data.notes,
+                    starRating: data.starRating
+                });
             }
         }
         multiDocData = temp;

@@ -114,6 +114,9 @@ public:
     int textCount() const { return m_textCount; }
     int localCount() const { return m_localCount; }
     int unavailableCount() const { return m_unavailableCount; }
+    const QList<DocumentInfo>& documents() const { return m_documents; }
+    Q_INVOKABLE QVariantMap getDocument(int docId) const;
+    Q_INVOKABLE int findDocIdByPath(const QString &path) const;
 
 signals:
     void countsChanged();

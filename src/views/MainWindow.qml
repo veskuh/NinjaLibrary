@@ -61,6 +61,16 @@ KaakaoWindow {
     property string pendingSelectDocPath: ""
     property var folderNavigationMap: ({})
 
+    property bool isModelEmpty: true
+
+    function updateEmptyState() {
+        isModelEmpty = (proxyFilter.rowCount() === 0);
+    }
+
+    Component.onCompleted: {
+        updateEmptyState();
+    }
+
     function getRootFolderName(rootPath) {
         if (!rootPath)
             return "";
@@ -92,14 +102,7 @@ KaakaoWindow {
     }
 
     function findDocIdByPath(path) {
-        for (var i = 0; i < documentModel.rowCount(); i++) {
-            var idx = documentModel.index(i, 0);
-            var absPath = documentModel.data(idx, 260); // AbsolutePathRole
-            if (absPath === path) {
-                return documentModel.data(idx, 257); // IdRole
-            }
-        }
-        return -1;
+        return documentModel.findDocIdByPath(path);
     }
 
     function checkPendingSelection() {
@@ -153,6 +156,19 @@ KaakaoWindow {
                     window.folderNavigationMap[selectedRoot] = currentPath;
                 }
             }
+            window.updateEmptyState();
+        }
+        function onModelReset() {
+            window.updateEmptyState();
+        }
+        function onRowsInserted(parent, first, last) {
+            window.updateEmptyState();
+        }
+        function onRowsRemoved(parent, first, last) {
+            window.updateEmptyState();
+        }
+        function onLayoutChanged() {
+            window.updateEmptyState();
         }
     }
 
@@ -614,33 +630,21 @@ KaakaoWindow {
                     Layout.fillHeight: true
 
                     onSectionSelected: section => {
-                        proxyFilter.folderFilter = "";
-                        proxyFilter.selectedTags = [];
-                        proxyFilter.categoryFilter = section;
-                        proxyFilter.scopeFilter = "All";
                         searchField.text = "";
                         canvasStack.clearSelections();
+                        proxyFilter.setFilters(section, "", [], "All");
                     }
                     onFolderSelected: path => {
-                        proxyFilter.categoryFilter = "All";
-                        proxyFilter.selectedTags = [];
-                        proxyFilter.scopeFilter = "All";
                         searchField.text = "";
                         canvasStack.clearSelections();
                         var cached = window.folderNavigationMap[path];
-                        if (cached !== undefined) {
-                            proxyFilter.folderFilter = cached;
-                        } else {
-                            proxyFilter.folderFilter = path;
-                        }
+                        var targetFolder = (cached !== undefined) ? cached : path;
+                        proxyFilter.setFilters("All", targetFolder, [], "All");
                     }
                     onTagSelected: tag => {
-                        proxyFilter.categoryFilter = "All";
-                        proxyFilter.folderFilter = "";
-                        proxyFilter.selectedTags = [tag];
-                        proxyFilter.scopeFilter = "All";
                         searchField.text = "";
                         canvasStack.clearSelections();
+                        proxyFilter.setFilters("All", "", [tag], "All");
                     }
                 }
 
@@ -843,6 +847,49 @@ KaakaoWindow {
                             NumberAnimation {
                                 duration: 200
                                 easing.type: Easing.InOutQuad
+                            }
+                        }
+                    }
+
+                    // Centered Placeholder View for empty states (empty folders or no search matches)
+                    ColumnLayout {
+                        id: placeholderView
+                        objectName: "placeholderView"
+                        anchors.centerIn: parent
+                        spacing: 16
+                        visible: window.isModelEmpty
+                        z: 10
+
+                        KaakaoLabel {
+                            objectName: "placeholderEmojiLabel"
+                            text: searchField.text !== "" ? "🔍" : "📁"
+                            font.pixelSize: 64
+                            Layout.alignment: Qt.AlignHCenter
+                            opacity: 0.6
+                        }
+
+                        ColumnLayout {
+                            spacing: 4
+                            Layout.alignment: Qt.AlignHCenter
+
+                            KaakaoLabel {
+                                objectName: "placeholderTitleLabel"
+                                text: searchField.text !== "" ? "No Search Results" : "This Folder is Empty"
+                                font.weight: Font.Bold
+                                font.pixelSize: 16
+                                Layout.alignment: Qt.AlignHCenter
+                                color: Theme.primaryText
+                            }
+
+                            KaakaoLabel {
+                                objectName: "placeholderSubtitleLabel"
+                                text: searchField.text !== "" 
+                                    ? "No documents match '" + searchField.text + "'" 
+                                    : "Drag and drop files here to add them to your library"
+                                font.pixelSize: 13
+                                Layout.alignment: Qt.AlignHCenter
+                                color: Theme.secondaryText
+                                opacity: 0.8
                             }
                         }
                     }

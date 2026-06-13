@@ -45,12 +45,9 @@ Item {
     function selectId(docId) {
         selectedIds = [docId];
         selectionChanged(selectedIds);
-        for (var i = 0; i < proxyFilter.rowCount(); i++) {
-            var idx = proxyFilter.index(i, 0);
-            if (proxyFilter.data(idx, 257) === docId) {
-                gridView.currentIndex = i;
-                break;
-            }
+        var row = proxyFilter.rowOfDocId(docId);
+        if (row !== -1) {
+            gridView.currentIndex = row;
         }
     }
 
@@ -157,15 +154,24 @@ Item {
 
                 isSelected: gridCanvas.selectedIds.indexOf(model.docId) >= 0
 
-                // Request thumbnail if not loaded yet
-                Component.onCompleted: {
-                    if (!model.isFolder && model.thumbnailPath === "" && !model.isOffline) {
-                        var ext = model.fileName.substring(model.fileName.lastIndexOf('.') + 1).toLowerCase();
-                        var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" || ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
-                        if (!isTextDoc) {
-                            libraryController.requestThumbnail(model.docId, model.absolutePath, false);
+                // Request thumbnail if not loaded yet (debounced to avoid request flooding during scrolling)
+                Timer {
+                    id: thumbnailDelayTimer
+                    interval: 200
+                    repeat: false
+                    onTriggered: {
+                        if (!model.isFolder && model.thumbnailPath === "" && !model.isOffline) {
+                            var ext = model.fileName.substring(model.fileName.lastIndexOf('.') + 1).toLowerCase();
+                            var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" || ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
+                            if (!isTextDoc) {
+                                libraryController.requestThumbnail(model.docId, model.absolutePath, false);
+                            }
                         }
                     }
+                }
+
+                Component.onCompleted: {
+                    thumbnailDelayTimer.start();
                 }
 
                 onClicked: event => {
