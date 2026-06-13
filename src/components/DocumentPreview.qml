@@ -43,7 +43,9 @@ Item {
         if (!imageLoader.item)
             return;
         var hasThumbnail = (root.thumbnailPath !== "" && root.thumbnailPath !== "file://");
-        if (hasThumbnail) {
+        if (root.isImageFile && root.interactive && root.absolutePath !== "" && !root.isOffline) {
+            imageLoader.item.source = "file://" + root.absolutePath;
+        } else if (hasThumbnail) {
             imageLoader.item.source = root.thumbnailPath;
         } else if (root.isImageFile && root.absolutePath !== "" && !root.isOffline) {
             imageLoader.item.source = "file://" + root.absolutePath;
