@@ -1214,6 +1214,59 @@ TestCase {
         win.destroy();
     }
 
+    function test_subfolder_navigation_selection_cleared() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let quickLook = win.quickLookDialog;
+        verify(quickLook !== null, "QuickLookDialog should be instantiated");
+
+        // Clear and add mock data to documentModel
+        documentModel.clear();
+        proxyFilter.clear();
+
+        // Add a mock subfolder
+        let subfolder = {
+            "257": 10,
+            "id": 10,
+            "docId": 10,
+            "fileName": "subfolder1",
+            "absolutePath": "/watched/subfolder1",
+            "isOffline": false,
+            "279": true,
+            "isFolder": true
+        };
+        documentModel.append(subfolder);
+        proxyFilter.append(subfolder);
+        wait(100);
+
+        // Select the subfolder
+        win.selectDocument(10);
+        wait(100);
+
+        let inspector = findChildByType(win, "Inspector");
+        compare(inspector.selectedId, 10, "Subfolder should be selected");
+        compare(quickLook.docData !== null, true, "docData should be bound to selection");
+        compare(quickLook.docData.absolutePath, "/watched/subfolder1", "docData path should be correct");
+
+        // Now navigate into the subfolder (triggers onFolderFilterChanged)
+        proxyFilter.folderFilter = "/watched/subfolder1";
+        wait(100);
+
+        // Verify that the selection is cleared
+        compare(inspector.selectedId, -1, "Selection should be cleared to -1 after entering subfolder");
+        compare(quickLook.docData, null, "docData should be null after selection cleared");
+
+        // Verify that spacebar shortcut is disabled since selection is cleared
+        let spaceShortcut = findChildByName(win, "spaceShortcut");
+        verify(spaceShortcut !== null, "spaceShortcut should be found");
+        verify(!spaceShortcut.enabled, "spaceShortcut should be disabled when selection is cleared");
+
+        win.destroy();
+    }
+
+
     function test_quick_look_text_preview() {
         let win = mainWindowComponent.createObject(this);
         verify(win !== null, "MainWindow should be instantiated");

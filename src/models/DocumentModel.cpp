@@ -272,7 +272,7 @@ void DocumentModel::forceRefresh()
     }
 
     // Append virtual folders
-    int virtualFolderId = -1;
+    int virtualFolderId = -2;
     for (const QString &folderPath : uniqueFolders) {
         DocumentInfo folderDoc;
         folderDoc.id = virtualFolderId--;

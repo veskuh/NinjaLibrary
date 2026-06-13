@@ -145,6 +145,7 @@ KaakaoWindow {
         target: proxyFilter
         ignoreUnknownSignals: true
         function onFolderFilterChanged() {
+            canvasStack.clearSelections();
             var selectedRoot = sidebar.getSelectedFolder();
             if (selectedRoot !== "") {
                 var currentPath = proxyFilter.folderFilter;
