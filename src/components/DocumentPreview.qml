@@ -135,6 +135,9 @@ Item {
                 text: "◀"
                 implicitWidth: 24
                 implicitHeight: 24
+                leftPadding: 0
+                rightPadding: 0
+                padding: 0
                 enabled: root.currentPage > 0
                 onClicked: root.prevPage()
             }
@@ -152,6 +155,9 @@ Item {
                 text: "▶"
                 implicitWidth: 24
                 implicitHeight: 24
+                leftPadding: 0
+                rightPadding: 0
+                padding: 0
                 enabled: root.currentPage < totalPages - 1
                 onClicked: root.nextPage()
             }

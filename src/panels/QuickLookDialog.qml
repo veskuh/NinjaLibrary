@@ -86,12 +86,12 @@ Dialog {
             }
 
             // Close button overlayed in top-right
-            KaakaoButton {
+            KaakaoControlButton {
                 id: closeButton
                 objectName: "closeButton"
-                text: "✕"
-                implicitWidth: 28
-                implicitHeight: 28
+                controlStyle: KaakaoControlButton.ControlStyle.Inline
+                implicitWidth: 18
+                implicitHeight: 18
                 anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.margins: 8
