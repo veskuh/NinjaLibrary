@@ -50,6 +50,7 @@
 #include <thread>
 
 #include "../utils/DocUtils.h"
+#include "../utils/PdfUtils.h"
 #include "../workers/OcrTask.h"
 #include "../workers/ScannerTask.h"
 #include "../workers/ThumbnailTask.h"
@@ -1148,6 +1149,128 @@ void LibraryController::showInFinder(const QString &filePath)
 }
 
 void LibraryController::copyToClipboard(const QString &text) { DocUtils::copyToClipboard(text); }
+
+QVariantList LibraryController::searchDocumentContent(int docId, const QString &absolutePath, const QString &query)
+{
+    QVariantList results;
+    if (query.trimmed().isEmpty()) {
+        return results;
+    }
+
+    if (absolutePath.toLower().endsWith(".pdf")) {
+        return PdfUtils::searchPdfPages(absolutePath, query);
+    }
+
+    // Non-PDF fallback (plain text, markdown, docx etc. treat as single page 0)
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT text_snippet FROM document_search WHERE document_id = :docId;");
+        q.bindValue(":docId", docId);
+        if (q.exec() && q.next()) {
+            QString pageText = q.value(0).toString();
+            int index = 0;
+            while ((index = pageText.indexOf(query, index, Qt::CaseInsensitive)) != -1) {
+                QVariantMap map;
+                map["pageIndex"] = 0;
+                
+                int start = qMax(0, index - 100);
+                int end = qMin(pageText.length(), index + query.length() + 100);
+                QString prefix = (start > 0) ? "..." : "";
+                QString suffix = (end < pageText.length()) ? "..." : "";
+                map["context"] = prefix + pageText.mid(start, end - start).replace('\n', ' ') + suffix;
+                
+                results.append(map);
+                index += query.length();
+                if (results.size() >= 100) break;
+            }
+        }
+    }
+    return results;
+}
+
+QVariantList LibraryController::searchDocuments(const QString &queryStr)
+{
+    QVariantList results;
+    QString trimmed = queryStr.trimmed();
+    if (trimmed.isEmpty()) {
+        return results;
+    }
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return results;
+
+    QSqlQuery query(db);
+    query.prepare(
+        "SELECT d.id, d.file_name, d.absolute_path, d.file_size, d.is_offline, d.star_rating, ds.text_snippet, "
+        "       (SELECT group_concat(t.name) FROM document_tags dt JOIN tags t ON dt.tag_id = t.id WHERE dt.document_id = d.id) as tags "
+        "FROM documents d "
+        "JOIN document_search ds ON d.id = ds.document_id "
+        "WHERE d.id IN (SELECT document_id FROM document_search WHERE document_search MATCH :ftsQuery) "
+        "ORDER BY d.file_name ASC;"
+    );
+
+    QStringList terms = trimmed.split(" ", Qt::SkipEmptyParts);
+    QString ftsQuery;
+    for (int i = 0; i < terms.size(); ++i) {
+        if (i > 0) ftsQuery += " AND ";
+        QString term = terms[i];
+        // Remove characters that might break FTS5 parser
+        term.replace("\"", "").replace("'", "").replace("*", "").replace(":", "");
+        if (!term.isEmpty()) {
+            ftsQuery += term + "*";
+        }
+    }
+
+    if (ftsQuery.isEmpty()) {
+        return results;
+    }
+
+    query.bindValue(":ftsQuery", ftsQuery);
+
+    if (query.exec()) {
+        while (query.next()) {
+            QVariantMap doc;
+            doc["docId"] = query.value(0).toInt();
+            doc["id"] = query.value(0).toInt();
+            doc["fileName"] = query.value(1).toString();
+            doc["absolutePath"] = query.value(2).toString();
+            
+            qint64 size = query.value(3).toLongLong();
+            doc["fileSize"] = size;
+            QString sizeStr;
+            if (size < 1024) sizeStr = QString("%1 B").arg(size);
+            else if (size < 1024 * 1024) sizeStr = QString("%1 KB").arg(size / 1024);
+            else sizeStr = QString("%1 MB").arg(double(size) / (1024 * 1024), 0, 'f', 1);
+            doc["fileSizeStr"] = sizeStr;
+
+            doc["isOffline"] = query.value(4).toBool();
+            doc["starRating"] = query.value(5).toInt();
+            
+            QString textSnippet = query.value(6).toString();
+            QString tagsConcat = query.value(7).toString();
+            QStringList tags = tagsConcat.isEmpty() ? QStringList() : tagsConcat.split(",");
+            doc["tags"] = tags;
+            
+            int matchCount = 0;
+            if (!terms.isEmpty()) {
+                QString firstTerm = terms[0];
+                int idx = 0;
+                while ((idx = textSnippet.indexOf(firstTerm, idx, Qt::CaseInsensitive)) != -1) {
+                    matchCount++;
+                    idx += firstTerm.length();
+                }
+            }
+            doc["matchCount"] = matchCount;
+            
+            results.append(doc);
+        }
+    } else {
+        qWarning() << "searchDocuments FTS5 query failed:" << query.lastError().text();
+    }
+
+    return results;
+}
 
 bool LibraryController::markDocumentOpened(int docId)
 {

@@ -76,6 +76,8 @@ public slots:
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &urlStr);
     Q_INVOKABLE void showInFinder(const QString &filePath);
     Q_INVOKABLE void copyToClipboard(const QString &text);
+    Q_INVOKABLE QVariantList searchDocumentContent(int docId, const QString &absolutePath, const QString &query);
+    Q_INVOKABLE QVariantList searchDocuments(const QString &queryStr);
     bool markDocumentOpened(int docId);
 
     // Centralized sidecar read/write APIs

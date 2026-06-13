@@ -111,4 +111,44 @@ int getPdfPageCount(const QString &pdfPath)
         return (int)[pdfDoc pageCount];
     }
 }
+
+QVariantList searchPdfPages(const QString &pdfPath, const QString &query)
+{
+    QVariantList results;
+    if (query.trimmed().isEmpty()) return results;
+
+    @autoreleasepool {
+        NSString *nsPath = pdfPath.toNSString();
+        NSURL *url = [NSURL fileURLWithPath:nsPath];
+        if (!url) return results;
+
+        PDFDocument *pdfDoc = [[PDFDocument alloc] initWithURL:url];
+        if (!pdfDoc) return results;
+
+        int pageCount = (int)[pdfDoc pageCount];
+        for (int i = 0; i < pageCount; ++i) {
+            PDFPage *page = [pdfDoc pageAtIndex:i];
+            if (!page) continue;
+            QString pageText = QString::fromNSString([page string]);
+            
+            int index = 0;
+            while ((index = pageText.indexOf(query, index, Qt::CaseInsensitive)) != -1) {
+                QVariantMap map;
+                map["pageIndex"] = i;
+                
+                int start = qMax(0, index - 100);
+                int end = qMin(pageText.length(), index + query.length() + 100);
+                QString prefix = (start > 0) ? "..." : "";
+                QString suffix = (end < pageText.length()) ? "..." : "";
+                map["context"] = prefix + pageText.mid(start, end - start).replace('\n', ' ') + suffix;
+                
+                results.append(map);
+                index += query.length();
+                if (results.size() >= 100) break;
+            }
+            if (results.size() >= 100) break;
+        }
+    }
+    return results;
+}
 }  // namespace PdfUtils

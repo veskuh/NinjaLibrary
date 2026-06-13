@@ -13,6 +13,7 @@ Dialog {
     
     // Custom properties
     property var docData: null
+    property alias docPreview: docPreview
     
     signal navigateRequested(string direction)
 

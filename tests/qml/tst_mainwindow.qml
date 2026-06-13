@@ -1213,4 +1213,75 @@ TestCase {
 
         win.destroy();
     }
+
+    function test_quick_search_dialog_ui() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let searchDialog = win.quickSearchDialog;
+        verify(searchDialog !== null, "QuickSearchDialog should exist");
+        verify(!searchDialog.visible, "QuickSearchDialog should be closed initially");
+
+        // Verify toolbar button exists
+        let searchBtn = findChildByName(win, "quickSearchButton");
+        verify(searchBtn !== null, "QuickSearch button should exist in toolbar");
+
+        // Click toolbar button to open dialog
+        mouseClick(searchBtn);
+        wait(100);
+        verify(searchDialog.visible, "QuickSearchDialog should open on button click");
+
+        // Close it
+        searchDialog.close();
+        wait(100);
+        verify(!searchDialog.visible, "QuickSearchDialog should close");
+
+        // Verify shortcut activation
+        let searchShortcut = findChildByName(win, "quickSearchShortcut");
+        verify(searchShortcut !== null, "quickSearchShortcut should exist");
+        searchShortcut.activated();
+        wait(100);
+        verify(searchDialog.visible, "QuickSearchDialog should open on shortcut activation");
+
+        // Verify initial focus is on the search field
+        let searchField = findChildByName(searchDialog, "quickSearchField");
+        verify(searchField !== null, "quickSearchField should exist");
+        verify(searchField.activeFocus, "quickSearchField should have active focus initially");
+
+        // Verify preview button exists and is disabled initially
+        let previewBtn = findChildByName(searchDialog, "quickSearchPreviewButton");
+        verify(previewBtn !== null, "quickSearchPreviewButton should exist");
+        verify(!previewBtn.enabled, "quickSearchPreviewButton should be disabled initially");
+
+        // Tab focus cycling
+        let docListView = findChildByName(searchDialog, "quickDocListView");
+        verify(docListView !== null, "docListView should exist");
+        let snippetsListView = findChildByName(searchDialog, "quickSnippetsListView");
+        verify(snippetsListView !== null, "snippetsListView should exist");
+
+        // Tab to docListView
+        keyClick(Qt.Key_Tab);
+        wait(50);
+        verify(docListView.activeFocus, "docListView should have focus after Tab");
+
+        // Tab to snippetsListView
+        keyClick(Qt.Key_Tab);
+        wait(50);
+        verify(snippetsListView.activeFocus, "snippetsListView should have focus after Tab again");
+
+        // Tab back to searchField
+        keyClick(Qt.Key_Tab);
+        wait(50);
+        verify(searchField.activeFocus, "searchField should have focus after Tab a third time");
+
+        // Shift+Tab back to snippetsListView
+        keyClick(Qt.Key_Backtab);
+        wait(50);
+        verify(snippetsListView.activeFocus, "snippetsListView should have focus after Shift+Tab");
+
+        searchDialog.close();
+        wait(100);
+        win.destroy();
+    }
 }

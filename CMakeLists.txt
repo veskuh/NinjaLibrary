@@ -150,6 +150,7 @@ qt_add_qml_module(NinjaLibrary
         src/panels/AboutDialog.qml
         src/panels/PreferencesDialog.qml
         src/panels/QuickLookDialog.qml
+        src/panels/QuickSearchDialog.qml
 )
 
 # Add platform specific source files

@@ -75,4 +75,38 @@ int getPdfPageCount(const QString &pdfPath)
     if (!doc || doc->isLocked()) return 0;
     return doc->numPages();
 }
+
+QVariantList searchPdfPages(const QString &pdfPath, const QString &query)
+{
+    QVariantList results;
+    if (query.trimmed().isEmpty()) return results;
+
+    std::unique_ptr<Poppler::Document> doc(Poppler::Document::load(pdfPath));
+    if (!doc || doc->isLocked()) return results;
+
+    int pages = doc->numPages();
+    for (int i = 0; i < pages; ++i) {
+        std::unique_ptr<Poppler::Page> page(doc->page(i));
+        if (!page) continue;
+        QString pageText = page->text(QRectF());
+
+        int index = 0;
+        while ((index = pageText.indexOf(query, index, Qt::CaseInsensitive)) != -1) {
+            QVariantMap map;
+            map["pageIndex"] = i;
+            
+            int start = qMax(0, index - 100);
+            int end = qMin(pageText.length(), index + query.length() + 100);
+            QString prefix = (start > 0) ? "..." : "";
+            QString suffix = (end < pageText.length()) ? "..." : "";
+            map["context"] = prefix + pageText.mid(start, end - start).replace('\n', ' ') + suffix;
+            
+            results.append(map);
+            index += query.length();
+            if (results.size() >= 100) break;
+        }
+        if (results.size() >= 100) break;
+    }
+    return results;
+}
 }  // namespace PdfUtils

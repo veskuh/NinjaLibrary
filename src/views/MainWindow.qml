@@ -180,6 +180,7 @@ KaakaoWindow {
     property alias itemContextMenu: itemContextMenu
     property alias trashDialog: trashDialog
     property alias quickLookDialog: quickLookDialog
+    property alias quickSearchDialog: quickSearchDialog
 
     menuBar: AppMenuBar {
         id: mainMenuBar
@@ -233,6 +234,17 @@ KaakaoWindow {
         id: prefsDialog
     }
 
+    QuickSearchDialog {
+        id: quickSearchDialog
+        objectName: "quickSearchDialog"
+        onDocumentSnippetClicked: (doc, pageIndex) => {
+            quickSearchDialog.wasOpenedBeforePreview = true;
+            window.selectDocument(doc.docId);
+            quickLookDialog.open();
+            quickLookDialog.docPreview.currentPage = pageIndex;
+        }
+    }
+
     KaakaoDialog {
         id: trashDialog
         objectName: "trashDialog"
@@ -284,6 +296,13 @@ KaakaoWindow {
                 activeCanvas.moveRight();
             }
         }
+        onClosed: {
+            if (quickSearchDialog.wasOpenedBeforePreview) {
+                quickSearchDialog.returningFromPreview = true;
+                quickSearchDialog.open();
+                quickSearchDialog.wasOpenedBeforePreview = false;
+            }
+        }
     }
 
     Shortcut {
@@ -297,6 +316,15 @@ KaakaoWindow {
             } else {
                 quickLookDialog.open();
             }
+        }
+    }
+
+    Shortcut {
+        id: quickSearchShortcut
+        objectName: "quickSearchShortcut"
+        sequence: Qt.platform.os === "osx" ? "Cmd+Shift+F" : "Ctrl+Shift+F"
+        onActivated: {
+            quickSearchDialog.open();
         }
     }
 
@@ -449,6 +477,40 @@ KaakaoWindow {
                     repeat: false
                     onTriggered: {
                         proxyFilter.filterString = searchField.text;
+                    }
+                }
+            }
+
+            // Quick Search Button
+            KaakaoToolButton {
+                id: quickSearchButton
+                objectName: "quickSearchButton"
+                iconEmoji: "🔍"
+                text: "Quick Search"
+                padding: 0
+                topPadding: 0
+                bottomPadding: 0
+                ToolTip.text: "Quick Search"
+                ToolTip.visible: hovered
+                onClicked: quickSearchDialog.open()
+
+                contentItem: Column {
+                    spacing: 2
+                    opacity: quickSearchButton.enabled ? 1.0 : 0.4
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: quickSearchButton.iconEmoji
+                        font.pixelSize: 20
+                        renderType: Text.NativeRendering
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: quickSearchButton.text
+                        font: quickSearchButton.font
+                        color: Theme.primaryText
+                        renderType: Text.NativeRendering
+                        horizontalAlignment: Text.AlignHCenter
                     }
                 }
             }

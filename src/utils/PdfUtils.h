@@ -34,6 +34,8 @@
 #include <QImage>
 #include <QString>
 
+#include <QVariantList>
+
 namespace PdfUtils {
 // Renders the first page of the PDF at path as a QImage.
 QImage renderPdfThumbnail(const QString &pdfPath, int targetWidth = 256);
@@ -43,6 +45,9 @@ QString extractPdfText(const QString &pdfPath);
 
 // Gets page count.
 int getPdfPageCount(const QString &pdfPath);
+
+// Searches PDF page-by-page for search matches.
+QVariantList searchPdfPages(const QString &pdfPath, const QString &query);
 }  // namespace PdfUtils
 
 #endif  // PDFUTILS_H
