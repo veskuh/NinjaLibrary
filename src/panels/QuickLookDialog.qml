@@ -62,27 +62,6 @@ Dialog {
             }
         }
 
-        // Header
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.margins: Theme.paddingSmall
-            
-            KaakaoLabel {
-                text: quickLook.docData ? quickLook.docData.fileName : ""
-                font.weight: Font.Bold
-                font.pixelSize: 15
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-            }
-            
-            KaakaoButton {
-                text: "✕"
-                implicitWidth: 28
-                implicitHeight: 28
-                onClicked: quickLook.close()
-            }
-        }
-
         // Preview Canvas
         Rectangle {
             Layout.fillWidth: true
@@ -105,6 +84,20 @@ Dialog {
                 fontPixelSize: 48
                 interactive: true
             }
+
+            // Close button overlayed in top-right
+            KaakaoButton {
+                id: closeButton
+                objectName: "closeButton"
+                text: "✕"
+                implicitWidth: 28
+                implicitHeight: 28
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 8
+                z: 11
+                onClicked: quickLook.close()
+            }
         }
 
         // Footer Metadata & Open button
@@ -114,7 +107,7 @@ Dialog {
             spacing: 12
             
             KaakaoLabel {
-                text: quickLook.docData ? (quickLook.docData.fileSizeStr + " • " + quickLook.docData.absolutePath) : ""
+                text: quickLook.docData ? (quickLook.docData.fileName + " • " + quickLook.docData.fileSizeStr + " • " + quickLook.docData.absolutePath) : ""
                 role: KaakaoLabel.Role.Small
                 elide: Text.ElideMiddle
                 Layout.fillWidth: true
