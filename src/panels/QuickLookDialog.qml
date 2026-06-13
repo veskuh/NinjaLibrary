@@ -7,8 +7,9 @@ import "../components"
 Dialog {
     id: quickLook
     modal: true
-    width: parent ? Math.round(parent.width * 0.8) : 640
-    height: parent ? Math.round(parent.height * 0.8) : 520
+    padding: Theme.paddingSmall
+    width: parent ? Math.round(parent.width * 0.95) : 760
+    height: parent ? Math.round(parent.height * 0.95) : 600
     
     // Custom properties
     property var docData: null
@@ -33,7 +34,7 @@ Dialog {
     }
 
     contentItem: ColumnLayout {
-        spacing: 12
+        spacing: 6
         focus: true
 
         Keys.onPressed: (event) => {
@@ -64,7 +65,7 @@ Dialog {
         // Header
         RowLayout {
             Layout.fillWidth: true
-            Layout.margins: 12
+            Layout.margins: Theme.paddingSmall
             
             KaakaoLabel {
                 text: quickLook.docData ? quickLook.docData.fileName : ""
@@ -95,7 +96,7 @@ Dialog {
             DocumentPreview {
                 id: docPreview
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.margins: 4
                 fileName: quickLook.docData ? quickLook.docData.fileName : ""
                 absolutePath: quickLook.docData ? quickLook.docData.absolutePath : ""
                 thumbnailPath: (quickLook.docData && quickLook.docData.thumbnailPath) ? quickLook.docData.thumbnailPath : ""
@@ -109,7 +110,7 @@ Dialog {
         // Footer Metadata & Open button
         RowLayout {
             Layout.fillWidth: true
-            Layout.margins: 12
+            Layout.margins: Theme.paddingSmall
             spacing: 12
             
             KaakaoLabel {
