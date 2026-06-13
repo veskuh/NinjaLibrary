@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Pdf
 import Kaakao 1.0
 
 Item {
@@ -12,14 +13,30 @@ Item {
     property bool isOffline: false
     property bool isFolder: false
     property int fontPixelSize: 24
+    property bool interactive: false
+    property int currentPage: 0
+    property alias pdfDoc: pdfDoc
+    property int testPageCount: -1
+    readonly property int totalPages: testPageCount >= 0 ? testPageCount : (showPdfPages ? pdfDoc.pageCount : 0)
 
     readonly property bool isImageFile: {
         var ext = root.fileName.substring(root.fileName.lastIndexOf('.') + 1).toLowerCase();
         return ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif" || ext === "bmp" || ext === "tiff";
     }
 
+    readonly property bool isPdfFile: {
+        var ext = root.fileName.substring(root.fileName.lastIndexOf('.') + 1).toLowerCase();
+        return ext === "pdf";
+    }
+
+    readonly property bool showPdfPages: root.isPdfFile && root.interactive && !root.isOffline
+
+    onAbsolutePathChanged: {
+        currentPage = 0;
+        updateImageSource();
+    }
+
     onThumbnailPathChanged: updateImageSource()
-    onAbsolutePathChanged: updateImageSource()
     onIsOfflineChanged: updateImageSource()
 
     function updateImageSource() {
@@ -35,10 +52,22 @@ Item {
         }
     }
 
+    function prevPage() {
+        if (currentPage > 0) {
+            currentPage--;
+        }
+    }
+
+    function nextPage() {
+        if (showPdfPages && currentPage < totalPages - 1) {
+            currentPage++;
+        }
+    }
+
     Loader {
         id: imageLoader
         anchors.fill: parent
-        active: (root.thumbnailPath !== "" && root.thumbnailPath !== "file://") || (root.isImageFile && root.absolutePath !== "" && !root.isOffline)
+        active: !root.showPdfPages && ((root.thumbnailPath !== "" && root.thumbnailPath !== "file://") || (root.isImageFile && root.absolutePath !== "" && !root.isOffline))
         source: "ImagePreview.qml"
 
         onLoaded: {
@@ -63,10 +92,76 @@ Item {
         }
     }
 
+    // PDF Preview Components (only active if showPdfPages is true)
+    PdfDocument {
+        id: pdfDoc
+        source: root.showPdfPages ? "file://" + root.absolutePath : ""
+    }
+
+    PdfPageImage {
+        id: pdfPageImage
+        anchors.fill: parent
+        document: pdfDoc
+        currentFrame: root.currentPage
+        fillMode: Image.PreserveAspectFit
+        visible: root.showPdfPages && totalPages > 0
+    }
+
+    Item {
+        id: pdfControlsContainer
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.margins: 16
+        width: pdfControlsRow.width + 12
+        height: pdfControlsRow.height + 12
+        visible: root.showPdfPages && totalPages > 1
+        z: 10
+
+        // Semi-transparent background for overlay look
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.isDarkMode ? Qt.rgba(0.12, 0.12, 0.12, 0.85) : Qt.rgba(0.95, 0.95, 0.95, 0.85)
+            border.color: Theme.buttonBorder
+            border.width: 1
+            radius: Theme.radiusStandard
+        }
+
+        Row {
+            id: pdfControlsRow
+            anchors.centerIn: parent
+            spacing: 8
+
+            KaakaoButton {
+                text: "◀"
+                implicitWidth: 24
+                implicitHeight: 24
+                enabled: root.currentPage > 0
+                onClicked: root.prevPage()
+            }
+
+            KaakaoLabel {
+                anchors.verticalCenter: parent.verticalCenter
+                text: (root.currentPage + 1) + " / " + totalPages
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+                color: Theme.primaryText
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            KaakaoButton {
+                text: "▶"
+                implicitWidth: 24
+                implicitHeight: 24
+                enabled: root.currentPage < totalPages - 1
+                onClicked: root.nextPage()
+            }
+        }
+    }
+
     // Fallback preview
     ColumnLayout {
         anchors.centerIn: parent
-        visible: imageLoader.status !== Loader.Ready || (imageLoader.item && imageLoader.item.status !== Image.Ready)
+        visible: (!root.showPdfPages || totalPages === 0) && (imageLoader.status !== Loader.Ready || (imageLoader.item && imageLoader.item.status !== Image.Ready))
         spacing: 4
 
         KaakaoLabel {

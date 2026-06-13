@@ -287,6 +287,8 @@ KaakaoWindow {
     }
 
     Shortcut {
+        id: spaceShortcut
+        objectName: "spaceShortcut"
         sequence: "Space"
         enabled: !searchField.activeFocus && inspector.selectedId !== -1
         onActivated: {

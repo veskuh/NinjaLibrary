@@ -7,8 +7,8 @@ import "../components"
 Dialog {
     id: quickLook
     modal: true
-    width: 640
-    height: 520
+    width: parent ? Math.round(parent.width * 0.8) : 640
+    height: parent ? Math.round(parent.height * 0.8) : 520
     
     // Custom properties
     property var docData: null
@@ -52,6 +52,12 @@ Dialog {
             } else if (event.key === Qt.Key_Right) {
                 navigateRequested("right");
                 event.accepted = true;
+            } else if (event.key === Qt.Key_PageUp) {
+                docPreview.prevPage();
+                event.accepted = true;
+            } else if (event.key === Qt.Key_PageDown) {
+                docPreview.nextPage();
+                event.accepted = true;
             }
         }
 
@@ -87,6 +93,7 @@ Dialog {
             clip: true
 
             DocumentPreview {
+                id: docPreview
                 anchors.fill: parent
                 anchors.margins: 12
                 fileName: quickLook.docData ? quickLook.docData.fileName : ""
@@ -95,6 +102,7 @@ Dialog {
                 isOffline: !!(quickLook.docData && quickLook.docData.isOffline)
                 isFolder: !!(quickLook.docData && quickLook.docData.isFolder)
                 fontPixelSize: 48
+                interactive: true
             }
         }
 

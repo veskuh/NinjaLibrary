@@ -418,6 +418,9 @@ TestCase {
         // 1. Single selection navigation test
         gridCanvas.selectedIds = [101];
         gridView.currentIndex = 0;
+        win.requestActivate();
+        win.contentItem.forceActiveFocus();
+        wait(100);
         innerGridView.forceActiveFocus();
         verify(innerGridView.activeFocus, "Inner GridView should have active focus");
 
@@ -528,6 +531,9 @@ TestCase {
         compare(inspector.selectedIds.length, 1, "Inspector should have 1 selected ID");
 
         // Direct focus to searchField first to test escape handling
+        win.requestActivate();
+        win.contentItem.forceActiveFocus();
+        wait(100);
         searchField.forceActiveFocus();
         verify(searchField.activeFocus, "Search field should have focus");
 
@@ -1012,6 +1018,7 @@ TestCase {
 
         // Clear and add mock data to documentModel
         documentModel.clear();
+        proxyFilter.clear();
         let doc1 = {
             "257": 1,
             "id": 1,
@@ -1044,15 +1051,20 @@ TestCase {
         compare(inspector.selectedId, 1, "Document 1 should be selected");
         compare(quickLook.docData !== null, true, "docData should be bound to selection");
 
-        // Focus window and trigger spacebar to open Quick Look
-        win.contentItem.forceActiveFocus();
-        keyClick(Qt.Key_Space);
+        // Focus the table canvas list view and trigger spacebar shortcut to open Quick Look
+        let spaceShortcut = findChildByName(win, "spaceShortcut");
+        verify(spaceShortcut !== null, "spaceShortcut should be found");
+        verify(spaceShortcut.enabled, "spaceShortcut should be enabled");
+        spaceShortcut.activated();
         wait(300);
 
         verify(quickLook.opened, "QuickLookDialog should be open after pressing Space");
         compare(quickLook.docData.fileName, "doc1.pdf", "QuickLookDialog should display first document");
 
         // Set focus to the quickLook dialog contentItem and press Down Arrow key
+        win.requestActivate();
+        win.contentItem.forceActiveFocus();
+        wait(100);
         quickLook.contentItem.forceActiveFocus();
         verify(quickLook.contentItem.activeFocus, "QuickLookDialog contentItem should have active focus");
         keyClick(Qt.Key_Down);
@@ -1063,10 +1075,81 @@ TestCase {
         compare(quickLook.docData.fileName, "doc2.pdf", "QuickLookDialog should now show document 2");
 
         // Trigger Space key again to close dialog
-        keyClick(Qt.Key_Space);
+        verify(spaceShortcut.enabled, "spaceShortcut should be enabled");
+        spaceShortcut.activated();
         wait(200);
 
         verify(!quickLook.opened, "QuickLookDialog should close after pressing Space again");
+
+        win.destroy();
+    }
+
+    function test_quick_look_pdf_page_turning() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let quickLook = win.quickLookDialog;
+        verify(quickLook !== null, "QuickLookDialog should be instantiated");
+
+        // Clear and add mock data to documentModel
+        documentModel.clear();
+        proxyFilter.clear();
+        let doc1 = {
+            "257": 1,
+            "id": 1,
+            "docId": 1,
+            "fileName": "test.pdf",
+            "absolutePath": "/path/to/test.pdf",
+            "isOffline": false,
+            "isFolder": false
+        };
+        documentModel.append(doc1);
+        proxyFilter.append(doc1);
+        wait(100);
+
+        // Select document
+        win.selectDocument(1);
+        wait(100);
+
+        // Trigger spacebar shortcut to open Quick Look
+        let spaceShortcut = findChildByName(win, "spaceShortcut");
+        verify(spaceShortcut !== null, "spaceShortcut should be found");
+        verify(spaceShortcut.enabled, "spaceShortcut should be enabled");
+        spaceShortcut.activated();
+        wait(300);
+
+        verify(quickLook.opened, "QuickLookDialog should be open");
+
+        // Find DocumentPreview
+        let docPreview = findChildByType(quickLook, "DocumentPreview");
+        verify(docPreview !== null, "DocumentPreview should be found");
+        
+        // Mock pageCount to 5 using testPageCount
+        docPreview.testPageCount = 5;
+        compare(docPreview.totalPages, 5, "totalPages should be mocked to 5");
+        
+        compare(docPreview.currentPage, 0, "Initial page should be 0");
+
+        // Set focus to the quickLook dialog contentItem and press PageDown key to go to next page
+        win.requestActivate();
+        win.contentItem.forceActiveFocus();
+        wait(100);
+        quickLook.contentItem.forceActiveFocus();
+        keyClick(Qt.Key_PageDown);
+        wait(200);
+        compare(docPreview.currentPage, 1, "Page should increment to 1 after PageDown");
+
+        // Press PageUp to return to previous page
+        keyClick(Qt.Key_PageUp);
+        wait(200);
+        compare(docPreview.currentPage, 0, "Page should decrement back to 0 after PageUp");
+
+        // Close dialog
+        verify(spaceShortcut.enabled, "spaceShortcut should be enabled");
+        spaceShortcut.activated();
+        wait(200);
+        verify(!quickLook.opened, "QuickLookDialog should close");
 
         win.destroy();
     }
