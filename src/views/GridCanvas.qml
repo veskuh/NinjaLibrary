@@ -60,6 +60,22 @@ Item {
         gridView.currentIndex = -1;
     }
 
+    function moveUp() {
+        gridView.gridView.moveCurrentIndexUp();
+    }
+
+    function moveDown() {
+        gridView.gridView.moveCurrentIndexDown();
+    }
+
+    function moveLeft() {
+        gridView.gridView.moveCurrentIndexLeft();
+    }
+
+    function moveRight() {
+        gridView.gridView.moveCurrentIndexRight();
+    }
+
     KaakaoGridView {
         id: gridView
         anchors.fill: parent

@@ -86,6 +86,21 @@ Item {
         selectionChanged([]);
     }
 
+    function moveUp() {
+        if (innerListView) {
+            innerListView.decrementCurrentIndex();
+        }
+    }
+
+    function moveDown() {
+        if (innerListView) {
+            innerListView.incrementCurrentIndex();
+        }
+    }
+
+    function moveLeft() {}
+    function moveRight() {}
+
     KaakaoTableView {
         id: tableView
         anchors.fill: parent

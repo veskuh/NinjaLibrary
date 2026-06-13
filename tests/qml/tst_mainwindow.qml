@@ -1000,4 +1000,74 @@ TestCase {
 
         win.destroy();
     }
+
+    function test_quick_look_preview_and_interactive_navigation() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let quickLook = win.quickLookDialog;
+        verify(quickLook !== null, "QuickLookDialog should be instantiated");
+        verify(!quickLook.opened, "QuickLookDialog should be closed initially");
+
+        // Clear and add mock data to documentModel
+        documentModel.clear();
+        let doc1 = {
+            "257": 1,
+            "id": 1,
+            "docId": 1,
+            "fileName": "doc1.pdf",
+            "absolutePath": "/path/1",
+            "isOffline": false,
+            "isFolder": false
+        };
+        let doc2 = {
+            "257": 2,
+            "id": 2,
+            "docId": 2,
+            "fileName": "doc2.pdf",
+            "absolutePath": "/path/2",
+            "isOffline": false,
+            "isFolder": false
+        };
+        documentModel.append(doc1);
+        proxyFilter.append(doc1);
+        documentModel.append(doc2);
+        proxyFilter.append(doc2);
+        wait(100);
+
+        // Select first document
+        win.selectDocument(1);
+        wait(100);
+
+        let inspector = findChildByType(win, "Inspector");
+        compare(inspector.selectedId, 1, "Document 1 should be selected");
+        compare(quickLook.docData !== null, true, "docData should be bound to selection");
+
+        // Focus window and trigger spacebar to open Quick Look
+        win.contentItem.forceActiveFocus();
+        keyClick(Qt.Key_Space);
+        wait(300);
+
+        verify(quickLook.opened, "QuickLookDialog should be open after pressing Space");
+        compare(quickLook.docData.fileName, "doc1.pdf", "QuickLookDialog should display first document");
+
+        // Set focus to the quickLook dialog contentItem and press Down Arrow key
+        quickLook.contentItem.forceActiveFocus();
+        verify(quickLook.contentItem.activeFocus, "QuickLookDialog contentItem should have active focus");
+        keyClick(Qt.Key_Down);
+        wait(200);
+
+        // Verify selection switched to doc 2 and preview updated
+        compare(inspector.selectedId, 2, "Selection should have moved to document 2");
+        compare(quickLook.docData.fileName, "doc2.pdf", "QuickLookDialog should now show document 2");
+
+        // Trigger Space key again to close dialog
+        keyClick(Qt.Key_Space);
+        wait(200);
+
+        verify(!quickLook.opened, "QuickLookDialog should close after pressing Space again");
+
+        win.destroy();
+    }
 }

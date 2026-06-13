@@ -179,6 +179,7 @@ KaakaoWindow {
     property alias mainMenuBar: mainMenuBar
     property alias itemContextMenu: itemContextMenu
     property alias trashDialog: trashDialog
+    property alias quickLookDialog: quickLookDialog
 
     menuBar: AppMenuBar {
         id: mainMenuBar
@@ -268,8 +269,38 @@ KaakaoWindow {
         text: message
     }
 
+    QuickLookDialog {
+        id: quickLookDialog
+        docData: inspector.docData
+        onNavigateRequested: (direction) => {
+            var activeCanvas = viewSegment.currentIndex === 0 ? gridCanvas : tableCanvas;
+            if (direction === "up") {
+                activeCanvas.moveUp();
+            } else if (direction === "down") {
+                activeCanvas.moveDown();
+            } else if (direction === "left") {
+                activeCanvas.moveLeft();
+            } else if (direction === "right") {
+                activeCanvas.moveRight();
+            }
+        }
+    }
+
+    Shortcut {
+        sequence: "Space"
+        enabled: !searchField.activeFocus && inspector.selectedId !== -1
+        onActivated: {
+            if (quickLookDialog.opened) {
+                quickLookDialog.close();
+            } else {
+                quickLookDialog.open();
+            }
+        }
+    }
+
     Shortcut {
         sequence: "Escape"
+        enabled: !quickLookDialog.opened
         onActivated: {
             if (searchField.text !== "") {
                 searchField.text = "";

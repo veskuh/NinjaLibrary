@@ -10,6 +10,7 @@ Item {
     property string absolutePath: ""
     property string fileName: ""
     property bool isOffline: false
+    property bool isFolder: false
     property int fontPixelSize: 24
 
     readonly property bool isImageFile: {
@@ -72,6 +73,8 @@ Item {
             text: {
                 if (root.isOffline)
                     return "⚠️";
+                if (root.isFolder)
+                    return "📁";
                 var ext = root.fileName.substring(root.fileName.lastIndexOf('.') + 1).toLowerCase();
                 if (ext === "pdf")
                     return "📄";
@@ -93,6 +96,8 @@ Item {
 
         KaakaoLabel {
             text: {
+                if (root.isFolder)
+                    return "FOLDER";
                 var ext = root.fileName.substring(root.fileName.lastIndexOf('.') + 1).toUpperCase();
                 return ext === "" ? "DOC" : ext;
             }
