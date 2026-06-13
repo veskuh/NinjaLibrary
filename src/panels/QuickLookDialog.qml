@@ -118,7 +118,8 @@ Dialog {
                 text: "Open with Application"
                 onClicked: {
                     if (quickLook.docData) {
-                        libraryController.showInFinder(quickLook.docData.absolutePath)
+                        Qt.openUrlExternally("file://" + quickLook.docData.absolutePath)
+                        libraryController.markDocumentOpened(quickLook.docData.docId)
                         quickLook.close()
                     }
                 }

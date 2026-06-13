@@ -1214,6 +1214,54 @@ TestCase {
         win.destroy();
     }
 
+    function test_quick_look_text_preview() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let quickLook = win.quickLookDialog;
+        verify(quickLook !== null, "QuickLookDialog should be instantiated");
+
+        // Clear and add mock data to documentModel
+        documentModel.clear();
+        proxyFilter.clear();
+        let doc1 = {
+            "257": 1,
+            "id": 1,
+            "docId": 1,
+            "fileName": "test.txt",
+            "absolutePath": "/path/to/test.txt",
+            "isOffline": false,
+            "isFolder": false
+        };
+        documentModel.append(doc1);
+        proxyFilter.append(doc1);
+        wait(100);
+
+        // Select document
+        win.selectDocument(1);
+        wait(100);
+
+        // Trigger spacebar shortcut to open Quick Look
+        let spaceShortcut = findChildByName(win, "spaceShortcut");
+        verify(spaceShortcut !== null, "spaceShortcut should be found");
+        spaceShortcut.activated();
+        wait(300);
+
+        verify(quickLook.opened, "QuickLookDialog should be open");
+
+        // Find DocumentPreview
+        let docPreview = findChildByType(quickLook, "DocumentPreview");
+        verify(docPreview !== null, "DocumentPreview should be found");
+        verify(docPreview.isTextFile, "isTextFile should be true");
+        verify(docPreview.showTextPreview, "showTextPreview should be true");
+
+        // Close dialog
+        spaceShortcut.activated();
+        wait(200);
+        win.destroy();
+    }
+
     function test_quick_search_dialog_ui() {
         let win = mainWindowComponent.createObject(this);
         verify(win !== null, "MainWindow should be instantiated");

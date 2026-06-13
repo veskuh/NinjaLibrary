@@ -72,6 +72,9 @@ public:
     Q_INVOKABLE void batchAddTags(const QVariantList &, const QStringList &) {}
     Q_INVOKABLE void markDocumentOpened(int docId) { emit documentOpened(docId); }
     Q_INVOKABLE void copyToClipboard(const QString &text) { emit pathCopied(text); }
+    Q_INVOKABLE QVariantList searchDocumentContent(int, const QString &, const QString &) { return QVariantList(); }
+    Q_INVOKABLE QVariantList searchDocuments(const QString &) { return QVariantList(); }
+    Q_INVOKABLE QString readTextFile(const QString &) { return "Mock Text Content"; }
 signals:
     void libraryChanged();
     void watchedFoldersChanged();

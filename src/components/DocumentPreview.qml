@@ -29,15 +29,37 @@ Item {
         return ext === "pdf";
     }
 
+    readonly property bool isTextFile: {
+        var ext = root.fileName.substring(root.fileName.lastIndexOf('.') + 1).toLowerCase();
+        return ext === "txt" || ext === "md";
+    }
+
     readonly property bool showPdfPages: root.isPdfFile && root.interactive && !root.isOffline
+    readonly property bool showTextPreview: root.isTextFile && root.absolutePath !== "" && !root.isOffline
+
+    property string textContent: ""
+
+    onShowTextPreviewChanged: updateTextContent()
+
+    function updateTextContent() {
+        if (showTextPreview) {
+            textContent = libraryController.readTextFile(root.absolutePath);
+        } else {
+            textContent = "";
+        }
+    }
 
     onAbsolutePathChanged: {
         currentPage = 0;
         updateImageSource();
+        updateTextContent();
     }
 
     onThumbnailPathChanged: updateImageSource()
-    onIsOfflineChanged: updateImageSource()
+    onIsOfflineChanged: {
+        updateImageSource();
+        updateTextContent();
+    }
 
     function updateImageSource() {
         if (!imageLoader.item)
@@ -184,10 +206,45 @@ Item {
         }
     }
 
+    // Scrollable Text Viewer for .txt and .md files
+    ScrollView {
+        id: textPreviewScroll
+        anchors.fill: parent
+        anchors.leftMargin: root.interactive ? 36 : 8
+        anchors.rightMargin: root.interactive ? 36 : 8
+        anchors.topMargin: root.interactive ? 36 : 8
+        anchors.bottomMargin: root.interactive ? 36 : 8
+        visible: root.showTextPreview
+        clip: true
+
+        background: Rectangle {
+            color: Theme.contentBackground
+            border.color: Theme.buttonBorder
+            border.width: 1
+            radius: Theme.radiusStandard
+        }
+
+        TextArea {
+            id: textArea
+            text: root.textContent
+            readOnly: true
+            selectByMouse: true
+            wrapMode: TextEdit.Wrap
+            font.family: Qt.platform.os === "osx" ? "Menlo" : "monospace"
+            font.pixelSize: 12
+            color: Theme.primaryText
+            leftPadding: 16
+            rightPadding: 16
+            topPadding: 16
+            bottomPadding: 16
+            background: null // transparent background
+        }
+    }
+
     // Fallback preview
     ColumnLayout {
         anchors.centerIn: parent
-        visible: (!root.showPdfPages || totalPages === 0) && (imageLoader.status !== Loader.Ready || (imageLoader.item && imageLoader.item.status !== Image.Ready))
+        visible: (!root.showPdfPages || totalPages === 0) && (imageLoader.status !== Loader.Ready || (imageLoader.item && imageLoader.item.status !== Image.Ready)) && !root.showTextPreview
         spacing: 4
 
         KaakaoLabel {

@@ -1272,6 +1272,15 @@ QVariantList LibraryController::searchDocuments(const QString &queryStr)
     return results;
 }
 
+QString LibraryController::readTextFile(const QString &filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return QString();
+    }
+    return QString::fromUtf8(file.readAll());
+}
+
 bool LibraryController::markDocumentOpened(int docId)
 {
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
