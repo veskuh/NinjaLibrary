@@ -37,7 +37,7 @@ jobs:
         version: '6.8.3'
         host: 'mac'
         target: 'desktop'
-        modules: 'qt5compat qtshadertools qtimageformats'
+        modules: 'qt5compat qtshadertools qtimageformats qtpdf'
         cache: true
 
     - name: Setup Compiler Cache
@@ -96,6 +96,7 @@ jobs:
         apt-get install -y git tar gzip build-essential cmake ninja-build \
           qt6-base-dev qt6-declarative-dev qt6-5compat-dev qt6-shadertools-dev \
           qml6-module-qtquick-controls qml6-module-qt5compat-graphicaleffects \
+          qt6-pdf-dev qml6-module-qtquick-pdf \
           libpoppler-qt6-dev libtesseract-dev tesseract-ocr \
           dpkg-dev file xvfb openbox zip
 
@@ -104,7 +105,7 @@ jobs:
       run: |
         dnf install -y git tar gzip gcc-c++ cmake ninja-build \
           qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qt5compat-devel qt6-qtshadertools-devel \
-          qt6-qtimageformats poppler-qt6-devel tesseract-devel \
+          qt6-qtpdf-devel qt6-qtimageformats poppler-qt6-devel tesseract-devel \
           rpm-build file findutils xorg-x11-server-Xvfb openbox zip
 
     - name: Configure Git Safe Directory
