@@ -98,9 +98,27 @@ Item {
         source: root.showPdfPages ? "file://" + root.absolutePath : ""
     }
 
+    // White background for PDFs to support transparent PDF pages
+    Rectangle {
+        anchors.fill: parent
+        color: "#ffffff"
+        visible: root.showPdfPages && totalPages > 0
+        z: -1
+    }
+
     PdfPageImage {
         id: pdfPageImage
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: (root.showPdfPages && totalPages > 1) ? pdfControlsContainer.top : parent.bottom
+        
+        // Add margins to prevent overlapping with overlay controls (close button in top-right, page HUD in bottom)
+        anchors.leftMargin: root.interactive ? 36 : 0
+        anchors.rightMargin: root.interactive ? 36 : 0
+        anchors.topMargin: root.interactive ? 36 : 0
+        anchors.bottomMargin: (root.showPdfPages && totalPages > 1) ? 8 : (root.interactive ? 36 : 0)
+        
         document: pdfDoc
         currentFrame: root.currentPage
         fillMode: Image.PreserveAspectFit
