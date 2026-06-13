@@ -73,9 +73,20 @@ Item {
         gridView.gridView.moveCurrentIndexRight();
     }
 
+    // Caches the width to prevent layout thrashing/re-flows during inspector animations
+    property real stableWidth: width
+    onWidthChanged: {
+        if (!window.inspectorAnimating) {
+            stableWidth = width;
+        }
+    }
+
     KaakaoGridView {
         id: gridView
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: window.inspectorAnimating ? stableWidth : parent.width
 
         gridView.topMargin: Theme.paddingMedium
         gridView.leftMargin: Theme.paddingMedium

@@ -62,6 +62,7 @@ KaakaoWindow {
     property var folderNavigationMap: ({})
 
     property bool isModelEmpty: true
+    property bool inspectorAnimating: false
 
     function updateEmptyState() {
         isModelEmpty = (proxyFilter.rowCount() === 0);
@@ -800,6 +801,7 @@ KaakaoWindow {
                     id: canvasStack
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    clip: true
 
                     function clearSelections() {
                         gridCanvas.clearSelection();
@@ -1071,19 +1073,27 @@ KaakaoWindow {
                 Transition {
                     from: "expanded"
                     to: "collapsed"
-                    NumberAnimation {
-                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
-                        duration: 200
-                        easing.type: Easing.InOutQuad
+                    SequentialAnimation {
+                        ScriptAction { script: window.inspectorAnimating = true }
+                        NumberAnimation {
+                            properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
+                            duration: 200
+                            easing.type: Easing.InOutQuad
+                        }
+                        ScriptAction { script: window.inspectorAnimating = false }
                     }
                 },
                 Transition {
                     from: "collapsed"
                     to: "expanded"
-                    NumberAnimation {
-                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
-                        duration: 200
-                        easing.type: Easing.InOutQuad
+                    SequentialAnimation {
+                        ScriptAction { script: window.inspectorAnimating = true }
+                        NumberAnimation {
+                            properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
+                            duration: 200
+                            easing.type: Easing.InOutQuad
+                        }
+                        ScriptAction { script: window.inspectorAnimating = false }
                     }
                 }
             ]
