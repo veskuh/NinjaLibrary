@@ -350,6 +350,7 @@ ItemDelegate {
                     itemContextMenu.targetPath = control.absolutePathValue;
                     itemContextMenu.targetRating = control.starRatingValue;
                     itemContextMenu.targetIsOffline = control.isOffline;
+                    itemContextMenu.targetIsFolder = control.isFolderValue;
                     itemContextMenu.popup(popupPos.x, popupPos.y);
                 }
             }

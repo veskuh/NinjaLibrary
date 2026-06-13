@@ -39,8 +39,10 @@ KaakaoMenu {
     property string targetPath: ""
     property int targetRating: 0
     property bool targetIsOffline: false
+    property bool targetIsFolder: false
 
     signal moveToTrashRequested(int docId, string filePath)
+    signal previewRequested()
 
     KaakaoMenuItem {
         text: "Open"
@@ -51,6 +53,14 @@ KaakaoMenu {
                     libraryController.markDocumentOpened(menu.targetDocId);
                 }
             }
+        }
+    }
+
+    KaakaoMenuItem {
+        text: "Preview"
+        visible: !menu.targetIsFolder
+        onTriggered: {
+            menu.previewRequested();
         }
     }
 
@@ -89,6 +99,7 @@ KaakaoMenu {
     KaakaoMenu {
         id: rateMenu
         title: "Rate"
+        enabled: !menu.targetIsFolder
 
         KaakaoMenuItem {
             text: "★☆☆☆☆"

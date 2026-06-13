@@ -185,6 +185,7 @@ Item {
                             itemContextMenu.targetPath = model.absolutePath;
                             itemContextMenu.targetRating = model.starRating;
                             itemContextMenu.targetIsOffline = model.isOffline;
+                            itemContextMenu.targetIsFolder = model.isFolder !== undefined ? model.isFolder : false;
                             itemContextMenu.popup(popupPos.x, popupPos.y);
                         }
                         return;

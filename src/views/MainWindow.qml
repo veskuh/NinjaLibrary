@@ -389,6 +389,9 @@ KaakaoWindow {
             trashDialog.filePath = filePath;
             trashDialog.open();
         }
+        onPreviewRequested: {
+            quickLookDialog.open();
+        }
     }
 
     // Top Header ToolBar

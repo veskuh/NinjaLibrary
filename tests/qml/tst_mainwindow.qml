@@ -921,6 +921,66 @@ TestCase {
         win.destroy();
     }
 
+    function test_context_menu_preview_and_folder_rating() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let contextMenu = win.itemContextMenu;
+        verify(contextMenu !== null, "ItemContextMenu should exist");
+
+        let quickLook = win.quickLookDialog;
+        verify(quickLook !== null, "QuickLookDialog should exist");
+        verify(!quickLook.opened, "QuickLookDialog should be closed initially");
+
+        // Find preview item and rate menu
+        let previewItem = null;
+        let rateMenu = null;
+        for (let i = 0; i < contextMenu.count; i++) {
+            let item = contextMenu.itemAt(i);
+            if (item && item.text === "Preview") {
+                previewItem = item;
+            } else if (item && item.text === "Rate") {
+                rateMenu = item;
+            }
+        }
+        verify(previewItem !== null, "Preview item should be found");
+        verify(rateMenu !== null, "Rate submenu should be found");
+
+        // Case 1: Target is a file
+        contextMenu.targetIsFolder = false;
+        contextMenu.open();
+        wait(100);
+        verify(previewItem.visible, "Preview item should be visible for files");
+        verify(rateMenu.enabled, "Rate submenu should be enabled for files");
+
+        // Trigger preview item
+        previewItem.triggered();
+        wait(100);
+        verify(quickLook.opened, "QuickLookDialog should open when preview action is triggered");
+
+        // Close preview
+        quickLook.close();
+        wait(100);
+        verify(!quickLook.opened, "QuickLookDialog should close");
+
+        // Close context menu
+        contextMenu.close();
+        wait(100);
+
+        // Case 2: Target is a folder
+        contextMenu.targetIsFolder = true;
+        contextMenu.open();
+        wait(100);
+        verify(!previewItem.visible, "Preview item should be hidden for folders");
+        verify(!rateMenu.enabled, "Rate submenu should be disabled for folders");
+
+        contextMenu.close();
+        wait(100);
+
+        win.destroy();
+    }
+
     function test_sidebar_folder_context_menu_rescan() {
         let win = mainWindowComponent.createObject(this);
         verify(win !== null, "MainWindow should be instantiated");
