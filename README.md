@@ -5,11 +5,9 @@ NinjaLibrary is a local-first document gallery application designed for macOS (U
 ---
 
 ## Features
-- **iPhoto-Style Grid & iTunes-Style Table Views**: Dual layout canvas using Kaakao.
-- **SQLite Metadata Schema**: Fully indexed using SQLite FTS5 for debounced, fast queries.
-- **Background Ingestion & OCR**: Pipeline parsing textual PDFs via Poppler-Qt6 or falling back to Tesseract-OCR for scanned images.
-- **macOS Sandbox Persistence**: Objective-C++ security-scoped URL bookmark resolution.
-- **Centralized Sidecar Storage**: Centralized metadata backup in `~/.local/share/NinjaLibrary/sidecars/`.
+- iPhoto-Style Grid & iTunes-Style Table Views: Dual layout canvas using Kaakao.
+- SQLite Metadata Schema: Fully indexed using SQLite FTS5 for debounced, fast queries.
+- Background Ingestion & OCR: Pipeline parsing textual PDFs via Poppler-Qt6 or falling back to Tesseract-OCR for scanned images.
 
 ---
 

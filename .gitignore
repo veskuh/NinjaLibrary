@@ -9,6 +9,9 @@ build*/
 # macOS system files
 .DS_Store
 
+# Logs
+*.log
+
 # User-specific configuration
 .idea/
 .vscode/
