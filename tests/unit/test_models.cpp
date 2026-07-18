@@ -70,7 +70,7 @@ void TestModels::initTestCase()
     QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
                                "file_size, file_hash, star_rating, is_offline, date_modified) "
                                "VALUES (%1, 'fileA.pdf', '/test/docs/fileA.pdf', 100, 'hash123', "
-                               "5, 0, datetime('now'));")
+                               "5, 0, datetime('now', 'localtime'));")
                            .arg(folderId)));
     int docAId = query.lastInsertId().toInt();
 
@@ -78,7 +78,7 @@ void TestModels::initTestCase()
     QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
                                "file_size, file_hash, star_rating, is_offline, date_modified) "
                                "VALUES (%1, 'fileB.png', '/test/docs/fileB.png', 200, 'hash456', "
-                               "3, 0, datetime('now'));")
+                               "3, 0, datetime('now', 'localtime'));")
                            .arg(folderId)));
     int docBId = query.lastInsertId().toInt();
 
@@ -87,7 +87,7 @@ void TestModels::initTestCase()
     QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
                                "file_size, file_hash, star_rating, is_offline, date_modified) "
                                "VALUES (%1, 'fileC.pdf', '/test/docs/fileC.pdf', 100, 'hash123', "
-                               "2, 1, datetime('now'));")
+                               "2, 1, datetime('now', 'localtime'));")
                            .arg(folderId)));
     int docCId = query.lastInsertId().toInt();
 

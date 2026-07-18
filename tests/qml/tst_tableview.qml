@@ -146,6 +146,22 @@ TestCase {
         return null;
     }
 
+    // Helper to find inner ListView inside KaakaoTableView
+    function findListView(parent) {
+        if (!parent)
+            return null;
+        if (parent.toString().indexOf("ListView") >= 0)
+            return parent;
+        if (parent.children) {
+            for (let i = 0; i < parent.children.length; ++i) {
+                let found = findListView(parent.children[i]);
+                if (found)
+                    return found;
+            }
+        }
+        return null;
+    }
+
     function test_table_view_different_rows() {
         let tableView = tableViewComponent.createObject(this);
         verify(tableView !== null, "TableView should be created");
@@ -156,20 +172,7 @@ TestCase {
         wait(200);
 
         // Find the inner ListView inside KaakaoTableView
-        let listView = null;
-        for (let i = 0; i < tableView.children.length; ++i) {
-            let child = tableView.children[i];
-            // Find the Column layout
-            if (child.children) {
-                for (let j = 0; j < child.children.length; ++j) {
-                    let inner = child.children[j];
-                    if (inner.toString().indexOf("ListView") >= 0) {
-                        listView = inner;
-                        break;
-                    }
-                }
-            }
-        }
+        let listView = findListView(tableView);
 
         verify(listView !== null, "Inner ListView should be found");
         compare(listView.count, 3, "ListView should have 3 items");
@@ -223,19 +226,7 @@ TestCase {
         wait(200);
 
         // Find the inner ListView
-        let listView = null;
-        for (let i = 0; i < tableView.children.length; ++i) {
-            let child = tableView.children[i];
-            if (child.children) {
-                for (let j = 0; j < child.children.length; ++j) {
-                    let inner = child.children[j];
-                    if (inner.toString().indexOf("ListView") >= 0) {
-                        listView = inner;
-                        break;
-                    }
-                }
-            }
-        }
+        let listView = findListView(tableView);
         verify(listView !== null, "Inner ListView should be found");
 
         let contentItem = listView.contentItem;
@@ -277,19 +268,7 @@ TestCase {
         wait(200);
 
         // Find the inner ListView
-        let listView = null;
-        for (let i = 0; i < tableView.children.length; ++i) {
-            let child = tableView.children[i];
-            if (child.children) {
-                for (let j = 0; j < child.children.length; ++j) {
-                    let inner = child.children[j];
-                    if (inner.toString().indexOf("ListView") >= 0) {
-                        listView = inner;
-                        break;
-                    }
-                }
-            }
-        }
+        let listView = findListView(tableView);
         verify(listView !== null, "Inner ListView should be found");
 
         // Originally: fileA.pdf is row 0, fileB.png is row 1, fileC.pdf is row 2
@@ -336,19 +315,7 @@ TestCase {
         tableView.model = mockModel;
         wait(200);
 
-        let listView = null;
-        for (let i = 0; i < tableView.children.length; ++i) {
-            let child = tableView.children[i];
-            if (child.children) {
-                for (let j = 0; j < child.children.length; ++j) {
-                    let inner = child.children[j];
-                    if (inner.toString().indexOf("ListView") >= 0) {
-                        listView = inner;
-                        break;
-                    }
-                }
-            }
-        }
+        let listView = findListView(tableView);
         verify(listView !== null, "Inner ListView should be found");
 
         let contentItem = listView.contentItem;

@@ -418,9 +418,19 @@ void TestWorkers::testLibraryControllerAPIs()
     QVERIFY(!m_controller->addWatchedFolder(""));
     QVERIFY(!m_controller->addWatchedFolder("/non/existent/path/for/sure/1234"));
 
+    QSignalSpy scanningSpy(m_controller, &LibraryController::isScanningChanged);
+
     // 2. Test addWatchedFolder with valid path
     QVERIFY(m_controller->addWatchedFolder(tempPath));
     QVERIFY(m_controller->watchedFolders().contains(tempPath));
+
+    // Test UI getters while active
+    if (!m_controller->isScanning()) {
+        QVERIFY(scanningSpy.wait(2000));
+    }
+    QVERIFY(m_controller->isScanning());
+    QVERIFY(m_controller->scanProgress() >= 0.0);
+    QVERIFY(!m_controller->scanStatusText().isEmpty());
 
     // Wait for the scanner to finish so it inserts the document
     QSignalSpy spyLibrary(m_controller, &LibraryController::libraryChanged);
@@ -429,6 +439,14 @@ void TestWorkers::testLibraryControllerAPIs()
     // Process queued signals and wait for background OCR/Thumbnail tasks to complete
     QCoreApplication::processEvents();
     QThreadPool::globalInstance()->waitForDone();
+
+    // Test UI getters while idle
+    if (m_controller->isScanning()) {
+        QVERIFY(scanningSpy.wait(5000));
+    }
+    QVERIFY(!m_controller->isScanning());
+    QCOMPARE(m_controller->scanProgress(), 0.0);
+    QVERIFY(m_controller->scanStatusText().isEmpty());
 
     // Check DB for the document
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -452,11 +470,24 @@ void TestWorkers::testLibraryControllerAPIs()
         dbTags << query.value(0).toString();
     }
     QVERIFY(dbTags.contains("tagA"));
+
+    // Test search APIs
+    m_controller->searchDocuments("image");
+    m_controller->searchDocuments("dummy text");
+    m_controller->searchDocumentContent(docId, imgPath, "image");
     QVERIFY(dbTags.contains("tagB"));
     QVERIFY(!dbTags.contains(""));  // empty tag skipped
 
     // Test batchUpdateTags empty inputs (graceful return)
     QVERIFY(m_controller->batchUpdateTags({}, {"tagC"}));
+
+    // Test batchAddTags
+    QVERIFY(m_controller->batchAddTags({docId}, {"addedTag"}));
+    QVERIFY(m_controller->getUniqueTags().contains("addedTag"));
+
+    // Test batchRemoveTags
+    QVERIFY(m_controller->batchRemoveTags({docId}, {"addedTag"}));
+    QVERIFY(!m_controller->getUniqueTags().contains("addedTag"));
 
     // 3b. Test batchAddTags, batchRemoveTags, and getUniqueTags
     // Insert a second document for batch operations
@@ -722,8 +753,60 @@ void TestWorkers::testLibraryControllerAPIs()
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
     QVERIFY(!m_controller->watchedFolders().contains(tempPath));
 
+    // Test Unicode normalization edge cases for removeWatchedFolder
+    {
+        QTemporaryDir testUnicodeDir;
+        QVERIFY(testUnicodeDir.isValid());
+        // Use a path with 'ö' constructed directly with NFC
+        QString baseDirPath = QFileInfo(testUnicodeDir.path()).canonicalFilePath();
+        QString nfcDirName = QString::fromUtf8("h\xC3\xB6lm\xC3\xB6_kansio");
+        QString nfcDirPath = baseDirPath + "/" + nfcDirName;
+        QVERIFY(QDir().mkpath(nfcDirPath));
+
+        QVERIFY(m_controller->addWatchedFolder(nfcDirPath));
+        // Note: the exact stored form might differ depending on OS (e.g. macOS native filesystem might convert it to NFD)
+        // By checking both forms in our removal function, we are resilient against this.
+
+        QCoreApplication::processEvents();
+        QThreadPool::globalInstance()->waitForDone();
+
+        // Pass the explicitly decomposed (NFD) string to removeWatchedFolder
+        QString nfdDirPath = nfcDirPath.normalized(QString::NormalizationForm_D);
+        QVERIFY(m_controller->removeWatchedFolder(nfdDirPath));
+        
+        // Verify it was successfully removed regardless of how the OS returned the directory name
+        bool found = false;
+        const QStringList folders = m_controller->watchedFolders();
+        for (const QString &f : folders) {
+            if (f.normalized(QString::NormalizationForm_C) == nfcDirPath.normalized(QString::NormalizationForm_C)) {
+                found = true;
+                break;
+            }
+        }
+        QVERIFY(!found);
+    }
+
     // Verify sidecar was deleted (garbage collected) because the document was deleted
     QVERIFY(!m_controller->readSidecar(imgPath, checkTags, checkRating, checkNotes));
+
+    // Test scan control APIs
+    bool initialPause = m_controller->isScanPaused();
+    m_controller->toggleScanPause(); 
+    QVERIFY(m_controller->isScanPaused() != initialPause);
+    m_controller->toggleScanPause();
+    QVERIFY(m_controller->isScanPaused() == initialPause);
+    
+    // Verify getters don't crash and return valid strings
+    QVERIFY(!m_controller->scanStatusText().isNull());
+
+    // Test removing a physically deleted folder
+    QTemporaryDir deletedDir;
+    QVERIFY(deletedDir.isValid());
+    QString deletedDirPath = QFileInfo(deletedDir.path()).canonicalFilePath();
+    QVERIFY(m_controller->addWatchedFolder(deletedDirPath));
+    QVERIFY(QDir(deletedDirPath).removeRecursively());
+    QVERIFY(m_controller->removeWatchedFolder(deletedDirPath));
+    QVERIFY(!m_controller->watchedFolders().contains(deletedDirPath));
 
     // Test Feature 4: Folder conflict and merging
     {

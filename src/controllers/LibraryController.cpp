@@ -214,21 +214,42 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
 
     db.transaction();
 
+    // Build possible paths to handle macOS NFC/NFD Unicode normalization discrepancies
+    QStringList possiblePaths;
+    possiblePaths << folderPath << absPath
+                  << folderPath.normalized(QString::NormalizationForm_C)
+                  << folderPath.normalized(QString::NormalizationForm_D)
+                  << absPath.normalized(QString::NormalizationForm_C)
+                  << absPath.normalized(QString::NormalizationForm_D);
+    possiblePaths.removeDuplicates();
+
+    int folderId = -1;
+    QString matchedPath = absPath; // fallback
+
+    // 1. Get folder ID and exact stored path from database
+    for (const QString &pathCandidate : std::as_const(possiblePaths)) {
+        QSqlQuery idQuery(db);
+        idQuery.prepare("SELECT id, absolute_path FROM watched_folders WHERE absolute_path = :path;");
+        idQuery.bindValue(":path", pathCandidate);
+        if (idQuery.exec() && idQuery.next()) {
+            folderId = idQuery.value(0).toInt();
+            matchedPath = idQuery.value(1).toString();
+            break;
+        }
+    }
+
+    if (folderId == -1) {
+        qWarning() << "removeWatchedFolder: no matching watched folder for" << folderPath;
+        db.rollback();
+        return false;
+    }
+
     // Delete active scan for this folder if exists
     {
         QSqlQuery removeScan(db);
         removeScan.prepare("DELETE FROM active_scans WHERE folder_path = :path;");
-        removeScan.bindValue(":path", absPath);
+        removeScan.bindValue(":path", matchedPath);
         removeScan.exec();
-    }
-
-    // 1. Get folder ID from database
-    int folderId = -1;
-    QSqlQuery idQuery(db);
-    idQuery.prepare("SELECT id FROM watched_folders WHERE absolute_path = :path;");
-    idQuery.bindValue(":path", absPath);
-    if (idQuery.exec() && idQuery.next()) {
-        folderId = idQuery.value(0).toInt();
     }
 
     if (folderId != -1) {
@@ -270,7 +291,7 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     // 5. Delete the watched folder record
     QSqlQuery query(db);
     query.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
-    query.bindValue(":path", absPath);
+    query.bindValue(":path", matchedPath);
 
     if (!query.exec()) {
         qWarning() << "Failed to remove watched folder from database:" << query.lastError().text();
@@ -280,7 +301,7 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
 
     db.commit();
 
-    m_watcher->removePath(absPath);
+    m_watcher->removePath(matchedPath);
     updateFoldersCache();
     cleanupSidecars();
 
@@ -867,6 +888,8 @@ void LibraryController::updateFoldersCache()
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return;
 
+    QList<QPair<QString, QString>> pathsToUpdate;
+
     QSqlQuery query("SELECT absolute_path, macos_bookmark FROM watched_folders;", db);
     while (query.next()) {
         QString path = query.value(0).toString();
@@ -878,12 +901,31 @@ void LibraryController::updateFoldersCache()
             QString tmpResolved;
             if (MacBookmarks::resolveAndAccessBookmark(bookmark, tmpResolved)) {
                 resolvedPath = tmpResolved;
+                if (resolvedPath != path) {
+                    pathsToUpdate.append({path, resolvedPath});
+                }
             }
         }
 #endif
         m_watchedFoldersCache.append(resolvedPath);
         // Ensure path and its subdirectories are watched
         watchFolderRecursively(resolvedPath);
+    }
+
+    if (!pathsToUpdate.isEmpty()) {
+        db.transaction();
+        QSqlQuery updateQuery(db);
+        updateQuery.prepare("UPDATE watched_folders SET absolute_path = :newPath WHERE absolute_path = :oldPath;");
+        for (const auto &pair : std::as_const(pathsToUpdate)) {
+            updateQuery.bindValue(":newPath", pair.second);
+            updateQuery.bindValue(":oldPath", pair.first);
+            if (!updateQuery.exec()) {
+                qWarning() << "Failed to update watched folder path after bookmark resolution:" << updateQuery.lastError().text();
+            } else {
+                qDebug() << "Updated watched folder path in DB from" << pair.first << "to" << pair.second;
+            }
+        }
+        db.commit();
     }
 
     emit watchedFoldersChanged();
