@@ -100,8 +100,6 @@ Item {
     // guaranteed by the spec).
     Component.onCompleted: {
         if (!parent) return;
-        labelItem.Layout.column = 0;
-        valueItem.Layout.column = 1;
         labelItem.parent = parent;
         valueItem.parent = parent;
         if (fillWidth) {

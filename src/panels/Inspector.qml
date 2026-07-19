@@ -89,7 +89,7 @@ Rectangle {
         if (data && data.docId !== undefined) {
             docData = data;
             if (notesArea) {
-                notesArea.text = docData.notes;
+                notesArea.text = docData.notes || "";
             }
             return;
         }
@@ -507,10 +507,10 @@ Rectangle {
 
                     MetadataField {
                         label: "Path:"
-                        value: d.absolutePath || ""
+                        value: (d && d.absolutePath) ? d.absolutePath : ""
                         elide: Text.ElideLeft
                         fillWidth: true
-                        toolTip: d.absolutePath || ""
+                        toolTip: (d && d.absolutePath) ? d.absolutePath : ""
                     }
 
                     MetadataField {
@@ -559,7 +559,7 @@ Rectangle {
                             target: inspector
                             ignoreUnknownSignals: true
                             function onDocDataChanged() {
-                                singleRatingRow.rating = inspector.docData ? inspector.docData.starRating : 0;
+                                singleRatingRow.rating = inspector.docData ? (inspector.docData.starRating || 0) : 0;
                             }
                         }
                         onRatingSelected: (newRating) => {
