@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtTest
 import NinjaLibrary
 import Kaakao 1.0
+import "../../src/panels/TagUtils.js" as TagUtils
 
 TestCase {
     name: "ComponentTests"
@@ -244,5 +245,41 @@ TestCase {
         compare(pane.SplitView.maximumWidth, 300);
 
         splitView.destroy();
+    }
+
+    function test_parse_tags_text_edge_cases() {
+        // Test TagUtils.parseTagsText directly — no Inspector context required.
+        function check(input, expected) {
+            let result = TagUtils.parseTagsText(input);
+            compare(result.length, expected.length, "Lengths should match for input: '" + input + "'");
+            for (let i = 0; i < expected.length; ++i) {
+                compare(result[i], expected[i], "Element " + i + " should match for input: '" + input + "'");
+            }
+        }
+
+        // Empty string
+        check("", []);
+
+        // All-whitespace
+        check("   ", []);
+
+        // Multiple blank comma-separated entries
+        check(" ,   ,  ", []);
+
+        // Duplicates — first occurrence wins
+        check("work, work, school, work", ["work", "school"]);
+
+        // Leading/trailing commas
+        check(",work,school,", ["work", "school"]);
+        check(",,,work,,,school,,,", ["work", "school"]);
+
+        // Mixed spacing — trimmed but NOT lower-cased (tag names are case-sensitive)
+        check("  work  ,  School , WORK ", ["work", "School", "WORK"]);
+
+        // Single tag, no commas
+        check("onlyone", ["onlyone"]);
+
+        // All-duplicate input
+        check("dup,dup,dup,dup", ["dup"]);
     }
 }

@@ -33,6 +33,7 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import Kaakao 1.0
 import "../components"
+import "TagUtils.js" as TagUtils
 
 Rectangle {
     id: inspector
@@ -68,15 +69,7 @@ Rectangle {
     property var allSelectedTags: Object.keys(tagCounts).sort()
 
     function parseTagsText(rawText) {
-        var parts = rawText.split(",");
-        var tags = [];
-        for (var i = 0; i < parts.length; i++) {
-            var part = parts[i].trim();
-            if (part !== "" && tags.indexOf(part) === -1) {
-                tags.push(part);
-            }
-        }
-        return tags;
+        return TagUtils.parseTagsText(rawText);
     }
 
     function saveNotes() {
@@ -483,38 +476,30 @@ Rectangle {
                     columnSpacing: 8
                     Layout.fillWidth: true
 
-                    MetadataLabel {
-                        text: "Contents:"
-                        visible: !!d.isFolder
-                    }
-                    MetadataValue {
-                        text: d.itemCountStr || ""
-                        visible: !!d.isFolder
+                    MetadataField {
+                        label: "Contents:"
+                        value: d.itemCountStr || ""
+                        isFolder: !!d.isFolder
+                        visibleWhenFolder: true
                     }
 
-                    MetadataLabel {
-                        text: "Size:"
-                        visible: !d.isFolder
-                    }
-                    MetadataValue {
-                        text: d.fileSizeStr || ""
-                        visible: !d.isFolder
+                    MetadataField {
+                        label: "Size:"
+                        value: d.fileSizeStr || ""
+                        isFolder: !!d.isFolder
+                        visibleWhenFolder: false
                     }
 
-                    MetadataLabel {
-                        text: "Pages:"
-                        visible: !d.isFolder
-                    }
-                    MetadataValue {
-                        text: d.pageCount !== undefined ? d.pageCount : ""
-                        visible: !d.isFolder
+                    MetadataField {
+                        label: "Pages:"
+                        value: d.pageCount !== undefined ? d.pageCount : ""
+                        isFolder: !!d.isFolder
+                        visibleWhenFolder: false
                     }
 
-                    MetadataLabel {
-                        text: "Type:"
-                    }
-                    MetadataValue {
-                        text: {
+                    MetadataField {
+                        label: "Type:"
+                        value: {
                             if (!inspector.docData)
                                 return "";
                             if (d.isFolder)
@@ -525,48 +510,31 @@ Rectangle {
                         }
                     }
 
-                    MetadataLabel {
-                        text: "Path:"
-                    }
-                    MetadataValue {
-                        text: d.absolutePath || ""
+                    MetadataField {
+                        label: "Path:"
+                        value: d.absolutePath || ""
                         elide: Text.ElideLeft
-                        Layout.fillWidth: true
-
-                        ToolTip.visible: pathMouse.containsMouse && text !== ""
-                        ToolTip.text: text
-
-                        MouseArea {
-                            id: pathMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.NoButton
-                        }
+                        fillWidth: true
+                        toolTip: d.absolutePath || ""
                     }
 
-                    MetadataLabel {
-                        text: "Modified:"
-                    }
-                    MetadataValue {
-                        text: d.dateModified ? inspector.formatDate(d.dateModified) : ""
+                    MetadataField {
+                        label: "Modified:"
+                        value: d.dateModified ? inspector.formatDate(d.dateModified) : ""
                     }
 
-                    MetadataLabel {
-                        text: "Imported:"
-                        visible: !d.isFolder
-                    }
-                    MetadataValue {
-                        text: d.dateAdded ? inspector.formatDate(d.dateAdded) : ""
-                        visible: !d.isFolder
+                    MetadataField {
+                        label: "Imported:"
+                        value: d.dateAdded ? inspector.formatDate(d.dateAdded) : ""
+                        isFolder: !!d.isFolder
+                        visibleWhenFolder: false
                     }
 
-                    MetadataLabel {
-                        text: "Opened:"
-                        visible: !d.isFolder
-                    }
-                    MetadataValue {
-                        text: d.lastOpened !== undefined ? inspector.formatLastOpened(d.lastOpened) : "Never"
-                        visible: !d.isFolder
+                    MetadataField {
+                        label: "Opened:"
+                        value: d.lastOpened !== undefined ? inspector.formatLastOpened(d.lastOpened) : "Never"
+                        isFolder: !!d.isFolder
+                        visibleWhenFolder: false
                     }
                 }
 

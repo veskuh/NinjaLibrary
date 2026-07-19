@@ -146,6 +146,7 @@ qt_add_qml_module(NinjaLibrary
         src/components/StarRatingRow.qml
         src/components/MetadataLabel.qml
         src/components/MetadataValue.qml
+        src/components/MetadataField.qml
         src/components/LocalTableRowDelegate.qml
         src/components/DocumentPreview.qml
         src/components/ImagePreview.qml
@@ -153,6 +154,7 @@ qt_add_qml_module(NinjaLibrary
         src/views/TableCanvas.qml
         src/panels/Sidebar.qml
         src/panels/Inspector.qml
+        src/panels/TagUtils.js
         src/panels/AboutDialog.qml
         src/panels/PreferencesDialog.qml
         src/panels/QuickLookDialog.qml
