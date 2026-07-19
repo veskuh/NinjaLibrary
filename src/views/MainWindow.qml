@@ -269,6 +269,7 @@ KaakaoWindow {
     TrashConfirmDialog {
         id: trashDialog
         objectName: "trashDialog"
+        parent: window.contentItem
         onAcceptedWithData: (id, path) => {
             libraryController.moveToTrash(id, path);
         }
@@ -928,6 +929,10 @@ KaakaoWindow {
         // Right Collage Inspector
         CollapsibleSplitPane {
             id: inspectorContainer
+            // Note: inspector.collapsed is the canonical owner of the collapsed state,
+            // as tests and external QML triggers directly modify inspector.collapsed.
+            // Under normal circumstances, you should set inspector.collapsed rather than
+            // inspectorContainer.collapsed to avoid breaking this unidirectional binding.
             collapsed: inspector.collapsed
             minWidth: 220
             preferredWidth: 260
