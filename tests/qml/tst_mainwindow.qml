@@ -1445,4 +1445,32 @@ TestCase {
         wait(100);
         win.destroy();
     }
+
+    function test_folder_view_mode_helper() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be created");
+
+
+
+        // 1. Test hierarchical mode
+        win.setFolderViewMode("hierarchical");
+        compare(proxyFilter.includeSubfolderContents, false, "hierarchical: includeSubfolderContents should be false");
+        compare(proxyFilter.showSubfolderIcons, true, "hierarchical: showSubfolderIcons should be true");
+
+        // 2. Test direct mode
+        win.setFolderViewMode("direct");
+        compare(proxyFilter.includeSubfolderContents, false, "direct: includeSubfolderContents should be false");
+        compare(proxyFilter.showSubfolderIcons, false, "direct: showSubfolderIcons should be false");
+
+        // 3. Test recursive mode
+        win.setFolderViewMode("recursive");
+        compare(proxyFilter.includeSubfolderContents, true, "recursive: includeSubfolderContents should be true");
+        compare(proxyFilter.showSubfolderIcons, false, "recursive: showSubfolderIcons should be false");
+
+        // Reset proxyFilter to defaults to prevent test side-effects
+        proxyFilter.includeSubfolderContents = false;
+        proxyFilter.showSubfolderIcons = true;
+
+        win.destroy();
+    }
 }

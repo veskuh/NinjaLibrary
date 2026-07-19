@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtTest
 import NinjaLibrary
 import Kaakao 1.0
@@ -182,5 +183,66 @@ TestCase {
         pill.destroy();
         clickSpy.destroy();
         removeSpy.destroy();
+    }
+
+    Component {
+        id: collapsibleSplitPaneComponent
+        SplitView {
+            CollapsibleSplitPane {
+                id: testPane
+            }
+        }
+    }
+
+    function test_collapsible_split_pane() {
+        let splitView = collapsibleSplitPaneComponent.createObject(this);
+        verify(splitView !== null, "SplitView should be created");
+        
+        // Find the CollapsibleSplitPane child safely
+        function findPane(item) {
+            if (!item) return null;
+            if (item.toString().indexOf("CollapsibleSplitPane") >= 0) return item;
+            if (item.children) {
+                for (let i = 0; i < item.children.length; ++i) {
+                    let found = findPane(item.children[i]);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        let pane = findPane(splitView);
+        verify(pane !== null, "CollapsibleSplitPane should be found");
+
+        pane.collapsed = false;
+        pane.minWidth = 100;
+        pane.preferredWidth = 200;
+        pane.maxWidth = 300;
+
+        // Verify default non-collapsed states
+        compare(pane.collapsed, false);
+        compare(pane.minWidth, 100);
+        compare(pane.preferredWidth, 200);
+        compare(pane.maxWidth, 300);
+
+        // Check state transitions
+        pane.collapsed = true;
+        compare(pane.collapsed, true);
+        
+        // Wait for the collapse transition animation (200ms) to complete
+        wait(300);
+        compare(pane.SplitView.minimumWidth, 0);
+        compare(pane.SplitView.preferredWidth, 0);
+        compare(pane.SplitView.maximumWidth, 0);
+
+        pane.collapsed = false;
+        compare(pane.collapsed, false);
+        
+        // Wait for the expand transition animation (200ms) to complete
+        wait(300);
+        compare(pane.SplitView.minimumWidth, 100);
+        compare(pane.SplitView.preferredWidth, 200);
+        compare(pane.SplitView.maximumWidth, 300);
+
+        splitView.destroy();
     }
 }

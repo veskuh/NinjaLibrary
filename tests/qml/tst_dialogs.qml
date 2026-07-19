@@ -84,4 +84,46 @@ TestCase {
 
         dialog.destroy();
     }
+
+    function test_trash_confirm_dialog() {
+        let dialog = createTemporaryQmlObject("import NinjaLibrary; TrashConfirmDialog {}", this);
+        verify(dialog !== null, "TrashConfirmDialog should be created");
+
+        // Verify default property values
+        compare(dialog.title, "Move to Trash");
+        compare(dialog.symbol, "🗑️");
+
+        // Test filename extraction Unix path
+        dialog.filePath = "/Users/test/Documents/my_awesome_file.pdf";
+        compare(dialog.fileName, "my_awesome_file.pdf");
+        compare(dialog.text, "Are you sure you want to move 'my_awesome_file.pdf' to the Trash?");
+
+        // Test filename extraction Windows path
+        dialog.filePath = "C:\\Users\\test\\Documents\\another_file.png";
+        compare(dialog.fileName, "another_file.png");
+        compare(dialog.text, "Are you sure you want to move 'another_file.png' to the Trash?");
+
+        // Test filename extraction without directory
+        dialog.filePath = "simple_file.txt";
+        compare(dialog.fileName, "simple_file.txt");
+
+        // Test signal emission
+        dialog.docId = 123;
+        dialog.filePath = "/Users/test/Documents/my_awesome_file.pdf";
+
+        let acceptedSpy = createTemporaryQmlObject("import QtTest; SignalSpy {}", this);
+        acceptedSpy.target = dialog;
+        acceptedSpy.signalName = "acceptedWithData";
+
+        // Trigger accept
+        dialog.accept();
+
+        compare(acceptedSpy.count, 1, "acceptedWithData signal should be emitted once");
+        let signalArgs = acceptedSpy.signalArguments[0];
+        compare(signalArgs[0], 123, "First argument should be docId");
+        compare(signalArgs[1], "/Users/test/Documents/my_awesome_file.pdf", "Second argument should be filePath");
+
+        dialog.destroy();
+        acceptedSpy.destroy();
+    }
 }
