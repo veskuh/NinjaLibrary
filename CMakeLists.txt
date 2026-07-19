@@ -141,6 +141,8 @@ qt_add_qml_module(NinjaLibrary
         src/views/DragOverlay.qml
         src/components/DocumentCard.qml
         src/components/TagPill.qml
+        src/components/CollapsibleSplitPane.qml
+        src/components/EmojiToolButton.qml
         src/components/LocalTableRowDelegate.qml
         src/components/DocumentPreview.qml
         src/components/ImagePreview.qml
@@ -152,6 +154,7 @@ qt_add_qml_module(NinjaLibrary
         src/panels/PreferencesDialog.qml
         src/panels/QuickLookDialog.qml
         src/panels/QuickSearchDialog.qml
+        src/panels/TrashConfirmDialog.qml
 )
 
 # Add platform specific source files

@@ -35,6 +35,7 @@ import Qt.labs.platform 1.1 as Labs
 import QtCore
 import Kaakao 1.0
 import "../panels"
+import "../components"
 
 KaakaoWindow {
     id: window
@@ -106,6 +107,27 @@ KaakaoWindow {
         return documentModel.findDocIdByPath(path);
     }
 
+    function openDocument(path) {
+        Qt.openUrlExternally("file://" + path);
+        var docId = findDocIdByPath(path);
+        if (docId !== -1) {
+            libraryController.markDocumentOpened(docId);
+        }
+    }
+
+    function setFolderViewMode(mode) {
+        if (mode === "hierarchical") {
+            proxyFilter.includeSubfolderContents = false;
+            proxyFilter.showSubfolderIcons = true;
+        } else if (mode === "direct") {
+            proxyFilter.includeSubfolderContents = false;
+            proxyFilter.showSubfolderIcons = false;
+        } else if (mode === "recursive") {
+            proxyFilter.includeSubfolderContents = true;
+            proxyFilter.showSubfolderIcons = false;
+        }
+    }
+
     function checkPendingSelection() {
         if (pendingSelectDocPath !== "") {
             var docId = findDocIdByPath(pendingSelectDocPath);
@@ -173,26 +195,18 @@ KaakaoWindow {
         }
     }
 
-    onXChanged: {
+    function syncGeometry() {
         if (window.visibility === Window.Windowed) {
             winSettings.x = window.x;
-        }
-    }
-    onYChanged: {
-        if (window.visibility === Window.Windowed) {
             winSettings.y = window.y;
-        }
-    }
-    onWidthChanged: {
-        if (window.visibility === Window.Windowed) {
             winSettings.width = window.width;
-        }
-    }
-    onHeightChanged: {
-        if (window.visibility === Window.Windowed) {
             winSettings.height = window.height;
         }
     }
+    onXChanged: syncGeometry()
+    onYChanged: syncGeometry()
+    onWidthChanged: syncGeometry()
+    onHeightChanged: syncGeometry()
 
     property alias mainMenuBar: mainMenuBar
     property alias itemContextMenu: itemContextMenu
@@ -209,18 +223,7 @@ KaakaoWindow {
         onToggleSidebarRequested: sidebar.collapsed = !sidebar.collapsed
         onToggleInspectorRequested: inspector.collapsed = !inspector.collapsed
         onSetViewModeRequested: index => viewSegment.currentIndex = index
-        onSetFolderViewModeRequested: mode => {
-            if (mode === "hierarchical") {
-                proxyFilter.includeSubfolderContents = false;
-                proxyFilter.showSubfolderIcons = true;
-            } else if (mode === "direct") {
-                proxyFilter.includeSubfolderContents = false;
-                proxyFilter.showSubfolderIcons = false;
-            } else if (mode === "recursive") {
-                proxyFilter.includeSubfolderContents = true;
-                proxyFilter.showSubfolderIcons = false;
-            }
-        }
+        onSetFolderViewModeRequested: mode => window.setFolderViewMode(mode)
         onMinimizeRequested: window.showMinimized()
         onOpenAboutRequested: aboutDialog.open()
         onOpenPreferencesRequested: prefsDialog.open()
@@ -263,24 +266,11 @@ KaakaoWindow {
         }
     }
 
-    KaakaoDialog {
+    TrashConfirmDialog {
         id: trashDialog
         objectName: "trashDialog"
-        title: "Move to Trash"
-        symbol: "🗑️"
-        width: 380
-        standardButtons: Dialog.Yes | Dialog.No
-
-        x: parent ? (parent.width - width) / 2 : 100
-        y: parent ? (parent.height - implicitHeight) / 2 : 100
-
-        property int docId: -1
-        property string filePath: ""
-
-        text: "Are you sure you want to move '" + (filePath ? filePath.substring(filePath.lastIndexOf('/') + 1) : "") + "' to the Trash?"
-
-        onAccepted: {
-            libraryController.moveToTrash(docId, filePath);
+        onAcceptedWithData: (id, path) => {
+            libraryController.moveToTrash(id, path);
         }
     }
 
@@ -377,30 +367,21 @@ KaakaoWindow {
             visible: sidebar.getSelectedFolder() !== ""
             checkable: true
             checked: !proxyFilter.includeSubfolderContents && proxyFilter.showSubfolderIcons
-            onTriggered: {
-                proxyFilter.includeSubfolderContents = false;
-                proxyFilter.showSubfolderIcons = true;
-            }
+            onTriggered: window.setFolderViewMode("hierarchical")
         }
         KaakaoMenuItem {
             text: "Only Show Files at Current Level"
             visible: sidebar.getSelectedFolder() !== ""
             checkable: true
             checked: !proxyFilter.includeSubfolderContents && !proxyFilter.showSubfolderIcons
-            onTriggered: {
-                proxyFilter.includeSubfolderContents = false;
-                proxyFilter.showSubfolderIcons = false;
-            }
+            onTriggered: window.setFolderViewMode("direct")
         }
         KaakaoMenuItem {
             text: "Include All Subfolder Contents"
             visible: sidebar.getSelectedFolder() !== ""
             checkable: true
             checked: proxyFilter.includeSubfolderContents
-            onTriggered: {
-                proxyFilter.includeSubfolderContents = true;
-                proxyFilter.showSubfolderIcons = false;
-            }
+            onTriggered: window.setFolderViewMode("recursive")
         }
         KaakaoMenuSeparator {
             visible: sidebar.getSelectedFolder() !== ""
@@ -500,70 +481,24 @@ KaakaoWindow {
             }
 
             // Quick Search Button
-            KaakaoToolButton {
+            EmojiToolButton {
                 id: quickSearchButton
                 objectName: "quickSearchButton"
                 iconEmoji: "🔍"
                 text: "Quick Search"
-                padding: 0
-                topPadding: 0
-                bottomPadding: 0
                 ToolTip.text: "Quick Search"
                 ToolTip.visible: hovered
                 onClicked: quickSearchDialog.open()
-
-                contentItem: Column {
-                    spacing: 2
-                    opacity: quickSearchButton.enabled ? 1.0 : 0.4
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: quickSearchButton.iconEmoji
-                        font.pixelSize: 20
-                        renderType: Text.NativeRendering
-                    }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: quickSearchButton.text
-                        font: quickSearchButton.font
-                        color: Theme.primaryText
-                        renderType: Text.NativeRendering
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                }
             }
 
             // Toggle Right Inspector
-            KaakaoToolButton {
+            EmojiToolButton {
                 id: inspectorButton
                 iconEmoji: "ⓘ"
                 text: "Inspector"
-                padding: 0
-                topPadding: 0
-                bottomPadding: 0
                 ToolTip.text: "Toggle Inspector"
                 ToolTip.visible: hovered
                 onClicked: inspector.collapsed = !inspector.collapsed
-
-                contentItem: Column {
-                    spacing: 2
-                    opacity: inspectorButton.enabled ? 1.0 : 0.4
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: inspectorButton.iconEmoji
-                        font.pixelSize: 20
-                        renderType: Text.NativeRendering
-                    }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: inspectorButton.text
-                        font: inspectorButton.font
-                        color: Theme.primaryText
-                        renderType: Text.NativeRendering
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                }
             }
         }
     }
@@ -574,52 +509,13 @@ KaakaoWindow {
         orientation: Qt.Horizontal
 
         // Left Navigation Sidebar Column
-        Item {
+        CollapsibleSplitPane {
             id: sidebarContainer
-            visible: !sidebar.collapsed || width > 0
-
-            states: [
-                State {
-                    name: "collapsed"
-                    when: sidebar.collapsed
-                    PropertyChanges {
-                        target: sidebarContainer
-                        SplitView.minimumWidth: 0
-                        SplitView.preferredWidth: 0
-                        SplitView.maximumWidth: 0
-                    }
-                },
-                State {
-                    name: "expanded"
-                    when: !sidebar.collapsed
-                    PropertyChanges {
-                        target: sidebarContainer
-                        SplitView.minimumWidth: 150
-                        SplitView.preferredWidth: 200
-                        SplitView.maximumWidth: 300
-                    }
-                }
-            ]
-            transitions: [
-                Transition {
-                    from: "expanded"
-                    to: "collapsed"
-                    NumberAnimation {
-                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
-                        duration: 200
-                        easing.type: Easing.InOutQuad
-                    }
-                },
-                Transition {
-                    from: "collapsed"
-                    to: "expanded"
-                    NumberAnimation {
-                        properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
-                        duration: 200
-                        easing.type: Easing.InOutQuad
-                    }
-                }
-            ]
+            collapsed: sidebar.collapsed
+            minWidth: 150
+            preferredWidth: 200
+            maxWidth: 300
+            visible: !collapsed || width > 0
 
             ColumnLayout {
                 anchors.fill: parent
@@ -813,13 +709,7 @@ KaakaoWindow {
                         anchors.fill: parent
                         scaleFactor: zoomSlider.value
                         onSelectionChanged: ids => inspector.selectedIds = ids
-                        onDoubleClicked: path => {
-                            Qt.openUrlExternally("file://" + path);
-                            var docId = window.findDocIdByPath(path);
-                            if (docId !== -1) {
-                                libraryController.markDocumentOpened(docId);
-                            }
-                        }
+                        onDoubleClicked: path => window.openDocument(path)
 
                         opacity: viewSegment.currentIndex === 0 ? 1.0 : 0.0
                         visible: opacity > 0.0
@@ -835,13 +725,7 @@ KaakaoWindow {
                         id: tableCanvas
                         anchors.fill: parent
                         onSelectionChanged: ids => inspector.selectedIds = ids
-                        onDoubleClicked: path => {
-                            Qt.openUrlExternally("file://" + path);
-                            var docId = window.findDocIdByPath(path);
-                            if (docId !== -1) {
-                                libraryController.markDocumentOpened(docId);
-                            }
-                        }
+                        onDoubleClicked: path => window.openDocument(path)
 
                         opacity: viewSegment.currentIndex === 1 ? 1.0 : 0.0
                         visible: opacity > 0.0
@@ -1042,61 +926,20 @@ KaakaoWindow {
         }
 
         // Right Collage Inspector
-        Inspector {
-            id: inspector
+        CollapsibleSplitPane {
+            id: inspectorContainer
+            collapsed: inspector.collapsed
+            minWidth: 220
+            preferredWidth: 260
+            maxWidth: 350
             visible: !collapsed || width > 0
-            selectedIds: []
+            onIsAnimatingChanged: window.inspectorAnimating = isAnimating
 
-            states: [
-                State {
-                    name: "collapsed"
-                    when: inspector.collapsed
-                    PropertyChanges {
-                        target: inspector
-                        SplitView.minimumWidth: 0
-                        SplitView.preferredWidth: 0
-                        SplitView.maximumWidth: 0
-                    }
-                },
-                State {
-                    name: "expanded"
-                    when: !inspector.collapsed
-                    PropertyChanges {
-                        target: inspector
-                        SplitView.minimumWidth: 220
-                        SplitView.preferredWidth: 260
-                        SplitView.maximumWidth: 350
-                    }
-                }
-            ]
-            transitions: [
-                Transition {
-                    from: "expanded"
-                    to: "collapsed"
-                    SequentialAnimation {
-                        ScriptAction { script: window.inspectorAnimating = true }
-                        NumberAnimation {
-                            properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
-                            duration: 200
-                            easing.type: Easing.InOutQuad
-                        }
-                        ScriptAction { script: window.inspectorAnimating = false }
-                    }
-                },
-                Transition {
-                    from: "collapsed"
-                    to: "expanded"
-                    SequentialAnimation {
-                        ScriptAction { script: window.inspectorAnimating = true }
-                        NumberAnimation {
-                            properties: "SplitView.preferredWidth,SplitView.minimumWidth,SplitView.maximumWidth"
-                            duration: 200
-                            easing.type: Easing.InOutQuad
-                        }
-                        ScriptAction { script: window.inspectorAnimating = false }
-                    }
-                }
-            ]
+            Inspector {
+                id: inspector
+                anchors.fill: parent
+                selectedIds: []
+            }
         }
     }
 

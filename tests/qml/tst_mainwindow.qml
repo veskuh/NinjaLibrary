@@ -72,7 +72,7 @@ TestCase {
     function findToolButtonByText(parent, text) {
         if (!parent)
             return null;
-        if (parent.toString().indexOf("KaakaoToolButton") >= 0 && parent.text === text) {
+        if ((parent.toString().indexOf("KaakaoToolButton") >= 0 || parent.toString().indexOf("EmojiToolButton") >= 0) && parent.text === text) {
             return parent;
         }
         if (parent.children) {
