@@ -229,18 +229,16 @@ TestCase {
         pane.collapsed = true;
         compare(pane.collapsed, true);
         
-        // Wait for the collapse transition animation (200ms) to complete
-        wait(300);
-        compare(pane.SplitView.minimumWidth, 0);
+        // Wait for the collapse transition animation to complete
+        tryCompare(pane.SplitView, "minimumWidth", 0, 2000);
         compare(pane.SplitView.preferredWidth, 0);
         compare(pane.SplitView.maximumWidth, 0);
 
         pane.collapsed = false;
         compare(pane.collapsed, false);
         
-        // Wait for the expand transition animation (200ms) to complete
-        wait(300);
-        compare(pane.SplitView.minimumWidth, 100);
+        // Wait for the expand transition animation to complete
+        tryCompare(pane.SplitView, "minimumWidth", 100, 2000);
         compare(pane.SplitView.preferredWidth, 200);
         compare(pane.SplitView.maximumWidth, 300);
 

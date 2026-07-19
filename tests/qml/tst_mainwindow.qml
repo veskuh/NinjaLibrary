@@ -1423,23 +1423,19 @@ TestCase {
 
         // Tab to docListView
         keyClick(Qt.Key_Tab);
-        wait(50);
-        verify(docListView.activeFocus, "docListView should have focus after Tab");
+        tryCompare(docListView, "activeFocus", true, 1000, "docListView should have focus after Tab");
 
         // Tab to snippetsListView
         keyClick(Qt.Key_Tab);
-        wait(50);
-        verify(snippetsListView.activeFocus, "snippetsListView should have focus after Tab again");
+        tryCompare(snippetsListView, "activeFocus", true, 1000, "snippetsListView should have focus after Tab again");
 
         // Tab back to searchField
         keyClick(Qt.Key_Tab);
-        wait(50);
-        verify(searchField.activeFocus, "searchField should have focus after Tab a third time");
+        tryCompare(searchField, "activeFocus", true, 1000, "searchField should have focus after Tab a third time");
 
         // Shift+Tab back to snippetsListView
         keyClick(Qt.Key_Backtab);
-        wait(50);
-        verify(snippetsListView.activeFocus, "snippetsListView should have focus after Shift+Tab");
+        tryCompare(snippetsListView, "activeFocus", true, 1000, "snippetsListView should have focus after Shift+Tab");
 
         searchDialog.close();
         wait(100);
