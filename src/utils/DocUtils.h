@@ -36,10 +36,10 @@
 #include <QRegularExpression>
 
 namespace DocUtils {
-// Returns true if any segment of the path matches macOS package/VCS/Trash directory structures
-inline bool isIgnoredPath(const QString &path)
+// Returns true if the directory path (or any of its parents) matches macOS package/VCS/Trash structures
+inline bool isInsideIgnoredDir(const QString &dirPath)
 {
-    QStringList segments = path.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
+    QStringList segments = dirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
     for (const QString &segment : segments) {
         if (segment.endsWith(".app", Qt::CaseInsensitive) ||
             segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||

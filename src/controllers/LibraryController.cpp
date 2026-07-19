@@ -795,7 +795,7 @@ void LibraryController::watchFolderRecursively(const QString &folderPath)
         }
 
         // Filter out unwanted directories (same logic as in ScannerTask)
-        if (!DocUtils::isIgnoredPath(absSubDirPath)) {
+        if (!DocUtils::isInsideIgnoredDir(absSubDirPath)) {
             m_watcher->addPath(absSubDirPath);
         }
     }

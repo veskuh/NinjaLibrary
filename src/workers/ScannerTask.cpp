@@ -572,9 +572,7 @@ void ScannerTask::run()
 
 bool ScannerTask::isSupportedDocument(const QString &filePath) const
 {
-    // Filter out files inside macOS package directory structures and other ignore-listed
-    // directories
-    if (DocUtils::isIgnoredPath(filePath)) {
+    if (DocUtils::isInsideIgnoredDir(QFileInfo(filePath).absolutePath())) {
         return false;
     }
 
