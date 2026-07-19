@@ -140,3 +140,16 @@ target_compile_definitions(test_qml_ui PRIVATE
 
 add_test(NAME test_qml_ui COMMAND test_qml_ui)
 
+# Create Utils Unit Test Target
+qt_add_executable(test_utils
+    unit/test_utils.cpp
+    ../src/utils/DocUtils.h
+)
+
+target_link_libraries(test_utils PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+add_test(NAME test_utils COMMAND test_utils)
+

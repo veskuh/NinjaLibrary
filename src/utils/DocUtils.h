@@ -55,8 +55,9 @@ inline bool isInsideIgnoredDir(const QString &dirPath)
             segment.endsWith(".plugin", Qt::CaseInsensitive) ||
             segment.endsWith(".appex", Qt::CaseInsensitive) ||
             segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
-            segment.endsWith(".xcassets", Qt::CaseInsensitive) || segment == ".git" ||
-            segment == ".svn" || segment.toLower() == ".trash") {
+            segment.endsWith(".xcassets", Qt::CaseInsensitive) ||
+            segment.toLower() == ".git" ||
+            segment.toLower() == ".svn" || segment.toLower() == ".trash") {
             return true;
         }
     }
