@@ -34,8 +34,58 @@
 #include <QString>
 #include <QStringList>
 #include <QRegularExpression>
+#include <QMap>
 
 namespace DocUtils {
+// Returns a human-friendly description of the file type based on extension
+inline QString fileTypeDescription(const QString &fileName)
+{
+    int lastDot = fileName.lastIndexOf('.');
+    if (lastDot < 0) {
+        return "Unknown File";
+    }
+    int lastSlash = fileName.lastIndexOf('/');
+    int lastBack = fileName.lastIndexOf('\\');
+    int lastSeparator = (lastSlash > lastBack) ? lastSlash : lastBack;
+    if (lastDot <= lastSeparator) {
+        return "Unknown File";
+    }
+    QString ext = fileName.mid(lastDot + 1).toLower();
+
+    static const QMap<QString, QString> types = {
+        {"pdf", "PDF Document"},
+        {"doc", "Word Document"},
+        {"docx", "Word Document"},
+        {"xls", "Excel Spreadsheet"},
+        {"xlsx", "Excel Spreadsheet"},
+        {"ppt", "PowerPoint Presentation"},
+        {"pptx", "PowerPoint Presentation"},
+        {"txt", "Plain Text File"},
+        {"md", "Markdown Document"},
+        {"png", "PNG Image"},
+        {"jpg", "JPEG Image"},
+        {"jpeg", "JPEG Image"},
+        {"gif", "GIF Image"},
+        {"bmp", "BMP Image"},
+        {"tiff", "TIFF Image"},
+        {"tif", "TIFF Image"},
+        {"rtf", "Rich Text Format"},
+        {"html", "HTML Document"},
+        {"htm", "HTML Document"},
+        {"json", "JSON Document"},
+        {"csv", "Comma-Separated Values File"},
+        {"xml", "XML Document"},
+        {"zip", "ZIP Archive"},
+        {"tar", "TAR Archive"},
+        {"gz", "GZIP Archive"}
+    };
+
+    auto it = types.find(ext);
+    if (it != types.end()) {
+        return it.value();
+    }
+    return ext.toUpper() + " File";
+}
 // Returns true if the directory path (or any of its parents) matches macOS package/VCS/Trash structures
 inline bool isInsideIgnoredDir(const QString &dirPath)
 {

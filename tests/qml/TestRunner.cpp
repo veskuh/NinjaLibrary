@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QVariant>
 #include <QtQuickTest>
+#include "../../src/utils/DocUtils.h"
 
 class MockController : public QObject
 {
@@ -75,6 +76,10 @@ public:
     Q_INVOKABLE QVariantList searchDocumentContent(int, const QString &, const QString &) { return QVariantList(); }
     Q_INVOKABLE QVariantList searchDocuments(const QString &) { return QVariantList(); }
     Q_INVOKABLE QString readTextFile(const QString &) { return "Mock Text Content"; }
+    Q_INVOKABLE QString fileTypeDescription(const QString &fileName) const
+    {
+        return DocUtils::fileTypeDescription(fileName);
+    }
 signals:
     void libraryChanged();
     void watchedFoldersChanged();

@@ -52,16 +52,7 @@ Rectangle {
         onTriggered: inspector.showSavedIndicator = false
     }
 
-    property var allSelectedTags: {
-        var tagsSet = {};
-        for (var i = 0; i < multiDocData.length; i++) {
-            var docTags = multiDocData[i].tags;
-            for (var j = 0; j < docTags.length; j++) {
-                tagsSet[docTags[j]] = (tagsSet[docTags[j]] || 0) + 1;
-            }
-        }
-        return Object.keys(tagsSet).sort();
-    }
+    readonly property var d: inspector.docData || ({})
 
     property var tagCounts: {
         var tagsSet = {};
@@ -72,6 +63,20 @@ Rectangle {
             }
         }
         return tagsSet;
+    }
+
+    property var allSelectedTags: Object.keys(tagCounts).sort()
+
+    function parseTagsText(rawText) {
+        var parts = rawText.split(",");
+        var tags = [];
+        for (var i = 0; i < parts.length; i++) {
+            var part = parts[i].trim();
+            if (part !== "" && tags.indexOf(part) === -1) {
+                tags.push(part);
+            }
+        }
+        return tags;
     }
 
     function saveNotes() {
@@ -287,66 +292,19 @@ Rectangle {
                     opacity: 1.0
                 }
 
-                Row {
+                StarRatingRow {
                     id: batchRatingRow
-                    spacing: 4
                     Layout.alignment: Qt.AlignHCenter
-
-                    property int hoveredIndex: -1
-                    property int localRating: 0
-
+                    rating: 0
                     Connections {
                         target: inspector
                         ignoreUnknownSignals: true
                         function onSelectedIdsChanged() {
-                            batchRatingRow.localRating = 0;
+                            batchRatingRow.rating = 0;
                         }
                     }
-
-                    Repeater {
-                        model: 5
-                        KaakaoLabel {
-                            text: "★"
-                            font.pixelSize: 22
-                            color: {
-                                var active = false;
-                                if (batchRatingRow.hoveredIndex !== -1) {
-                                    active = index <= batchRatingRow.hoveredIndex;
-                                } else {
-                                    active = index < batchRatingRow.localRating;
-                                }
-                                return active ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc");
-                            }
-                            opacity: 1.0
-                            scale: batchStarMouseArea.containsMouse ? 1.2 : 1.0
-
-                            Behavior on scale {
-                                NumberAnimation {
-                                    duration: 100
-                                }
-                            }
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 100
-                                }
-                            }
-
-                            MouseArea {
-                                id: batchStarMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onEntered: batchRatingRow.hoveredIndex = index
-                                onExited: batchRatingRow.hoveredIndex = -1
-                                onClicked: {
-                                    var newRating = index + 1;
-                                    if (batchRatingRow.localRating === newRating) {
-                                        newRating = 0;
-                                    }
-                                    batchRatingRow.localRating = newRating;
-                                    libraryController.batchUpdateRating(inspector.selectedIds, newRating);
-                                }
-                            }
-                        }
+                    onRatingSelected: (newRating) => {
+                        libraryController.batchUpdateRating(inspector.selectedIds, newRating);
                     }
                 }
 
@@ -386,14 +344,7 @@ Rectangle {
                     onAccepted: {
                         var rawText = text.trim();
                         if (rawText !== "") {
-                            var parts = rawText.split(",");
-                            var tagsToAdd = [];
-                            for (var i = 0; i < parts.length; i++) {
-                                var part = parts[i].trim();
-                                if (part !== "" && tagsToAdd.indexOf(part) === -1) {
-                                    tagsToAdd.push(part);
-                                }
-                            }
+                            var tagsToAdd = parseTagsText(rawText);
                             if (tagsToAdd.length > 0) {
                                 libraryController.batchAddTags(inspector.selectedIds, tagsToAdd);
                             }
@@ -412,27 +363,27 @@ Rectangle {
                 Rectangle {
                     width: 140
                     height: 140
-                    color: (inspector.docData && inspector.docData.isFolder) ? "transparent" : (Theme.isDarkMode ? "#121212" : "#f0f0f0")
+                    color: d.isFolder ? "transparent" : (Theme.isDarkMode ? "#121212" : "#f0f0f0")
                     radius: 4
-                    border.color: (inspector.docData && inspector.docData.isFolder) ? "transparent" : Theme.buttonBorder
+                    border.color: d.isFolder ? "transparent" : Theme.buttonBorder
                     Layout.alignment: Qt.AlignHCenter
 
                     DocumentPreview {
                         anchors.fill: parent
                         anchors.margins: 4
-                        thumbnailPath: (inspector.docData && inspector.docData.thumbnailPath) || ""
-                        absolutePath: (inspector.docData && inspector.docData.absolutePath) || ""
-                        fileName: (inspector.docData && inspector.docData.fileName) || ""
-                        isOffline: !!(inspector.docData && inspector.docData.isOffline)
+                        thumbnailPath: d.thumbnailPath || ""
+                        absolutePath: d.absolutePath || ""
+                        fileName: d.fileName || ""
+                        isOffline: !!d.isOffline
                         fontPixelSize: 32
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                        visible: !d.isFolder
                     }
 
                     // Folder representation
                     Rectangle {
                         anchors.fill: parent
                         color: "transparent"
-                        visible: !!(inspector.docData && inspector.docData.isFolder)
+                        visible: !!d.isFolder
 
                         KaakaoLabel {
                             anchors.centerIn: parent
@@ -446,7 +397,7 @@ Rectangle {
 
                 // File Name
                 KaakaoLabel {
-                    text: (inspector.docData && inspector.docData.fileName) || ""
+                    text: d.fileName || ""
                     font.pixelSize: 14
                     font.weight: Font.Bold
                     elide: Text.ElideMiddle
@@ -466,7 +417,7 @@ Rectangle {
 
                 KaakaoLabel {
                     text: "Unavailable"
-                    visible: !!(inspector.docData && inspector.docData.isOffline) && !(inspector.docData && inspector.docData.isFolder)
+                    visible: !!d.isOffline && !d.isFolder
                     role: KaakaoLabel.Role.Small
                     color: Theme.colorError
                     opacity: 1.0
@@ -477,16 +428,16 @@ Rectangle {
                     id: previewDisclosure
                     text: "Extracted Text Preview"
                     expanded: false
-                    visible: inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder
+                    visible: d.textSnippet !== undefined && d.textSnippet !== "" && !d.isFolder
                     Layout.fillWidth: true
                 }
 
                 Item {
                     id: previewContainer
                     Layout.fillWidth: true
-                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder) ? 275 : 0
+                    Layout.preferredHeight: (previewDisclosure.expanded && d.textSnippet !== undefined && d.textSnippet !== "" && !d.isFolder) ? 275 : 0
                     clip: true
-                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && inspector.docData && inspector.docData.textSnippet !== "" && !inspector.docData.isFolder)
+                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && d.textSnippet !== undefined && d.textSnippet !== "" && !d.isFolder)
 
                     Behavior on Layout.preferredHeight {
                         NumberAnimation {
@@ -511,7 +462,7 @@ Rectangle {
 
                             Text {
                                 width: previewContainer.width - 16
-                                text: inspector.docData ? inspector.docData.textSnippet : ""
+                                text: d.textSnippet || ""
                                 font.family: Theme.defaultFont.family
                                 font.pixelSize: 11
                                 color: Theme.primaryText
@@ -532,114 +483,53 @@ Rectangle {
                     columnSpacing: 8
                     Layout.fillWidth: true
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Contents:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
-                        visible: !!(inspector.docData && inspector.docData.isFolder)
+                        visible: !!d.isFolder
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.itemCountStr) || ""
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
-                        visible: !!(inspector.docData && inspector.docData.isFolder)
+                    MetadataValue {
+                        text: d.itemCountStr || ""
+                        visible: !!d.isFolder
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Size:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                        visible: !d.isFolder
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.fileSizeStr) || ""
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                    MetadataValue {
+                        text: d.fileSizeStr || ""
+                        visible: !d.isFolder
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Pages:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                        visible: !d.isFolder
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.pageCount !== undefined) ? inspector.docData.pageCount : ""
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                    MetadataValue {
+                        text: d.pageCount !== undefined ? d.pageCount : ""
+                        visible: !d.isFolder
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Type:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
                     }
-                    KaakaoLabel {
+                    MetadataValue {
                         text: {
                             if (!inspector.docData)
                                 return "";
-                            if (inspector.docData.isFolder)
+                            if (d.isFolder)
                                 return "Folder";
-                            if (!inspector.docData.fileName)
+                            if (!d.fileName)
                                 return "";
-                            var parts = inspector.docData.fileName.split('.');
-                            if (parts.length <= 1)
-                                return "Unknown File";
-                            var ext = parts[parts.length - 1].toLowerCase();
-                            var types = {
-                                "pdf": "PDF Document",
-                                "doc": "Word Document",
-                                "docx": "Word Document",
-                                "xls": "Excel Spreadsheet",
-                                "xlsx": "Excel Spreadsheet",
-                                "ppt": "PowerPoint Presentation",
-                                "pptx": "PowerPoint Presentation",
-                                "txt": "Plain Text File",
-                                "md": "Markdown Document",
-                                "png": "PNG Image",
-                                "jpg": "JPEG Image",
-                                "jpeg": "JPEG Image",
-                                "gif": "GIF Image",
-                                "bmp": "BMP Image",
-                                "tiff": "TIFF Image",
-                                "tif": "TIFF Image",
-                                "rtf": "Rich Text Format",
-                                "html": "HTML Document",
-                                "htm": "HTML Document",
-                                "json": "JSON Document",
-                                "csv": "Comma-Separated Values File",
-                                "xml": "XML Document",
-                                "zip": "ZIP Archive",
-                                "tar": "TAR Archive",
-                                "gz": "GZIP Archive"
-                            };
-                            return types[ext] || (ext.toUpperCase() + " File");
+                            return libraryController.fileTypeDescription(d.fileName);
                         }
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Path:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.absolutePath) || ""
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
+                    MetadataValue {
+                        text: d.absolutePath || ""
                         elide: Text.ElideLeft
                         Layout.fillWidth: true
 
@@ -654,54 +544,36 @@ Rectangle {
                         }
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Modified:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.dateModified) ? inspector.formatDate(inspector.docData.dateModified) : ""
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
+                    MetadataValue {
+                        text: d.dateModified ? inspector.formatDate(d.dateModified) : ""
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Imported:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                        visible: !d.isFolder
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.dateAdded) ? inspector.formatDate(inspector.docData.dateAdded) : ""
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                    MetadataValue {
+                        text: d.dateAdded ? inspector.formatDate(d.dateAdded) : ""
+                        visible: !d.isFolder
                     }
 
-                    KaakaoLabel {
+                    MetadataLabel {
                         text: "Opened:"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.sidebarSectionText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                        visible: !d.isFolder
                     }
-                    KaakaoLabel {
-                        text: (inspector.docData && inspector.docData.lastOpened !== undefined) ? inspector.formatLastOpened(inspector.docData.lastOpened) : "Never"
-                        role: KaakaoLabel.Role.Small
-                        color: Theme.primaryText
-                        opacity: 1.0
-                        visible: !(inspector.docData && inspector.docData.isFolder)
+                    MetadataValue {
+                        text: d.lastOpened !== undefined ? inspector.formatLastOpened(d.lastOpened) : "Never"
+                        visible: !d.isFolder
                     }
                 }
 
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 10
-                    visible: !(inspector.docData && inspector.docData.isFolder)
+                    visible: !d.isFolder
 
                     KaakaoSeparator {
                         Layout.fillWidth: true
@@ -716,66 +588,19 @@ Rectangle {
                         opacity: 1.0
                     }
 
-                    Row {
+                    StarRatingRow {
                         id: singleRatingRow
-                        spacing: 4
                         Layout.alignment: Qt.AlignHCenter
-
-                        property int hoveredIndex: -1
-                        property int localRating: inspector.docData ? inspector.docData.starRating : 0
-
+                        rating: inspector.docData ? inspector.docData.starRating : 0
                         Connections {
                             target: inspector
                             ignoreUnknownSignals: true
                             function onDocDataChanged() {
-                                singleRatingRow.localRating = inspector.docData ? inspector.docData.starRating : 0;
+                                singleRatingRow.rating = inspector.docData ? inspector.docData.starRating : 0;
                             }
                         }
-
-                        Repeater {
-                            model: 5
-                            KaakaoLabel {
-                                text: "★"
-                                font.pixelSize: 22
-                                color: {
-                                    var active = false;
-                                    if (singleRatingRow.hoveredIndex !== -1) {
-                                        active = index <= singleRatingRow.hoveredIndex;
-                                    } else {
-                                        active = index < singleRatingRow.localRating;
-                                    }
-                                    return active ? "#f1c40f" : (Theme.isDarkMode ? "#333" : "#ccc");
-                                }
-                                opacity: 1.0
-                                scale: starMouseArea.containsMouse ? 1.2 : 1.0
-
-                                Behavior on scale {
-                                    NumberAnimation {
-                                        duration: 100
-                                    }
-                                }
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 100
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: starMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onEntered: singleRatingRow.hoveredIndex = index
-                                    onExited: singleRatingRow.hoveredIndex = -1
-                                    onClicked: {
-                                        var newRating = index + 1;
-                                        if (singleRatingRow.localRating === newRating) {
-                                            newRating = 0;
-                                        }
-                                        singleRatingRow.localRating = newRating;
-                                        libraryController.batchUpdateRating([inspector.selectedId], newRating);
-                                    }
-                                }
-                            }
+                        onRatingSelected: (newRating) => {
+                            libraryController.batchUpdateRating([inspector.selectedId], newRating);
                         }
                     }
 
@@ -821,18 +646,9 @@ Rectangle {
                         onAccepted: {
                             var rawText = text.trim();
                             if (rawText !== "" && inspector.docData) {
-                                var currentTags = inspector.docData.tags.slice();
-                                var parts = rawText.split(",");
-                                var addedAny = false;
-                                for (var i = 0; i < parts.length; i++) {
-                                    var part = parts[i].trim();
-                                    if (part !== "" && currentTags.indexOf(part) === -1) {
-                                        currentTags.push(part);
-                                        addedAny = true;
-                                    }
-                                }
-                                if (addedAny) {
-                                    libraryController.batchUpdateTags([inspector.selectedId], currentTags);
+                                var tagsToAdd = parseTagsText(rawText);
+                                if (tagsToAdd.length > 0) {
+                                    libraryController.batchAddTags([inspector.selectedId], tagsToAdd);
                                 }
                                 text = "";
                             }
@@ -884,7 +700,7 @@ Rectangle {
                         KaakaoTextArea {
                             id: notesArea
                             objectName: "notesArea"
-                            text: inspector.docData ? inspector.docData.notes : ""
+                            text: d.notes || ""
                             placeholderText: "Write details or thoughts..."
                             placeholderTextColor: Theme.sidebarSectionText
 

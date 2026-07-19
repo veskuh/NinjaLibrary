@@ -143,6 +143,9 @@ qt_add_qml_module(NinjaLibrary
         src/components/TagPill.qml
         src/components/CollapsibleSplitPane.qml
         src/components/EmojiToolButton.qml
+        src/components/StarRatingRow.qml
+        src/components/MetadataLabel.qml
+        src/components/MetadataValue.qml
         src/components/LocalTableRowDelegate.qml
         src/components/DocumentPreview.qml
         src/components/ImagePreview.qml

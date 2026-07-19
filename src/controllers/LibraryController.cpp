@@ -1144,6 +1144,12 @@ QString LibraryController::readTextFile(const QString &filePath)
     return QString::fromUtf8(file.readAll());
 }
 
+QString LibraryController::fileTypeDescription(const QString &fileName) const
+{
+    return DocUtils::fileTypeDescription(fileName);
+}
+
+
 bool LibraryController::markDocumentOpened(int docId)
 {
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();

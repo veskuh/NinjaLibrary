@@ -79,6 +79,7 @@ public slots:
     Q_INVOKABLE QVariantList searchDocumentContent(int docId, const QString &absolutePath, const QString &query);
     Q_INVOKABLE QVariantList searchDocuments(const QString &queryStr);
     Q_INVOKABLE QString readTextFile(const QString &filePath);
+    Q_INVOKABLE QString fileTypeDescription(const QString &fileName) const;
     bool markDocumentOpened(int docId);
 
     // Centralized sidecar read/write APIs
