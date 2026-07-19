@@ -529,23 +529,8 @@ void ScannerTask::run()
                     int docId = pair.first;
                     QString docPath = pair.second;
 
-                    // A. Delete search index entries
-                    QSqlQuery deleteSearch(db);
-                    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
-                    deleteSearch.bindValue(":docId", docId);
-                    ok &= deleteSearch.exec();
-
-                    // B. Delete document tags
-                    QSqlQuery deleteTags(db);
-                    deleteTags.prepare("DELETE FROM document_tags WHERE document_id = :docId;");
-                    deleteTags.bindValue(":docId", docId);
-                    ok &= deleteTags.exec();
-
-                    // C. Delete document
-                    QSqlQuery deleteDoc(db);
-                    deleteDoc.prepare("DELETE FROM documents WHERE id = :docId;");
-                    deleteDoc.bindValue(":docId", docId);
-                    ok &= deleteDoc.exec();
+                    // A. Delete search index, tags, and document cascadingly
+                    ok &= DatabaseManager::deleteDocumentCascade(db, docId);
 
                     if (ok) {
                         // D. Clean up sidecar file if exists

@@ -408,3 +408,35 @@ bool DatabaseManager::initializeDatabase()
 }
 
 QString DatabaseManager::databasePath() const { return m_dbPath; }
+
+bool DatabaseManager::deleteDocumentCascade(QSqlDatabase &db, int docId)
+{
+    // 1. Delete search index entries first
+    QSqlQuery deleteSearch(db);
+    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
+    deleteSearch.bindValue(":docId", docId);
+    if (!deleteSearch.exec()) {
+        qWarning() << "Failed to clean up document search index:" << deleteSearch.lastError().text();
+        return false;
+    }
+
+    // 2. Delete document tags
+    QSqlQuery deleteTags(db);
+    deleteTags.prepare("DELETE FROM document_tags WHERE document_id = :docId;");
+    deleteTags.bindValue(":docId", docId);
+    if (!deleteTags.exec()) {
+        qWarning() << "Failed to clean up document tags:" << deleteTags.lastError().text();
+        return false;
+    }
+
+    // 3. Delete document record
+    QSqlQuery deleteDoc(db);
+    deleteDoc.prepare("DELETE FROM documents WHERE id = :docId;");
+    deleteDoc.bindValue(":docId", docId);
+    if (!deleteDoc.exec()) {
+        qWarning() << "Failed to delete document:" << deleteDoc.lastError().text();
+        return false;
+    }
+
+    return true;
+}

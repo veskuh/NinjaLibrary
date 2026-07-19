@@ -57,6 +57,9 @@ public:
     // Utility to get the database path
     QString databasePath() const;
 
+    // Static cascading delete utility for removing a document and its search index/tags
+    static bool deleteDocumentCascade(QSqlDatabase &db, int docId);
+
 private:
     QString m_dbPath;
 };

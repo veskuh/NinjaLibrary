@@ -297,36 +297,19 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     }
 
     if (folderId != -1) {
-        // 2. Delete search index entries first (since there is no foreign key constraint on virtual
-        // FTS5 table)
-        QSqlQuery deleteSearch(db);
-        deleteSearch.prepare(
-            "DELETE FROM document_search WHERE document_id IN (SELECT id FROM documents WHERE "
-            "folder_id = :folderId);");
-        deleteSearch.bindValue(":folderId", folderId);
-        if (!deleteSearch.exec()) {
-            qWarning() << "Failed to clean up document search index on stopwatching:"
-                       << deleteSearch.lastError().text();
-        }
-
-        // 3. Delete document tags first
-        QSqlQuery deleteTags(db);
-        deleteTags.prepare(
-            "DELETE FROM document_tags WHERE document_id IN (SELECT id FROM documents WHERE "
-            "folder_id = :folderId);");
-        deleteTags.bindValue(":folderId", folderId);
-        if (!deleteTags.exec()) {
-            qWarning() << "Failed to clean up document tags on stopwatching:"
-                       << deleteTags.lastError().text();
-        }
-
-        // 4. Delete documents
-        QSqlQuery deleteDocs(db);
-        deleteDocs.prepare("DELETE FROM documents WHERE folder_id = :folderId;");
-        deleteDocs.bindValue(":folderId", folderId);
-        if (!deleteDocs.exec()) {
-            qWarning() << "Failed to delete documents on stopwatching:"
-                       << deleteDocs.lastError().text();
+        QSqlQuery selectDocs(db);
+        selectDocs.prepare("SELECT id FROM documents WHERE folder_id = :folderId;");
+        selectDocs.bindValue(":folderId", folderId);
+        if (selectDocs.exec()) {
+            while (selectDocs.next()) {
+                int docId = selectDocs.value(0).toInt();
+                if (!DatabaseManager::deleteDocumentCascade(db, docId)) {
+                    db.rollback();
+                    return false;
+                }
+            }
+        } else {
+            qWarning() << "Failed to query documents on stopwatching:" << selectDocs.lastError().text();
             db.rollback();
             return false;
         }
@@ -391,29 +374,7 @@ bool LibraryController::moveToTrash(int documentId, const QString &filePath)
 
     db.transaction();
 
-    // 1. Delete search index entries first
-    QSqlQuery deleteSearch(db);
-    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
-    deleteSearch.bindValue(":docId", documentId);
-    if (!deleteSearch.exec()) {
-        qWarning() << "Failed to clean up document search index:"
-                   << deleteSearch.lastError().text();
-    }
-
-    // 2. Delete document tags
-    QSqlQuery deleteTags(db);
-    deleteTags.prepare("DELETE FROM document_tags WHERE document_id = :docId;");
-    deleteTags.bindValue(":docId", documentId);
-    if (!deleteTags.exec()) {
-        qWarning() << "Failed to clean up document tags:" << deleteTags.lastError().text();
-    }
-
-    // 3. Delete document record
-    QSqlQuery deleteDoc(db);
-    deleteDoc.prepare("DELETE FROM documents WHERE id = :docId;");
-    deleteDoc.bindValue(":docId", documentId);
-    if (!deleteDoc.exec()) {
-        qWarning() << "Failed to delete document:" << deleteDoc.lastError().text();
+    if (!DatabaseManager::deleteDocumentCascade(db, documentId)) {
         db.rollback();
         return false;
     }
