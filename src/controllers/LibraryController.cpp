@@ -59,6 +59,50 @@
 #include "../utils/MacBookmarks.h"
 #endif
 
+namespace {
+struct SidecarInputs {
+    QString docPath;
+    QStringList tags;
+    int rating = 0;
+    QString notes;
+    bool success = false;
+};
+
+SidecarInputs loadSidecarInputs(int docId, QSqlDatabase &db)
+{
+    SidecarInputs inputs;
+    QSqlQuery docQuery(db);
+    docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
+    docQuery.bindValue(":docId", docId);
+    if (!docQuery.exec() || !docQuery.next()) {
+        return inputs;
+    }
+    inputs.docPath = docQuery.value(0).toString();
+    inputs.rating = docQuery.value(1).toInt();
+
+    QSqlQuery tagQuery(db);
+    tagQuery.prepare(
+        "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
+        "dt.document_id = :docId;");
+    tagQuery.bindValue(":docId", docId);
+    if (tagQuery.exec()) {
+        while (tagQuery.next()) {
+            inputs.tags << tagQuery.value(0).toString();
+        }
+    }
+
+    QSqlQuery notesQuery(db);
+    notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
+    notesQuery.bindValue(":docId", docId);
+    if (notesQuery.exec() && notesQuery.next()) {
+        inputs.notes = notesQuery.value(0).toString();
+    }
+
+    inputs.success = true;
+    return inputs;
+}
+} // namespace
+
 LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     : QObject(parent), m_dbMgr(dbMgr)
 {
@@ -433,22 +477,9 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
         }
 
         // Load notes & rating to update the centralized sidecar if sidecar is active
-        query.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
-        query.bindValue(":docId", docId);
-        if (query.exec() && query.next()) {
-            QString docPath = query.value(0).toString();
-            int rating = query.value(1).toInt();
-
-            QSqlQuery notesQuery(db);
-            notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
-            notesQuery.bindValue(":docId", docId);
-            QString notes;
-            if (notesQuery.exec() && notesQuery.next()) {
-                notes = notesQuery.value(0).toString();
-            }
-
-            // Sidecar updating helper
-            writeSidecar(docPath, tags, rating, notes);
+        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        if (inputs.success) {
+            writeSidecar(inputs.docPath, tags, inputs.rating, inputs.notes);
         }
     }
 
@@ -500,35 +531,9 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
             }
         }
 
-        // Fetch all current tags for this document to write the sidecar
-        QSqlQuery fetchTags(db);
-        fetchTags.prepare(
-            "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
-            "dt.document_id = :docId;");
-        fetchTags.bindValue(":docId", docId);
-        QStringList allDocTags;
-        if (fetchTags.exec()) {
-            while (fetchTags.next()) {
-                allDocTags << fetchTags.value(0).toString();
-            }
-        }
-
-        // Fetch path, rating, notes for sidecar
-        QSqlQuery docQuery(db);
-        docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
-        docQuery.bindValue(":docId", docId);
-        if (docQuery.exec() && docQuery.next()) {
-            QString docPath = docQuery.value(0).toString();
-            int rating = docQuery.value(1).toInt();
-
-            QSqlQuery notesQuery(db);
-            notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
-            notesQuery.bindValue(":docId", docId);
-            QString notes;
-            if (notesQuery.exec() && notesQuery.next()) {
-                notes = notesQuery.value(0).toString();
-            }
-            writeSidecar(docPath, allDocTags, rating, notes);
+        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        if (inputs.success) {
+            writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
         }
     }
 
@@ -570,35 +575,9 @@ bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QSt
             }
         }
 
-        // Fetch all current tags for this document to write the sidecar
-        QSqlQuery fetchTags(db);
-        fetchTags.prepare(
-            "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
-            "dt.document_id = :docId;");
-        fetchTags.bindValue(":docId", docId);
-        QStringList allDocTags;
-        if (fetchTags.exec()) {
-            while (fetchTags.next()) {
-                allDocTags << fetchTags.value(0).toString();
-            }
-        }
-
-        // Fetch path, rating, notes for sidecar
-        QSqlQuery docQuery(db);
-        docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
-        docQuery.bindValue(":docId", docId);
-        if (docQuery.exec() && docQuery.next()) {
-            QString docPath = docQuery.value(0).toString();
-            int rating = docQuery.value(1).toInt();
-
-            QSqlQuery notesQuery(db);
-            notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
-            notesQuery.bindValue(":docId", docId);
-            QString notes;
-            if (notesQuery.exec() && notesQuery.next()) {
-                notes = notesQuery.value(0).toString();
-            }
-            writeSidecar(docPath, allDocTags, rating, notes);
+        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        if (inputs.success) {
+            writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
         }
     }
 
@@ -708,35 +687,9 @@ bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rat
             return false;
         }
 
-        // Fetch current tags & notes to update the centralized sidecar
-        query.prepare("SELECT absolute_path FROM documents WHERE id = :docId;");
-        query.bindValue(":docId", docId);
-        if (query.exec() && query.next()) {
-            QString docPath = query.value(0).toString();
-
-            // Fetch tags
-            QSqlQuery tagQuery(db);
-            tagQuery.prepare(
-                "SELECT name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
-                "dt.document_id = :docId;");
-            tagQuery.bindValue(":docId", docId);
-            QStringList tags;
-            if (tagQuery.exec()) {
-                while (tagQuery.next()) {
-                    tags.append(tagQuery.value(0).toString());
-                }
-            }
-
-            // Fetch notes
-            QSqlQuery notesQuery(db);
-            notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
-            notesQuery.bindValue(":docId", docId);
-            QString notes;
-            if (notesQuery.exec() && notesQuery.next()) {
-                notes = notesQuery.value(0).toString();
-            }
-
-            writeSidecar(docPath, tags, rating, notes);
+        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        if (inputs.success) {
+            writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
         }
     }
 
@@ -760,28 +713,9 @@ bool LibraryController::updateNotes(int docId, const QString &notes)
         return false;
     }
 
-    // Fetch details to update the sidecar on disk
-    QSqlQuery docQuery(db);
-    docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
-    docQuery.bindValue(":docId", docId);
-    if (docQuery.exec() && docQuery.next()) {
-        QString docPath = docQuery.value(0).toString();
-        int rating = docQuery.value(1).toInt();
-
-        // Fetch tags
-        QSqlQuery tagQuery(db);
-        tagQuery.prepare(
-            "SELECT name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
-            "dt.document_id = :docId;");
-        tagQuery.bindValue(":docId", docId);
-        QStringList tags;
-        if (tagQuery.exec()) {
-            while (tagQuery.next()) {
-                tags.append(tagQuery.value(0).toString());
-            }
-        }
-
-        writeSidecar(docPath, tags, rating, notes);
+    SidecarInputs inputs = loadSidecarInputs(docId, db);
+    if (inputs.success) {
+        writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
     }
 
     db.commit();
