@@ -32,8 +32,36 @@
 #define DOCUTILS_H
 
 #include <QString>
+#include <QStringList>
+#include <QRegularExpression>
 
 namespace DocUtils {
+// Returns true if any segment of the path matches macOS package/VCS/Trash directory structures
+inline bool isIgnoredPath(const QString &path)
+{
+    QStringList segments = path.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
+    for (const QString &segment : segments) {
+        if (segment.endsWith(".app", Qt::CaseInsensitive) ||
+            segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||
+            segment.endsWith(".photolibrary", Qt::CaseInsensitive) ||
+            segment.endsWith(".migratedphotolibrary", Qt::CaseInsensitive) ||
+            segment.endsWith(".framework", Qt::CaseInsensitive) ||
+            segment.endsWith(".bundle", Qt::CaseInsensitive) ||
+            segment.endsWith(".xcodeproj", Qt::CaseInsensitive) ||
+            segment.endsWith(".pages", Qt::CaseInsensitive) ||
+            segment.endsWith(".numbers", Qt::CaseInsensitive) ||
+            segment.endsWith(".key", Qt::CaseInsensitive) ||
+            segment.endsWith(".wdgt", Qt::CaseInsensitive) ||
+            segment.endsWith(".plugin", Qt::CaseInsensitive) ||
+            segment.endsWith(".appex", Qt::CaseInsensitive) ||
+            segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
+            segment.endsWith(".xcassets", Qt::CaseInsensitive) || segment == ".git" ||
+            segment == ".svn" || segment.toLower() == ".trash") {
+            return true;
+        }
+    }
+    return false;
+}
 // Returns true if the file extension is supported for text extraction
 bool isSupportedTextDocument(const QString &filePath);
 

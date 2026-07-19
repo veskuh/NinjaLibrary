@@ -611,31 +611,11 @@ bool ScannerTask::isSupportedDocument(const QString &filePath) const
 {
     // Filter out files inside macOS package directory structures and other ignore-listed
     // directories
-    QFileInfo fileInfo(filePath);
-    QString dirPath = fileInfo.absolutePath();
-    QStringList segments = dirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
-    for (const QString &segment : segments) {
-        if (segment.endsWith(".app", Qt::CaseInsensitive) ||
-            segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||
-            segment.endsWith(".photolibrary", Qt::CaseInsensitive) ||
-            segment.endsWith(".migratedphotolibrary", Qt::CaseInsensitive) ||
-            segment.endsWith(".framework", Qt::CaseInsensitive) ||
-            segment.endsWith(".bundle", Qt::CaseInsensitive) ||
-            segment.endsWith(".xcodeproj", Qt::CaseInsensitive) ||
-            segment.endsWith(".pages", Qt::CaseInsensitive) ||
-            segment.endsWith(".numbers", Qt::CaseInsensitive) ||
-            segment.endsWith(".key", Qt::CaseInsensitive) ||
-            segment.endsWith(".wdgt", Qt::CaseInsensitive) ||
-            segment.endsWith(".plugin", Qt::CaseInsensitive) ||
-            segment.endsWith(".appex", Qt::CaseInsensitive) ||
-            segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
-            segment.endsWith(".xcassets", Qt::CaseInsensitive) || segment == ".git" ||
-            segment == ".svn" || segment.toLower() == ".trash") {
-            return false;
-        }
+    if (DocUtils::isIgnoredPath(filePath)) {
+        return false;
     }
 
-    QString ext = fileInfo.suffix().toLower();
+    QString ext = QFileInfo(filePath).suffix().toLower();
     return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
            ext == "bmp" || DocUtils::isSupportedTextDocument(filePath);
 }

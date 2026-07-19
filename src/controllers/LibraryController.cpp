@@ -844,32 +844,7 @@ void LibraryController::watchFolderRecursively(const QString &folderPath)
         }
 
         // Filter out unwanted directories (same logic as in ScannerTask)
-        bool ok = true;
-        QStringList segments =
-            absSubDirPath.split(QRegularExpression("[/\\\\]"), Qt::SkipEmptyParts);
-        for (const QString &segment : segments) {
-            if (segment.endsWith(".app", Qt::CaseInsensitive) ||
-                segment.endsWith(".photoslibrary", Qt::CaseInsensitive) ||
-                segment.endsWith(".photolibrary", Qt::CaseInsensitive) ||
-                segment.endsWith(".migratedphotolibrary", Qt::CaseInsensitive) ||
-                segment.endsWith(".framework", Qt::CaseInsensitive) ||
-                segment.endsWith(".bundle", Qt::CaseInsensitive) ||
-                segment.endsWith(".xcodeproj", Qt::CaseInsensitive) ||
-                segment.endsWith(".pages", Qt::CaseInsensitive) ||
-                segment.endsWith(".numbers", Qt::CaseInsensitive) ||
-                segment.endsWith(".key", Qt::CaseInsensitive) ||
-                segment.endsWith(".wdgt", Qt::CaseInsensitive) ||
-                segment.endsWith(".plugin", Qt::CaseInsensitive) ||
-                segment.endsWith(".appex", Qt::CaseInsensitive) ||
-                segment.endsWith(".scnassets", Qt::CaseInsensitive) ||
-                segment.endsWith(".xcassets", Qt::CaseInsensitive) || segment == ".git" ||
-                segment == ".svn" || segment.toLower() == ".trash") {
-                ok = false;
-                break;
-            }
-        }
-
-        if (ok) {
+        if (!DocUtils::isIgnoredPath(absSubDirPath)) {
             m_watcher->addPath(absSubDirPath);
         }
     }
