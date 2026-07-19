@@ -520,7 +520,7 @@ TestCase {
         wait(200); // wait for fade-out animation
 
         compare(searchField.text, "", "Search text should be empty after clicking clear button");
-        verify(!clearBtn.visible, "Clear button should be hidden after being cleared");
+        tryCompare(clearBtn, "visible", false, 1000, "Clear button should be hidden after being cleared");
 
         // Set search text and selection
         searchField.text = "test query";
