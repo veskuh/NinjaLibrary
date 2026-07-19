@@ -48,6 +48,7 @@
 #include <QStandardPaths>
 #include <QUrl>
 #include <thread>
+#include "../database/TagRepository.h"
 
 #include "../utils/DocUtils.h"
 #include "../utils/PdfUtils.h"
@@ -406,32 +407,7 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
 
         // Insert new tags
         for (const QString &tagName : tags) {
-            if (tagName.trimmed().isEmpty()) continue;
-
-            // Ensure tag exists in the global tags table
-            query.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
-            query.bindValue(":name", tagName.trimmed());
-            if (!query.exec()) {
-                db.rollback();
-                return false;
-            }
-
-            // Get tag ID
-            query.prepare("SELECT id FROM tags WHERE name = :name;");
-            query.bindValue(":name", tagName.trimmed());
-            if (!query.exec() || !query.next()) {
-                db.rollback();
-                return false;
-            }
-            int tagId = query.value(0).toInt();
-
-            // Link tag to document
-            query.prepare(
-                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, "
-                ":tagId);");
-            query.bindValue(":docId", docId);
-            query.bindValue(":tagId", tagId);
-            if (!query.exec()) {
+            if (!TagRepository::ensureTagLinked(db, docId, tagName)) {
                 db.rollback();
                 return false;
             }
@@ -461,32 +437,7 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
 
     for (int docId : documentIds) {
         for (const QString &tagName : tags) {
-            if (tagName.trimmed().isEmpty()) continue;
-
-            // Ensure tag exists globally
-            query.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
-            query.bindValue(":name", tagName.trimmed());
-            if (!query.exec()) {
-                db.rollback();
-                return false;
-            }
-
-            // Get tag ID
-            query.prepare("SELECT id FROM tags WHERE name = :name;");
-            query.bindValue(":name", tagName.trimmed());
-            if (!query.exec() || !query.next()) {
-                db.rollback();
-                return false;
-            }
-            int tagId = query.value(0).toInt();
-
-            // Link tag to document
-            query.prepare(
-                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES (:docId, "
-                ":tagId);");
-            query.bindValue(":docId", docId);
-            query.bindValue(":tagId", tagId);
-            if (!query.exec()) {
+            if (!TagRepository::ensureTagLinked(db, docId, tagName)) {
                 db.rollback();
                 return false;
             }

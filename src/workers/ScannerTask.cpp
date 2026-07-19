@@ -48,6 +48,7 @@
 #include <QStandardPaths>
 #include <QStorageInfo>
 
+#include "../database/TagRepository.h"
 #include "../utils/DocUtils.h"
 #include "../utils/HashUtils.h"
 #include "../utils/MacBookmarks.h"
@@ -261,26 +262,7 @@ void ScannerTask::run()
                     }
 
                     for (const QString &tagName : tags) {
-                        QSqlQuery insertTag(db);
-                        insertTag.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
-                        insertTag.bindValue(":name", tagName.trimmed());
-                        ok &= insertTag.exec();
-
-                        QSqlQuery getTagId(db);
-                        getTagId.prepare("SELECT id FROM tags WHERE name = :name;");
-                        getTagId.bindValue(":name", tagName.trimmed());
-                        if (getTagId.exec() && getTagId.next()) {
-                            int tagId = getTagId.value(0).toInt();
-                            QSqlQuery linkTag(db);
-                            linkTag.prepare(
-                                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES "
-                                "(:docId, :tagId);");
-                            linkTag.bindValue(":docId", docId);
-                            linkTag.bindValue(":tagId", tagId);
-                            ok &= linkTag.exec();
-                        } else {
-                            ok = false;
-                        }
+                        ok &= TagRepository::ensureTagLinked(db, docId, tagName);
                     }
 
                     if (ok) {
@@ -437,26 +419,7 @@ void ScannerTask::run()
                     }
 
                     for (const QString &tagName : tags) {
-                        QSqlQuery insertTag(db);
-                        insertTag.prepare("INSERT OR IGNORE INTO tags (name) VALUES (:name);");
-                        insertTag.bindValue(":name", tagName.trimmed());
-                        ok &= insertTag.exec();
-
-                        QSqlQuery getTagId(db);
-                        getTagId.prepare("SELECT id FROM tags WHERE name = :name;");
-                        getTagId.bindValue(":name", tagName.trimmed());
-                        if (getTagId.exec() && getTagId.next()) {
-                            int tagId = getTagId.value(0).toInt();
-                            QSqlQuery linkTag(db);
-                            linkTag.prepare(
-                                "INSERT OR IGNORE INTO document_tags (document_id, tag_id) VALUES "
-                                "(:docId, :tagId);");
-                            linkTag.bindValue(":docId", docId);
-                            linkTag.bindValue(":tagId", tagId);
-                            ok &= linkTag.exec();
-                        } else {
-                            ok = false;
-                        }
+                        ok &= TagRepository::ensureTagLinked(db, docId, tagName);
                     }
                 } else {
                     ok = false;
