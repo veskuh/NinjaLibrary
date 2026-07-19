@@ -92,8 +92,16 @@ Item {
     }
 
     // ----- reparent into containing GridLayout ------------------------------
+    // We set Layout.column explicitly BEFORE reparenting so that, even if the
+    // QML engine ever changes the order in which sibling Component.onCompleted
+    // handlers fire, label always lands in column 0 and value in column 1.
+    // Row order follows child-insertion order, which is declaration order in
+    // Qt's single-threaded QML engine (stable in practice, though not formally
+    // guaranteed by the spec).
     Component.onCompleted: {
         if (!parent) return;
+        labelItem.Layout.column = 0;
+        valueItem.Layout.column = 1;
         labelItem.parent = parent;
         valueItem.parent = parent;
         if (fillWidth) {

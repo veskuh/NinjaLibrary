@@ -68,9 +68,6 @@ Rectangle {
 
     property var allSelectedTags: Object.keys(tagCounts).sort()
 
-    function parseTagsText(rawText) {
-        return TagUtils.parseTagsText(rawText);
-    }
 
     function saveNotes() {
         if (notesArea && docData && notesArea.text !== docData.notes) {
@@ -337,7 +334,7 @@ Rectangle {
                     onAccepted: {
                         var rawText = text.trim();
                         if (rawText !== "") {
-                            var tagsToAdd = parseTagsText(rawText);
+                            var tagsToAdd = TagUtils.parseTagsText(rawText);
                             if (tagsToAdd.length > 0) {
                                 libraryController.batchAddTags(inspector.selectedIds, tagsToAdd);
                             }
@@ -500,8 +497,6 @@ Rectangle {
                     MetadataField {
                         label: "Type:"
                         value: {
-                            if (!inspector.docData)
-                                return "";
                             if (d.isFolder)
                                 return "Folder";
                             if (!d.fileName)
@@ -614,7 +609,7 @@ Rectangle {
                         onAccepted: {
                             var rawText = text.trim();
                             if (rawText !== "" && inspector.docData) {
-                                var tagsToAdd = parseTagsText(rawText);
+                                var tagsToAdd = TagUtils.parseTagsText(rawText);
                                 if (tagsToAdd.length > 0) {
                                     libraryController.batchAddTags([inspector.selectedId], tagsToAdd);
                                 }
