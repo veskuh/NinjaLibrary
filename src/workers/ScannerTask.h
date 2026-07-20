@@ -48,6 +48,7 @@ public:
     ~ScannerTask();
 
     void run() override;
+    void cancel() { m_cancelled = true; }
 
     static std::atomic<bool> s_scanPaused;
     static QMutex s_pauseMutex;
@@ -67,6 +68,8 @@ private:
 
     bool isSupportedDocument(const QString &filePath) const;
     int countWords(const QString &text) const;
+
+    std::atomic<bool> m_cancelled{false};
 };
 
 #endif  // SCANNERTASK_H

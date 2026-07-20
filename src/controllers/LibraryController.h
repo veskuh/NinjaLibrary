@@ -42,6 +42,8 @@
 
 #include "../database/DatabaseManager.h"
 
+class ScannerTask;
+
 class LibraryController : public QObject
 {
     Q_OBJECT
@@ -126,6 +128,7 @@ private slots:
     void onLowDiskSpaceDetected();
     void onOcrTaskFinished(int docId);
     void onThumbnailTaskFinished(int docId, const QString &thumbnailPath);
+    void processNextStartupResume();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -149,6 +152,9 @@ private:
     QThreadPool m_thumbnailThreadPool;
     QThreadPool m_postScanThreadPool;
     QSet<int> m_inFlightThumbnails;
+    QMap<QString, ScannerTask*> m_activeScannerTasks;
+    QStringList m_pendingStartupResumes;
+    QTimer *m_startupResumeTimer;
     void updateScanProgress();
 };
 

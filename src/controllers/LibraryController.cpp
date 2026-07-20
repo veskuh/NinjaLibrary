@@ -133,16 +133,21 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
 
     connect(this, &LibraryController::scanRequested, this, &LibraryController::onScanRequested);
 
+    m_startupResumeTimer = new QTimer(this);
+    connect(m_startupResumeTimer, &QTimer::timeout, this, &LibraryController::processNextStartupResume);
+
     updateFoldersCache();
 
-    // Resume scans that were active when the app quit
+    // Resume scans that were active when the app quit (staggered)
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (db.isOpen()) {
         QSqlQuery query("SELECT folder_path FROM active_scans;", db);
         while (query.next()) {
-            QString folderPath = query.value(0).toString();
-            emit scanRequested(folderPath);
+            m_pendingStartupResumes.append(query.value(0).toString());
         }
+    }
+    if (!m_pendingStartupResumes.isEmpty()) {
+        m_startupResumeTimer->start(500); // Stagger scans by 500ms
     }
 }
 
@@ -302,6 +307,16 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         qWarning() << "removeWatchedFolder: no matching watched folder for" << folderPath;
         db.rollback();
         return false;
+    }
+
+    // Cancel active/queued scanner task if exists
+    if (m_activeScannerTasks.contains(matchedPath)) {
+        ScannerTask *task = m_activeScannerTasks.value(matchedPath);
+        task->cancel();
+        if (QThreadPool::globalInstance()->tryTake(task)) {
+            delete task;
+        }
+        m_activeScannerTasks.remove(matchedPath);
     }
 
     // Delete active scan for this folder if exists
@@ -840,6 +855,20 @@ void LibraryController::onScanRequested(const QString &folderPath)
     QString absPath = QDir(folderPath).canonicalPath();
     if (absPath.isEmpty()) absPath = QDir(folderPath).absolutePath();
 
+    if (m_activeScannerTasks.contains(absPath)) {
+        ScannerTask *task = m_activeScannerTasks.value(absPath);
+        task->cancel();
+        if (QThreadPool::globalInstance()->tryTake(task)) {
+            delete task;
+            m_activeScannerTasks.remove(absPath);
+            m_scanProgressMap.remove(absPath);
+        } else {
+            // Task is already running, wait for it to finish and restart
+            m_pendingScanRequests[absPath] = true;
+            return;
+        }
+    }
+
     if (m_scanProgressMap.contains(absPath)) {
         m_pendingScanRequests[absPath] = true;
         return;
@@ -865,6 +894,7 @@ void LibraryController::onScanRequested(const QString &folderPath)
     }
 
     ScannerTask *task = new ScannerTask(m_dbMgr, absPath);
+    m_activeScannerTasks.insert(absPath, task);
     connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
     connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
     connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
@@ -929,6 +959,7 @@ void LibraryController::onScanProgress(const QString &folderPath, int processed,
 
 void LibraryController::onScannerTaskFinished(const QString &folderPath)
 {
+    m_activeScannerTasks.remove(folderPath);
     m_scanProgressMap.remove(folderPath);
 
     // Remove active scan record from database
@@ -1280,5 +1311,18 @@ void LibraryController::toggleScanPause()
         resumeScan();
     } else {
         pauseScan();
+    }
+}
+
+void LibraryController::processNextStartupResume()
+{
+    if (m_pendingStartupResumes.isEmpty()) {
+        m_startupResumeTimer->stop();
+        return;
+    }
+    QString folderPath = m_pendingStartupResumes.takeFirst();
+    emit scanRequested(folderPath);
+    if (m_pendingStartupResumes.isEmpty()) {
+        m_startupResumeTimer->stop();
     }
 }

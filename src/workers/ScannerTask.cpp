@@ -69,6 +69,10 @@ ScannerTask::~ScannerTask() {}
 
 void ScannerTask::run()
 {
+    if (m_cancelled) {
+        emit finished(m_folderPath);
+        return;
+    }
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) {
         emit finished(m_folderPath);
@@ -123,6 +127,10 @@ void ScannerTask::run()
     progressTimer.start();
 
     for (const QString &filePath : filesToProcess) {
+        if (m_cancelled) {
+            emit finished(m_folderPath);
+            return;
+        }
         // Check disk space (safeguard threshold: 500MB)
         QStorageInfo storage(m_folderPath);
         if (storage.isValid() && storage.bytesAvailable() < 500LL * 1024LL * 1024LL) {
@@ -462,6 +470,15 @@ void ScannerTask::run()
             emit progress(m_folderPath, processedCount, totalFiles);
             progressTimer.restart();
         }
+        if (m_cancelled) {
+            emit finished(m_folderPath);
+            return;
+        }
+    }
+
+    if (m_cancelled) {
+        emit finished(m_folderPath);
+        return;
     }
 
     // 2. Detect deleted files (present in DB but missing on disk)

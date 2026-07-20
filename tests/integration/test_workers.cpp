@@ -62,6 +62,7 @@ private slots:
     void testPackageDirectorySkipping();
     void testImageThumbnailAndOcrWithExif();
     void testSubdirectoryDeletionDetection();
+    void testCooperativeCancellation();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -1372,6 +1373,73 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     }
 
     // Clean up watched folder
+    QVERIFY(m_controller->removeWatchedFolder(tempPath));
+    QThreadPool::globalInstance()->waitForDone();
+}
+
+void TestWorkers::testCooperativeCancellation()
+{
+    // Ensure thread pool is completely idle
+    QThreadPool::globalInstance()->waitForDone();
+
+    // Clear database to ensure a completely clean state
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery clearQuery(db);
+    QVERIFY(clearQuery.exec("DELETE FROM watched_folders;"));
+    QVERIFY(clearQuery.exec("DELETE FROM documents;"));
+    QVERIFY(clearQuery.exec("DELETE FROM document_search;"));
+
+    // Create temporary directory
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+    QVERIFY(!tempPath.isEmpty());
+
+    // Create 100 small files to make the scan take some time
+    for (int i = 0; i < 100; ++i) {
+        QString filePath = QDir(tempPath).filePath(QString("cancelDoc_%1.txt").arg(i));
+        QFile file(filePath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Just some text to make scanning take time.");
+        file.close();
+    }
+
+    QSignalSpy spyPostScan(m_controller, &LibraryController::postScanFinished);
+
+    // Add watched folder (top-level) which triggers scan
+    QVERIFY(m_controller->addWatchedFolder(tempPath));
+
+    // Wait a tiny bit for scan to start but not finish
+    QTest::qWait(10);
+
+    // Remove watched folder immediately, which should trigger cooperative cancellation
+    QVERIFY(m_controller->removeWatchedFolder(tempPath));
+
+    // Wait for the scanner to completely finish/abort
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
+
+    if (spyPostScan.isEmpty()) {
+        spyPostScan.wait(1000);
+    }
+
+    // Verify it doesn't crash, and can be removed safely.
+    // Also, trigger active scan cancel / queued tryTake test.
+    // Try requesting scan, and then requesting it again immediately.
+    QVERIFY(m_controller->addWatchedFolder(tempPath));
+    emit m_controller->scanRequested(tempPath); // Re-request immediately, should cancel/queued take
+
+    // Clean up
+    QThreadPool::globalInstance()->waitForDone();
+    while (m_controller->isScanning()) {
+        QTest::qWait(50);
+    }
+    if (spyPostScan.isEmpty()) {
+        spyPostScan.wait(1000);
+    }
+
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
     QThreadPool::globalInstance()->waitForDone();
 }
