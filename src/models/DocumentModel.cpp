@@ -357,7 +357,13 @@ void DocumentModel::forceRefresh()
         m_documents = newDocs;
         endResetModel();
     } else {
-        emit aboutToReconcile();
+        bool isReconciling = false;
+        auto ensureReconciling = [this, &isReconciling]() {
+            if (!isReconciling) {
+                isReconciling = true;
+                emit aboutToReconcile();
+            }
+        };
 
         // Reconcile changes incrementally
         QMap<QString, DocumentInfo> currentMap;
@@ -374,6 +380,7 @@ void DocumentModel::forceRefresh()
         for (int i = m_documents.size() - 1; i >= 0; --i) {
             const QString &path = m_documents.at(i).absolutePath;
             if (!newMap.contains(path)) {
+                ensureReconciling();
                 beginRemoveRows(QModelIndex(), i, i);
                 m_documents.removeAt(i);
                 endRemoveRows();
@@ -402,6 +409,7 @@ void DocumentModel::forceRefresh()
                      oldDoc.itemCount != newDoc.itemCount);
 
                 if (itemChanged) {
+                    ensureReconciling();
                     m_documents[i] = newDoc;
                     QModelIndex idx = index(i);
                     emit dataChanged(idx, idx);
@@ -412,6 +420,7 @@ void DocumentModel::forceRefresh()
         // 3. Add new items
         for (const auto &newDoc : newDocs) {
             if (!currentMap.contains(newDoc.absolutePath)) {
+                ensureReconciling();
                 int insertPos = m_documents.size();
                 beginInsertRows(QModelIndex(), insertPos, insertPos);
                 m_documents.append(newDoc);
@@ -419,7 +428,9 @@ void DocumentModel::forceRefresh()
             }
         }
         
-        emit reconciled();
+        if (isReconciling) {
+            emit reconciled();
+        }
     }
 
     if (changed) {
