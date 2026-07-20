@@ -120,6 +120,8 @@ public:
 
 signals:
     void countsChanged();
+    void aboutToReconcile();
+    void reconciled();
 
 public slots:
     void refresh();

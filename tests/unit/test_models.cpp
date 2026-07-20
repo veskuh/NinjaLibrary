@@ -49,6 +49,8 @@ private slots:
     void testSorting();
     void testRecentCategory();
     void testTagSelectionAndClearing();
+    void testModelChangeScopeDebounce();
+    void testSearchMatchDebounce();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -493,6 +495,87 @@ void TestModels::testTagSelectionAndClearing()
     // Clear tag selection
     proxyFilter.setSelectedTags(QStringList{});
     QCOMPARE(proxyFilter.rowCount(), 3);
+}
+
+void TestModels::testModelChangeScopeDebounce()
+{
+    // Verify that when the source model changes while no search is active, row
+    // membership stays up to date synchronously (via dynamicSortFilter), while the
+    // scope recount is debounced instead of running per model signal.
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+    proxyFilter.setShowUnavailable(true);
+
+    QCOMPARE(proxyFilter.rowCount(), 3);
+    QVERIFY(!proxyFilter.activeScopes().contains("TXT"));
+
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery query(db);
+
+    int folderId = -1;
+    QVERIFY(query.exec("SELECT id FROM watched_folders WHERE absolute_path = '/test/docs';"));
+    QVERIFY(query.next());
+    folderId = query.value(0).toInt();
+
+    QVERIFY(query.exec(QString("INSERT INTO documents (folder_id, file_name, absolute_path, "
+                               "file_size, file_hash, star_rating, is_offline, date_modified) "
+                               "VALUES (%1, 'fileD.txt', '/test/docs/fileD.txt', 50, 'hash789', "
+                               "0, 0, datetime('now', 'localtime'));")
+                           .arg(folderId)));
+    int docDId = query.lastInsertId().toInt();
+    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, "
+                               "text_snippet, notes) VALUES (%1, 'fileD.txt', 'Plain text "
+                               "content.', '');")
+                           .arg(docDId)));
+
+    sourceModel.forceRefresh();
+
+    // Row membership updates synchronously via base-class dynamic filtering
+    QCOMPARE(proxyFilter.rowCount(), 4);
+
+    // Scope recount is debounced; applied once the 400ms timer fires
+    QTest::qWait(500);
+    QVERIFY(proxyFilter.activeScopes().contains("TXT"));
+
+    // Clean up
+    QVERIFY(query.exec(QString("DELETE FROM document_search WHERE document_id = %1;").arg(docDId)));
+    QVERIFY(query.exec(QString("DELETE FROM documents WHERE id = %1;").arg(docDId)));
+}
+
+void TestModels::testSearchMatchDebounce()
+{
+    // Verify that when model data changes while a search is active, the match set
+    // recomputation is debounced and applied once the timer fires.
+    DocumentModel sourceModel(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
+    proxyFilter.setSourceModel(&sourceModel);
+    proxyFilter.setShowUnavailable(true);
+
+    // "world" initially matches only fileA.pdf
+    proxyFilter.setFilterString("world");
+    QCOMPARE(proxyFilter.rowCount(), 1);
+
+    // Change fileB's indexed text so it also matches the active search
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery query(db);
+    QVERIFY(
+        query.exec("UPDATE document_search SET text_snippet = 'world peace' WHERE file_name = "
+                   "'fileB.png';"));
+    sourceModel.forceRefresh();
+
+    // Recompute is debounced; applied once the 400ms timer fires
+    QTest::qWait(500);
+    QCOMPARE(proxyFilter.rowCount(), 2);
+
+    // Clearing the search stays synchronous
+    proxyFilter.setFilterString("");
+    QCOMPARE(proxyFilter.rowCount(), 3);
+
+    // Restore original text
+    QVERIFY(
+        query.exec("UPDATE document_search SET text_snippet = 'Scanned image content.' "
+                   "WHERE file_name = 'fileB.png';"));
 }
 
 QTEST_MAIN(TestModels)

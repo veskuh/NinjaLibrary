@@ -39,7 +39,8 @@
 
 #include "DocumentModel.h"
 
-static QString getParentDirectory(const QString &absolutePath) {
+static QString getParentDirectory(const QString &absolutePath)
+{
     if (absolutePath.isEmpty()) {
         return QString();
     }
@@ -54,7 +55,8 @@ static QString getParentDirectory(const QString &absolutePath) {
     return "";
 }
 
-static QString getFileSuffix(const QString &fileName) {
+static QString getFileSuffix(const QString &fileName)
+{
     int lastDot = fileName.lastIndexOf('.');
     if (lastDot >= 0) {
         int lastSlash = fileName.lastIndexOf('/');
@@ -84,6 +86,13 @@ ProxyFilter::ProxyFilter(DatabaseManager *dbMgr, QObject *parent)
     // Sort by file name ascending by default
     setSortRole(DocumentModel::FileNameRole);
     sort(0, Qt::AscendingOrder);
+
+    // Debounce heavy recomputation triggered by source model changes, so bursts of
+    // background indexing signals don't each trigger a full filter/scope recalculation
+    m_modelChangeTimer = new QTimer(this);
+    m_modelChangeTimer->setSingleShot(true);
+    m_modelChangeTimer->setInterval(400);
+    connect(m_modelChangeTimer, &QTimer::timeout, this, &ProxyFilter::processModelDrivenUpdate);
 }
 
 void ProxyFilter::setSortRole(int role) { QSortFilterProxyModel::setSortRole(role); }
@@ -93,33 +102,51 @@ ProxyFilter::~ProxyFilter() {}
 void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
 {
     if (this->sourceModel()) {
+        disconnect(this->sourceModel(), SIGNAL(aboutToReconcile()), this, SLOT(onAboutToReconcile()));
+        disconnect(this->sourceModel(), SIGNAL(reconciled()), this, SLOT(onReconciled()));
+        
         disconnect(this->sourceModel(), &QAbstractItemModel::modelReset, this,
-                   &ProxyFilter::updateSearchMatches);
+                   &ProxyFilter::scheduleModelDrivenUpdate);
         disconnect(this->sourceModel(), &QAbstractItemModel::rowsInserted, this,
-                   &ProxyFilter::updateSearchMatches);
+                   &ProxyFilter::scheduleModelDrivenUpdate);
         disconnect(this->sourceModel(), &QAbstractItemModel::rowsRemoved, this,
-                   &ProxyFilter::updateSearchMatches);
+                   &ProxyFilter::scheduleModelDrivenUpdate);
         disconnect(this->sourceModel(), &QAbstractItemModel::dataChanged, this,
-                   &ProxyFilter::updateSearchMatches);
+                   &ProxyFilter::scheduleModelDrivenUpdate);
     }
     QSortFilterProxyModel::setSourceModel(sourceModel);
     if (sourceModel) {
+        connect(sourceModel, SIGNAL(aboutToReconcile()), this, SLOT(onAboutToReconcile()));
+        connect(sourceModel, SIGNAL(reconciled()), this, SLOT(onReconciled()));
+        
         connect(sourceModel, &QAbstractItemModel::modelReset, this,
-                &ProxyFilter::updateSearchMatches);
+                &ProxyFilter::scheduleModelDrivenUpdate);
         connect(sourceModel, &QAbstractItemModel::rowsInserted, this,
-                &ProxyFilter::updateSearchMatches);
+                &ProxyFilter::scheduleModelDrivenUpdate);
         connect(sourceModel, &QAbstractItemModel::rowsRemoved, this,
-                &ProxyFilter::updateSearchMatches);
+                &ProxyFilter::scheduleModelDrivenUpdate);
         connect(sourceModel, &QAbstractItemModel::dataChanged, this,
-                &ProxyFilter::updateSearchMatches);
+                &ProxyFilter::scheduleModelDrivenUpdate);
     }
     updateSearchMatches();
+}
+
+void ProxyFilter::onAboutToReconcile()
+{
+    setDynamicSortFilter(false);
+}
+
+void ProxyFilter::onReconciled()
+{
+    setDynamicSortFilter(true);
+    invalidateAndRecalculate();
 }
 
 void ProxyFilter::setFilterString(const QString &filter)
 {
     if (m_filterString == filter) return;
     m_filterString = filter;
+    m_modelChangeTimer->stop();  // User-driven search supersedes pending debounced work
     updateSearchMatches();
     emit filterStringChanged();
 }
@@ -292,12 +319,30 @@ void ProxyFilter::updateSearchMatches()
     invalidateAndRecalculate();
 }
 
+void ProxyFilter::scheduleModelDrivenUpdate()
+{
+    // Coalesce bursts of model changes (e.g. background indexing) into one update
+    m_modelChangeTimer->start();
+}
+
+void ProxyFilter::processModelDrivenUpdate()
+{
+    if (m_searchActive) {
+        // Match set may have changed along with the data; recompute everything
+        updateSearchMatches();
+    } else {
+        // With dynamicSortFilter the base class already keeps row membership and
+        // ordering up to date per changed row, so only the scope bar needs a recount
+        recalculateScopes();
+    }
+}
+
 bool ProxyFilter::filterAcceptsRowWithoutScope(int source_row,
                                                const QModelIndex &source_parent) const
 {
     if (!sourceModel()) return false;
 
-    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    DocumentModel *docModel = qobject_cast<DocumentModel *>(sourceModel());
     if (docModel) {
         if (source_row < 0 || source_row >= docModel->documents().size()) return false;
         const DocumentInfo &doc = docModel->documents().at(source_row);
@@ -505,7 +550,7 @@ bool ProxyFilter::filterAcceptsRow(int source_row, const QModelIndex &source_par
         return true;
     }
 
-    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    DocumentModel *docModel = qobject_cast<DocumentModel *>(sourceModel());
     if (docModel) {
         if (source_row < 0 || source_row >= docModel->documents().size()) return false;
         const DocumentInfo &doc = docModel->documents().at(source_row);
@@ -595,7 +640,7 @@ void ProxyFilter::recalculateScopes()
     QDate today = QDate::currentDate();
     int rows = model->rowCount();
 
-    DocumentModel *docModel = qobject_cast<DocumentModel*>(model);
+    DocumentModel *docModel = qobject_cast<DocumentModel *>(model);
     if (docModel) {
         const QList<DocumentInfo> &docs = docModel->documents();
         for (int i = 0; i < rows; ++i) {
@@ -637,7 +682,8 @@ void ProxyFilter::recalculateScopes()
         for (int i = 0; i < rows; ++i) {
             if (filterAcceptsRowWithoutScope(i, QModelIndex())) {
                 QModelIndex idx = model->index(i, 0);
-                QDateTime dateModified = model->data(idx, DocumentModel::DateModifiedRole).toDateTime();
+                QDateTime dateModified =
+                    model->data(idx, DocumentModel::DateModifiedRole).toDateTime();
                 bool isOffline = model->data(idx, DocumentModel::IsOfflineRole).toBool();
                 QString fileName = model->data(idx, DocumentModel::FileNameRole).toString();
 
@@ -717,7 +763,8 @@ void ProxyFilter::invalidateAndRecalculate()
     recalculateScopes();
 }
 
-void ProxyFilter::setFilters(const QString &category, const QString &folder, const QStringList &tags, const QString &scope)
+void ProxyFilter::setFilters(const QString &category, const QString &folder,
+                             const QStringList &tags, const QString &scope)
 {
     bool changed = false;
 
@@ -768,7 +815,7 @@ void ProxyFilter::setFilters(const QString &category, const QString &folder, con
 
 int ProxyFilter::rowOfDocId(int docId) const
 {
-    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    DocumentModel *docModel = qobject_cast<DocumentModel *>(sourceModel());
     if (docModel) {
         int rows = rowCount();
         const QList<DocumentInfo> &docs = docModel->documents();
@@ -787,7 +834,7 @@ int ProxyFilter::rowOfDocId(int docId) const
 
 bool ProxyFilter::lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const
 {
-    DocumentModel *docModel = qobject_cast<DocumentModel*>(sourceModel());
+    DocumentModel *docModel = qobject_cast<DocumentModel *>(sourceModel());
     if (docModel) {
         const QList<DocumentInfo> &docs = docModel->documents();
         int leftRow = source_left.row();

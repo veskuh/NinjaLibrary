@@ -34,6 +34,7 @@
 #include <QSet>
 #include <QSortFilterProxyModel>
 #include <QStringList>
+#include <QTimer>
 
 #include "../database/DatabaseManager.h"
 
@@ -77,7 +78,8 @@ public:
     bool showSubfolderIcons() const { return m_showSubfolderIcons; }
 
     Q_INVOKABLE QVariant get(int row, const QString &roleName) const;
-    Q_INVOKABLE void setFilters(const QString &category, const QString &folder, const QStringList &tags, const QString &scope);
+    Q_INVOKABLE void setFilters(const QString &category, const QString &folder,
+                                const QStringList &tags, const QString &scope);
     Q_INVOKABLE int rowOfDocId(int docId) const;
     Q_INVOKABLE void setSortRole(int role);
     void setSourceModel(QAbstractItemModel *sourceModel) override;
@@ -112,6 +114,15 @@ signals:
     void includeSubfolderContentsChanged();
     void showSubfolderIconsChanged();
 
+private slots:
+    void onAboutToReconcile();
+    void onReconciled();
+
+private slots:
+    // Debounced handling of source model changes (e.g. background indexing bursts)
+    void scheduleModelDrivenUpdate();
+    void processModelDrivenUpdate();
+
 protected:
     bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
     bool lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const override;
@@ -134,6 +145,7 @@ private:
     QSet<QString> m_duplicateHashes;
     bool m_searchActive;
     mutable QHash<QString, int> m_roleNameToKey;
+    QTimer *m_modelChangeTimer;
 
     void invalidateAndRecalculate();
 };

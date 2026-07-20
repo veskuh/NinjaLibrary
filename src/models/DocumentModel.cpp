@@ -357,6 +357,8 @@ void DocumentModel::forceRefresh()
         m_documents = newDocs;
         endResetModel();
     } else {
+        emit aboutToReconcile();
+
         // Reconcile changes incrementally
         QMap<QString, DocumentInfo> currentMap;
         for (const auto &doc : m_documents) {
@@ -416,6 +418,8 @@ void DocumentModel::forceRefresh()
                 endInsertRows();
             }
         }
+        
+        emit reconciled();
     }
 
     if (changed) {
