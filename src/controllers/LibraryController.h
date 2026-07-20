@@ -34,6 +34,7 @@
 #include <QFileSystemWatcher>
 #include <QMap>
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QStringList>
 #include <QThreadPool>
@@ -147,12 +148,16 @@ private:
     double m_scanProgress = 0.0;
     int m_activeOcrTasks = 0;
     int m_totalOcrTasks = 0;
-    QMap<QString, QPair<int, int>> m_scanProgressMap;
+    struct ActiveScan {
+        QPointer<ScannerTask> task;
+        int processed = 0;
+        int total = 0;
+    };
+    QMap<QString, ActiveScan> m_activeScans;
     QMap<QString, bool> m_pendingScanRequests;
     QThreadPool m_thumbnailThreadPool;
     QThreadPool m_postScanThreadPool;
     QSet<int> m_inFlightThumbnails;
-    QMap<QString, ScannerTask*> m_activeScannerTasks;
     QStringList m_pendingStartupResumes;
     QTimer *m_startupResumeTimer;
     void updateScanProgress();

@@ -32,6 +32,7 @@
 
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QThread>
 #include <QSqlRecord>
 #include <QStandardPaths>
 #include <QThreadStorage>
@@ -141,7 +142,11 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
         QSqlQuery query(db);
         query.exec("PRAGMA foreign_keys = ON;");
         query.exec("PRAGMA journal_mode = WAL;");
-        query.exec("PRAGMA busy_timeout = 5000;");
+        if (QThread::currentThread() == QCoreApplication::instance()->thread()) {
+            query.exec("PRAGMA busy_timeout = 100;");
+        } else {
+            query.exec("PRAGMA busy_timeout = 5000;");
+        }
         query.exec("PRAGMA synchronous = NORMAL;");
     }
 

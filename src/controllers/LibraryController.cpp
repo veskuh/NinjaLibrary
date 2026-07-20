@@ -33,6 +33,7 @@
 #include <QClipboard>
 #include <QCryptographicHash>
 #include <QDesktopServices>
+#include <QEventLoop>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -309,14 +310,25 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         return false;
     }
 
-    // Cancel active/queued scanner task if exists
-    if (m_activeScannerTasks.contains(matchedPath)) {
-        ScannerTask *task = m_activeScannerTasks.value(matchedPath);
-        task->cancel();
-        if (QThreadPool::globalInstance()->tryTake(task)) {
-            delete task;
+    // Cancel active/queued scanner task if exists and wait for database lock release
+    if (m_activeScans.contains(matchedPath)) {
+        QPointer<ScannerTask> task = m_activeScans.value(matchedPath).task;
+        if (task) {
+            task->cancel();
+            if (QThreadPool::globalInstance()->tryTake(task.data())) {
+                // QThreadPool::tryTake only succeeds if the task hasn't started running yet.
+                // It is safe to delete it here since it was never run.
+                delete task.data();
+            } else {
+                // Task is currently running. Wait for it to abort and emit finished() cleanly.
+                QEventLoop loop;
+                connect(task.data(), &ScannerTask::finished, &loop, &QEventLoop::quit);
+                if (task) {
+                    loop.exec();
+                }
+            }
         }
-        m_activeScannerTasks.remove(matchedPath);
+        m_activeScans.remove(matchedPath);
     }
 
     // Delete active scan for this folder if exists
@@ -326,6 +338,22 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         removeScan.bindValue(":path", matchedPath);
         removeScan.exec();
     }
+
+    // Delete the watched folder record first and commit early so scanner self-aborts if it checks
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
+    query.bindValue(":path", matchedPath);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to remove watched folder from database:" << query.lastError().text();
+        db.rollback();
+        return false;
+    }
+
+    db.commit();
+
+    // Now start a new transaction for the cascading deletion of documents
+    db.transaction();
 
     if (folderId != -1) {
         QSqlQuery selectDocs(db);
@@ -344,17 +372,6 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
             db.rollback();
             return false;
         }
-    }
-
-    // 5. Delete the watched folder record
-    QSqlQuery query(db);
-    query.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
-    query.bindValue(":path", matchedPath);
-
-    if (!query.exec()) {
-        qWarning() << "Failed to remove watched folder from database:" << query.lastError().text();
-        db.rollback();
-        return false;
     }
 
     db.commit();
@@ -855,26 +872,35 @@ void LibraryController::onScanRequested(const QString &folderPath)
     QString absPath = QDir(folderPath).canonicalPath();
     if (absPath.isEmpty()) absPath = QDir(folderPath).absolutePath();
 
-    if (m_activeScannerTasks.contains(absPath)) {
-        ScannerTask *task = m_activeScannerTasks.value(absPath);
-        task->cancel();
-        if (QThreadPool::globalInstance()->tryTake(task)) {
-            delete task;
-            m_activeScannerTasks.remove(absPath);
-            m_scanProgressMap.remove(absPath);
+    if (m_activeScans.contains(absPath)) {
+        QPointer<ScannerTask> task = m_activeScans.value(absPath).task;
+        if (task) {
+            task->cancel();
+            if (QThreadPool::globalInstance()->tryTake(task.data())) {
+                // QThreadPool::tryTake only succeeds if the task hasn't started running yet.
+                // It is safe to delete it here since it was never run.
+                delete task.data();
+                m_activeScans.remove(absPath);
+            } else {
+                // Task is already running, wait for it to finish and restart
+                m_pendingScanRequests[absPath] = true;
+                return;
+            }
         } else {
-            // Task is already running, wait for it to finish and restart
-            m_pendingScanRequests[absPath] = true;
-            return;
+            m_activeScans.remove(absPath);
         }
     }
 
-    if (m_scanProgressMap.contains(absPath)) {
+    if (m_activeScans.contains(absPath)) {
         m_pendingScanRequests[absPath] = true;
         return;
     }
 
-    m_scanProgressMap.insert(absPath, qMakePair(0, 0));
+    ActiveScan scanInfo;
+    scanInfo.processed = 0;
+    scanInfo.total = 0;
+    m_activeScans.insert(absPath, scanInfo);
+
     if (!m_isScanning) {
         m_isScanning = true;
         emit isScanningChanged();
@@ -894,7 +920,8 @@ void LibraryController::onScanRequested(const QString &folderPath)
     }
 
     ScannerTask *task = new ScannerTask(m_dbMgr, absPath);
-    m_activeScannerTasks.insert(absPath, task);
+    m_activeScans[absPath].task = task;
+
     connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
     connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
     connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
@@ -952,15 +979,17 @@ void LibraryController::requestThumbnail(int docId, const QString &filePath, boo
 
 void LibraryController::onScanProgress(const QString &folderPath, int processed, int total)
 {
-    m_scanProgressMap[folderPath] = qMakePair(processed, total);
+    if (m_activeScans.contains(folderPath)) {
+        m_activeScans[folderPath].processed = processed;
+        m_activeScans[folderPath].total = total;
+    }
     updateScanProgress();
     emit libraryUpdated();
 }
 
 void LibraryController::onScannerTaskFinished(const QString &folderPath)
 {
-    m_activeScannerTasks.remove(folderPath);
-    m_scanProgressMap.remove(folderPath);
+    m_activeScans.remove(folderPath);
 
     // Remove active scan record from database
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -974,7 +1003,7 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
     }
 
     bool runCleanup = false;
-    if (m_scanProgressMap.isEmpty()) {
+    if (m_activeScans.isEmpty()) {
         if (m_isScanning) {
             m_isScanning = false;
             if (m_activeOcrTasks == 0) {
@@ -1039,9 +1068,9 @@ void LibraryController::updateScanProgress()
     int totalFiles = 0;
     int totalProcessed = 0;
 
-    for (auto it = m_scanProgressMap.constBegin(); it != m_scanProgressMap.constEnd(); ++it) {
-        totalProcessed += it.value().first;
-        totalFiles += it.value().second;
+    for (auto it = m_activeScans.constBegin(); it != m_activeScans.constEnd(); ++it) {
+        totalProcessed += it.value().processed;
+        totalFiles += it.value().total;
     }
 
     double progress = 0.0;
