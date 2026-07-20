@@ -21,7 +21,7 @@ set(CMAKE_AUTOUIC ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
 # Required Qt 6.8 components (Core5Compat and ShaderTools are required by Kaakao)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Sql Core5Compat Test QuickTest ShaderTools Pdf PdfQuick)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick Sql Core5Compat Test QuickTest ShaderTools Pdf PdfQuick Concurrent)
 
 # Find third party libraries
 # Tesseract is only needed on Linux; macOS uses native Vision framework for OCR
@@ -190,6 +190,7 @@ target_link_libraries(NinjaLibrary PRIVATE
     Qt6::Core5Compat
     Qt6::Pdf
     Qt6::PdfQuick
+    Qt6::Concurrent
     Kaakao
 )
 

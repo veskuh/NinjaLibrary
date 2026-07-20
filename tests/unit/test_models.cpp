@@ -131,7 +131,8 @@ void TestModels::testModelFiltering()
 {
     // Test base DocumentModel loads all 3 documents
     DocumentModel sourceModel(m_dbMgr);
-    QCOMPARE(sourceModel.rowCount(), 3);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ QTRY_COMPARE(sourceModel.rowCount(), 3);
 
     // Test ProxyFilter
     ProxyFilter proxyFilter(m_dbMgr);
@@ -139,55 +140,55 @@ void TestModels::testModelFiltering()
     proxyFilter.setShowUnavailable(true);
 
     // Initial count with showOffline = true
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Test offline hiding
     proxyFilter.setShowUnavailable(false);
-    QCOMPARE(proxyFilter.rowCount(), 2);  // File A & B are online
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);  // File A & B are online
     proxyFilter.setShowUnavailable(true);
 
     // Test tag intersection (AND filtering)
     // Filter tag "work" (matches File A, File B)
     proxyFilter.setSelectedTags(QStringList{"work"});
-    QCOMPARE(proxyFilter.rowCount(), 2);
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);
 
     // Filter tags "work" AND "important" (matches File A only)
     proxyFilter.setSelectedTags(QStringList{"work", "important"});
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
 
     // Reset tags filter
     proxyFilter.setSelectedTags(QStringList{});
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Test Rating filter >= 4 (File A = 5, matches)
     proxyFilter.setMinRating(4);
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
     proxyFilter.setMinRating(0);
 
     // Test Duplicate filter (File A and C share 'hash123')
     proxyFilter.setDuplicatesOnly(true);
-    QCOMPARE(proxyFilter.rowCount(), 2);
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);
     proxyFilter.setDuplicatesOnly(false);
 
     // Test FTS5 search (debounced search update)
     // Search "world" (matches File A)
     proxyFilter.setFilterString("world");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
 
     // Search "duplicate" (matches File C)
     proxyFilter.setFilterString("duplicate");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileC.pdf"));
 
     proxyFilter.setFilterString("");
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 }
 
 void TestModels::testProxyFilterGet()
@@ -195,7 +196,8 @@ void TestModels::testProxyFilterGet()
     // Verify that ProxyFilter::get(row, roleName) returns correct per-row data.
     // This is the mechanism KaakaoTableView delegates use to retrieve cell values.
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -208,7 +210,7 @@ void TestModels::testProxyFilterGet()
     QCOMPARE(proxyFilter.categoryFilter(), QString("All"));
     QCOMPARE(proxyFilter.folderFilter(), QString(""));
 
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Collect all file names via get() — each row must return a distinct name
     QStringList names;
@@ -262,11 +264,12 @@ void TestModels::testProxyFilterGetBounds()
 {
     // Verify that out-of-bounds and invalid role names return null QVariant
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Negative row
     QVERIFY(!proxyFilter.get(-1, "fileName").isValid());
@@ -284,36 +287,37 @@ void TestModels::testProxyFilterGetBounds()
 void TestModels::testMultiTermSearch()
 {
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
     // Initial count
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Multi-term search: notes and tag
     // fileA.pdf has tag "work" (1), notes "Boss notes"
     // Let's search "boss work" -> should match fileA.pdf
     proxyFilter.setFilterString("boss work");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
 
     // Case-insensitivity check: "BoSs WoRk"
     proxyFilter.setFilterString("BoSs WoRk");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
 
     // Non-matching term: "boss play" -> no match
     proxyFilter.setFilterString("boss play");
-    QCOMPARE(proxyFilter.rowCount(), 0);
+    QTRY_COMPARE(proxyFilter.rowCount(), 0);
 
     // Matches notes, content, filename, tag
     // fileA has filename "fileA.pdf", text "Hello world PDF text.", notes "Boss notes", tags
     // "work", "important" Search "fileA important pdf" -> should match fileA.pdf
     proxyFilter.setFilterString("fileA important pdf");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
 
@@ -321,24 +325,25 @@ void TestModels::testMultiTermSearch()
     // "work" tag is on File A and File B
     // Search "work" -> matches File A and File B
     proxyFilter.setFilterString("work");
-    QCOMPARE(proxyFilter.rowCount(), 2);
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);
 
     // "work hello" -> "work" on File A/B, but "hello" is only on File A ("Hello world...") and File
     // C ("Hello duplicate...") So "work hello" matches only File A
     proxyFilter.setFilterString("work hello");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
     QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
              QString("fileA.pdf"));
 
     // Reset filter
     proxyFilter.setFilterString("");
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 }
 
 void TestModels::testScopeFiltering()
 {
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -357,7 +362,7 @@ void TestModels::testScopeFiltering()
 
     // Test PDF filtering
     proxyFilter.setScopeFilter("PDF");
-    QCOMPARE(proxyFilter.rowCount(), 2);  // fileA.pdf and fileC.pdf
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);  // fileA.pdf and fileC.pdf
     for (int i = 0; i < proxyFilter.rowCount(); ++i) {
         QString name = proxyFilter.get(i, "fileName").toString();
         QVERIFY(name.endsWith(".pdf"));
@@ -365,25 +370,25 @@ void TestModels::testScopeFiltering()
 
     // Test PNG filtering
     proxyFilter.setScopeFilter("PNG");
-    QCOMPARE(proxyFilter.rowCount(), 1);  // fileB.png
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);  // fileB.png
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileB.png");
 
     // Test Online filtering
     proxyFilter.setScopeFilter("Local");
-    QCOMPARE(proxyFilter.rowCount(), 2);  // fileA.pdf and fileB.png
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);  // fileA.pdf and fileB.png
     for (int i = 0; i < proxyFilter.rowCount(); ++i) {
         QVERIFY(!proxyFilter.get(i, "isOffline").toBool());
     }
 
     // Test Offline filtering
     proxyFilter.setScopeFilter("Unavailable");
-    QCOMPARE(proxyFilter.rowCount(), 1);  // fileC.pdf
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);  // fileC.pdf
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), "fileC.pdf");
     QVERIFY(proxyFilter.get(0, "isOffline").toBool());
 
     // Reset scope
     proxyFilter.setScopeFilter("All");
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Now test that scopes are updated when other filters change.
     // Set min rating to 4. Only fileA.pdf (PDF, Local, Rating 5) matches.
@@ -408,14 +413,15 @@ void TestModels::testScopeFiltering()
 void TestModels::testSorting()
 {
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
     // 1. Sort by FileNameRole (259) Ascending
     proxyFilter.setSortRole(259);
     proxyFilter.sort(0, Qt::AscendingOrder);
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
     QCOMPARE(proxyFilter.get(0, "fileName").toString(), QString("fileA.pdf"));
     QCOMPARE(proxyFilter.get(1, "fileName").toString(), QString("fileB.png"));
     QCOMPARE(proxyFilter.get(2, "fileName").toString(), QString("fileC.pdf"));
@@ -449,7 +455,8 @@ void TestModels::testSorting()
 void TestModels::testRecentCategory()
 {
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
 
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -457,17 +464,19 @@ void TestModels::testRecentCategory()
 
     QVERIFY(query.exec("UPDATE documents SET last_opened = 0;"));
     sourceModel.forceRefresh();
+    QTRY_VERIFY(!sourceModel.isRefreshing());
 
     // By default, category filter "Recent" should show nothing because last_opened is 0 for all
     proxyFilter.setCategoryFilter("Recent");
-    QCOMPARE(proxyFilter.rowCount(), 0);
+    QTRY_COMPARE(proxyFilter.rowCount(), 0);
 
-    QVERIFY(query.exec("UPDATE documents SET last_opened = 100 WHERE file_name = 'fileA.pdf';"));
+    if (!query.exec("UPDATE documents SET last_opened = 100 WHERE file_name = 'fileA.pdf';")) { qWarning() << "SQL ERROR:" << query.lastError().text(); QFAIL("Query failed"); }
     QVERIFY(query.exec("UPDATE documents SET last_opened = 200 WHERE file_name = 'fileB.png';"));
     sourceModel.forceRefresh();
+    QTRY_VERIFY(!sourceModel.isRefreshing());
 
     // Should show 2 documents (File A and File B, but not File C)
-    QCOMPARE(proxyFilter.rowCount(), 2);
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);
 
     // They must be sorted by last_opened DESC: fileB.png (200) should be first, then fileA.pdf
     // (100)
@@ -481,20 +490,21 @@ void TestModels::testRecentCategory()
 void TestModels::testTagSelectionAndClearing()
 {
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
     // Initial count
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Filter by tag "work"
     proxyFilter.setSelectedTags(QStringList{"work"});
-    QCOMPARE(proxyFilter.rowCount(), 2);
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);
 
     // Clear tag selection
     proxyFilter.setSelectedTags(QStringList{});
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 }
 
 void TestModels::testModelChangeScopeDebounce()
@@ -503,11 +513,12 @@ void TestModels::testModelChangeScopeDebounce()
     // membership stays up to date synchronously (via dynamicSortFilter), while the
     // scope recount is debounced instead of running per model signal.
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
     QVERIFY(!proxyFilter.activeScopes().contains("TXT"));
 
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -530,9 +541,10 @@ void TestModels::testModelChangeScopeDebounce()
                            .arg(docDId)));
 
     sourceModel.forceRefresh();
+    QTRY_VERIFY(!sourceModel.isRefreshing());
 
     // Row membership updates synchronously via base-class dynamic filtering
-    QCOMPARE(proxyFilter.rowCount(), 4);
+    QTRY_COMPARE(proxyFilter.rowCount(), 4);
 
     // Scope recount is debounced; applied once the 400ms timer fires
     QTest::qWait(500);
@@ -548,13 +560,14 @@ void TestModels::testSearchMatchDebounce()
     // Verify that when model data changes while a search is active, the match set
     // recomputation is debounced and applied once the timer fires.
     DocumentModel sourceModel(m_dbMgr);
-    ProxyFilter proxyFilter(m_dbMgr);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
+ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
     // "world" initially matches only fileA.pdf
     proxyFilter.setFilterString("world");
-    QCOMPARE(proxyFilter.rowCount(), 1);
+    QTRY_COMPARE(proxyFilter.rowCount(), 1);
 
     // Change fileB's indexed text so it also matches the active search
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -563,14 +576,15 @@ void TestModels::testSearchMatchDebounce()
         query.exec("UPDATE document_search SET text_snippet = 'world peace' WHERE file_name = "
                    "'fileB.png';"));
     sourceModel.forceRefresh();
+    QTRY_VERIFY(!sourceModel.isRefreshing());
 
     // Recompute is debounced; applied once the 400ms timer fires
     QTest::qWait(500);
-    QCOMPARE(proxyFilter.rowCount(), 2);
+    QTRY_COMPARE(proxyFilter.rowCount(), 2);
 
     // Clearing the search stays synchronous
     proxyFilter.setFilterString("");
-    QCOMPARE(proxyFilter.rowCount(), 3);
+    QTRY_COMPARE(proxyFilter.rowCount(), 3);
 
     // Restore original text
     QVERIFY(

@@ -36,6 +36,7 @@
 #include <QList>
 #include <QStringList>
 #include <QTimer>
+#include <QFutureWatcher>
 
 #include "../database/DatabaseManager.h"
 
@@ -114,6 +115,7 @@ public:
     int textCount() const { return m_textCount; }
     int localCount() const { return m_localCount; }
     int unavailableCount() const { return m_unavailableCount; }
+    bool isRefreshing() const { return m_isRefreshing; }
     const QList<DocumentInfo>& documents() const { return m_documents; }
     Q_INVOKABLE QVariantMap getDocument(int docId) const;
     Q_INVOKABLE int findDocIdByPath(const QString &path) const;
@@ -128,6 +130,9 @@ public slots:
     void forceRefresh();
     void updateThumbnail(int docId, const QString &thumbnailPath);
 
+private slots:
+    void onRefreshFinished();
+
 private:
     DatabaseManager *m_dbMgr;
     QList<DocumentInfo> m_documents;
@@ -137,6 +142,9 @@ private:
     int m_textCount = 0;
     int m_localCount = 0;
     int m_unavailableCount = 0;
+    
+    QFutureWatcher<QList<DocumentInfo>> *m_refreshWatcher = nullptr;
+    bool m_isRefreshing = false;
 };
 
 #endif  // DOCUMENTMODEL_H

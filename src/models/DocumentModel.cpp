@@ -38,6 +38,7 @@
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QStandardPaths>
+#include <QtConcurrent>
 
 static QString getParentDirectory(const QString &absolutePath) {
     if (absolutePath.isEmpty()) {
@@ -70,6 +71,9 @@ DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
     connect(m_refreshTimer, &QTimer::timeout, this, &DocumentModel::forceRefresh);
+
+    m_refreshWatcher = new QFutureWatcher<QList<DocumentInfo>>(this);
+    connect(m_refreshWatcher, &QFutureWatcher<QList<DocumentInfo>>::finished, this, &DocumentModel::onRefreshFinished);
 
     forceRefresh();
 }
@@ -195,12 +199,11 @@ void DocumentModel::refresh()
     m_refreshTimer->start(200);  // Debounce by 200ms
 }
 
-void DocumentModel::forceRefresh()
+static QList<DocumentInfo> computeRefreshSnapshotOffThread(DatabaseManager *dbMgr)
 {
-    m_refreshTimer->stop();
-
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return;
+    QList<DocumentInfo> newDocs;
+    QSqlDatabase db = dbMgr->getDatabaseConnection();
+    if (!db.isOpen()) return newDocs;
 
     QList<QSqlRecord> records;
     {
@@ -231,8 +234,6 @@ void DocumentModel::forceRefresh()
     QMap<QString, int> folderFileCounts;
     QSet<QString> uniqueFolders;
     QMap<QString, int> folderIdMap;
-
-    QList<DocumentInfo> newDocs;
 
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     if (cacheDir.isEmpty()) {
@@ -312,6 +313,28 @@ void DocumentModel::forceRefresh()
         folderDoc.dateModified = QFileInfo(folderPath).lastModified();
         newDocs.append(folderDoc);
     }
+
+    return newDocs;
+}
+
+void DocumentModel::forceRefresh()
+{
+    m_refreshTimer->stop();
+
+    if (m_isRefreshing) {
+        m_refreshTimer->start(200);
+        return;
+    }
+
+    m_isRefreshing = true;
+    QFuture<QList<DocumentInfo>> future = QtConcurrent::run(&computeRefreshSnapshotOffThread, m_dbMgr);
+    m_refreshWatcher->setFuture(future);
+}
+
+void DocumentModel::onRefreshFinished()
+{
+    m_isRefreshing = false;
+    QList<DocumentInfo> newDocs = m_refreshWatcher->result();
 
     // Calculate count changes
     int tempPdf = 0;

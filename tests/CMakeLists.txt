@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.16)
 # Copyright (c) 2026 NinjaLibrary. All rights reserved.
 # Licensed under the BSD-3-Clause License.
 
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Test QuickTest)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Test QuickTest Concurrent)
 
 # Create Database Unit Test Target
 qt_add_executable(test_database
@@ -43,6 +43,7 @@ target_link_libraries(test_models PRIVATE
     Qt6::Gui
     Qt6::Sql
     Qt6::Test
+    Qt6::Concurrent
 )
 
 add_test(NAME test_models COMMAND test_models)
