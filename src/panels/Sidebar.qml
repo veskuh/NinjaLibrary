@@ -133,15 +133,18 @@ KaakaoSidebar {
 
     Component.onCompleted: {
         rebuildModel();
-        if (typeof libraryController !== "undefined" && libraryController) {
-            if (libraryController.watchedFoldersChanged) {
-                libraryController.watchedFoldersChanged.connect(rebuildModel);
-            }
-            if (libraryController.libraryChanged) {
-                libraryController.libraryChanged.connect(function() {
-                    tagRefreshTimer.restart();
-                });
-            }
+    }
+
+    Connections {
+        target: (typeof libraryController !== "undefined" && libraryController) ? libraryController : null
+        ignoreUnknownSignals: true
+
+        function onWatchedFoldersChanged() {
+            rebuildModel();
+        }
+
+        function onLibraryChanged() {
+            tagRefreshTimer.restart();
         }
     }
 

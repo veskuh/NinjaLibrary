@@ -96,6 +96,8 @@ public slots:
     void resumeScan();
     Q_INVOKABLE void toggleScanPause();
 
+    Q_INVOKABLE QStringList watchedDirectories() const;
+
 signals:
     void watchedFoldersChanged();
     void folderAdded(const QString &folderPath);
@@ -108,6 +110,7 @@ signals:
     void thumbnailGenerated(int docId, const QString &thumbnailPath);
     void isScanPausedChanged();
     void folderConflictDetected(const QString &message);
+    void postScanFinished();
 
 private slots:
     void onDirectoryChanged(const QString &path);
@@ -131,6 +134,7 @@ private:
     QStringList m_watchedFoldersCache;
     QString m_sidecarDir;
 
+    static QStringList collectSubdirectories(const QString &folderPath);
     void updateFoldersCache();
     void watchFolderRecursively(const QString &folderPath);
     QString getSidecarPath(const QString &documentPath) const;

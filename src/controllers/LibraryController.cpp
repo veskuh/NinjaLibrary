@@ -157,6 +157,11 @@ LibraryController::~LibraryController()
 
 QStringList LibraryController::watchedFolders() const { return m_watchedFoldersCache; }
 
+QStringList LibraryController::watchedDirectories() const
+{
+    return m_watcher ? m_watcher->directories() : QStringList();
+}
+
 bool LibraryController::isScanning() const { return m_isScanning || m_activeOcrTasks > 0; }
 
 double LibraryController::scanProgress() const
@@ -787,13 +792,14 @@ void LibraryController::updateFoldersCache()
     emit watchedFoldersChanged();
 }
 
-void LibraryController::watchFolderRecursively(const QString &folderPath)
+QStringList LibraryController::collectSubdirectories(const QString &folderPath)
 {
+    QStringList paths;
     if (folderPath.isEmpty() || !QDir(folderPath).exists()) {
-        return;
+        return paths;
     }
 
-    m_watcher->addPath(folderPath);
+    paths.append(folderPath);
 
     QDirIterator it(folderPath, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext()) {
@@ -806,8 +812,17 @@ void LibraryController::watchFolderRecursively(const QString &folderPath)
 
         // Filter out unwanted directories (same logic as in ScannerTask)
         if (!DocUtils::isInsideIgnoredDir(absSubDirPath)) {
-            m_watcher->addPath(absSubDirPath);
+            paths.append(absSubDirPath);
         }
+    }
+    return paths;
+}
+
+void LibraryController::watchFolderRecursively(const QString &folderPath)
+{
+    QStringList paths = collectSubdirectories(folderPath);
+    if (!paths.isEmpty()) {
+        m_watcher->addPaths(paths);
     }
 }
 
@@ -962,28 +977,18 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
             cleanupSidecars();
         }
 
-        QStringList pathsToWatch;
-        if (!folderPath.isEmpty() && QDir(folderPath).exists()) {
-            pathsToWatch.append(folderPath);
-            QDirIterator it(folderPath, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-            while (it.hasNext()) {
-                QString subDirPath = it.next();
-                QFileInfo dirInfo(subDirPath);
-                QString absSubDirPath = dirInfo.canonicalFilePath();
-                if (absSubDirPath.isEmpty()) {
-                    absSubDirPath = dirInfo.absoluteFilePath();
-                }
-                if (!DocUtils::isInsideIgnoredDir(absSubDirPath)) {
-                    pathsToWatch.append(absSubDirPath);
-                }
-            }
-        }
+        // Watch any new subdirectories recursively.
+        // Note: There is a transient window between the scan-finish and when
+        // this background QDirIterator finishes where newly created subdirs
+        // will not trigger filesystem watcher events.
+        QStringList pathsToWatch = collectSubdirectories(folderPath);
 
         // Apply watchers back on the UI thread
         QMetaObject::invokeMethod(this, [this, pathsToWatch]() {
             if (!pathsToWatch.isEmpty()) {
                 m_watcher->addPaths(pathsToWatch);
             }
+            emit postScanFinished();
         }, Qt::QueuedConnection);
     });
     m_postScanThreadPool.start(task, -10);

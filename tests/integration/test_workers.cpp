@@ -1321,6 +1321,8 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     subDirPath = QFileInfo(subDirPath).canonicalFilePath();
     QVERIFY(!subDirPath.isEmpty());
 
+    QSignalSpy spyPostScan(m_controller, &LibraryController::postScanFinished);
+
     // Add watched folder (top-level)
     QVERIFY(m_controller->addWatchedFolder(tempPath));
 
@@ -1329,6 +1331,12 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
+    if (spyPostScan.isEmpty()) {
+        QVERIFY(spyPostScan.wait(5000));
+    }
+
+    // Assert that the subdirectory was successfully watched
+    QVERIFY(m_controller->watchedDirectories().contains(subDirPath));
 
     // Verify it is in database
     {
@@ -1343,12 +1351,16 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     QVERIFY(QFile::remove(filePath));
 
     // Manually trigger the event handler to simulate filesystem watcher event
+    spyPostScan.clear();
     QMetaObject::invokeMethod(m_controller, "onDirectoryChanged", Q_ARG(QString, subDirPath));
 
     // Wait for the second scan to finish completely
     QThreadPool::globalInstance()->waitForDone();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
+    }
+    if (spyPostScan.isEmpty()) {
+        QVERIFY(spyPostScan.wait(5000));
     }
 
     // Check if document was deleted from database
