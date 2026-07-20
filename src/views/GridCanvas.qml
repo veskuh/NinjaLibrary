@@ -175,7 +175,7 @@ Item {
                             var ext = model.fileName.substring(model.fileName.lastIndexOf('.') + 1).toLowerCase();
                             var isTextDoc = (ext === "txt" || ext === "md" || ext === "doc" || ext === "docx" || ext === "xls" || ext === "xlsx" || ext === "ppt" || ext === "pptx");
                             if (!isTextDoc) {
-                                libraryController.requestThumbnail(model.docId, model.absolutePath, false);
+                                libraryController.requestThumbnail(model.docId, model.absolutePath, true);
                             }
                         }
                     }

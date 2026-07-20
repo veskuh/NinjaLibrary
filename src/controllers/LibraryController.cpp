@@ -128,6 +128,8 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     int maxThreads = qMax(1, (int)(std::thread::hardware_concurrency() / 2));
     QThreadPool::globalInstance()->setMaxThreadCount(maxThreads);
 
+    m_thumbnailThreadPool.setMaxThreadCount(2);
+
     connect(this, &LibraryController::scanRequested, this, &LibraryController::onScanRequested);
 
     updateFoldersCache();
@@ -884,10 +886,15 @@ void LibraryController::requestThumbnail(int docId, const QString &filePath, boo
     if (DocUtils::isSupportedTextDocument(filePath)) {
         return;
     }
+    if (m_inFlightThumbnails.contains(docId)) {
+        return;
+    }
+    m_inFlightThumbnails.insert(docId);
+
     ThumbnailTask *task = new ThumbnailTask(m_dbMgr, docId, filePath);
     connect(task, &ThumbnailTask::finished, this, &LibraryController::onThumbnailTaskFinished);
     task->setAutoDelete(true);
-    QThreadPool::globalInstance()->start(task, highPriority ? 10 : 0);
+    m_thumbnailThreadPool.start(task, highPriority ? 10 : 0);
 }
 
 void LibraryController::onScanProgress(const QString &folderPath, int processed, int total)
@@ -989,6 +996,7 @@ void LibraryController::onOcrTaskFinished(int docId)
 
 void LibraryController::onThumbnailTaskFinished(int docId, const QString &thumbnailPath)
 {
+    m_inFlightThumbnails.remove(docId);
     emit thumbnailGenerated(docId, thumbnailPath);
 }
 

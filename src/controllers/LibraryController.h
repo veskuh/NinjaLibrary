@@ -142,6 +142,8 @@ private:
     int m_totalOcrTasks = 0;
     QMap<QString, QPair<int, int>> m_scanProgressMap;
     QMap<QString, bool> m_pendingScanRequests;
+    QThreadPool m_thumbnailThreadPool;
+    QSet<int> m_inFlightThumbnails;
     void updateScanProgress();
 };
 
