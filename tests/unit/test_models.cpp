@@ -132,7 +132,7 @@ void TestModels::testModelFiltering()
     // Test base DocumentModel loads all 3 documents
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
- QTRY_COMPARE(sourceModel.rowCount(), 3);
+    QTRY_COMPARE(sourceModel.rowCount(), 3);
 
     // Test ProxyFilter
     ProxyFilter proxyFilter(m_dbMgr);
@@ -197,7 +197,7 @@ void TestModels::testProxyFilterGet()
     // This is the mechanism KaakaoTableView delegates use to retrieve cell values.
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -265,7 +265,7 @@ void TestModels::testProxyFilterGetBounds()
     // Verify that out-of-bounds and invalid role names return null QVariant
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -288,7 +288,7 @@ void TestModels::testMultiTermSearch()
 {
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -343,7 +343,7 @@ void TestModels::testScopeFiltering()
 {
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -414,7 +414,7 @@ void TestModels::testSorting()
 {
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -456,7 +456,7 @@ void TestModels::testRecentCategory()
 {
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
 
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -470,7 +470,10 @@ ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setCategoryFilter("Recent");
     QTRY_COMPARE(proxyFilter.rowCount(), 0);
 
-    if (!query.exec("UPDATE documents SET last_opened = 100 WHERE file_name = 'fileA.pdf';")) { qWarning() << "SQL ERROR:" << query.lastError().text(); QFAIL("Query failed"); }
+    if (!query.exec("UPDATE documents SET last_opened = 100 WHERE file_name = 'fileA.pdf';")) {
+        qWarning() << "SQL ERROR:" << query.lastError().text();
+        QFAIL("Query failed");
+    }
     QVERIFY(query.exec("UPDATE documents SET last_opened = 200 WHERE file_name = 'fileB.png';"));
     sourceModel.forceRefresh();
     QTRY_VERIFY(!sourceModel.isRefreshing());
@@ -491,7 +494,7 @@ void TestModels::testTagSelectionAndClearing()
 {
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -514,7 +517,7 @@ void TestModels::testModelChangeScopeDebounce()
     // scope recount is debounced instead of running per model signal.
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 
@@ -561,7 +564,7 @@ void TestModels::testSearchMatchDebounce()
     // recomputation is debounced and applied once the timer fires.
     DocumentModel sourceModel(m_dbMgr);
     QTRY_COMPARE(sourceModel.rowCount(), 3);
-ProxyFilter proxyFilter(m_dbMgr);
+    ProxyFilter proxyFilter(m_dbMgr);
     proxyFilter.setSourceModel(&sourceModel);
     proxyFilter.setShowUnavailable(true);
 

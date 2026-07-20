@@ -40,7 +40,8 @@
 #include <QStandardPaths>
 #include <QtConcurrent>
 
-static QString getParentDirectory(const QString &absolutePath) {
+static QString getParentDirectory(const QString &absolutePath)
+{
     if (absolutePath.isEmpty()) {
         return QString();
     }
@@ -55,7 +56,8 @@ static QString getParentDirectory(const QString &absolutePath) {
     return "";
 }
 
-static QString getFileName(const QString &path) {
+static QString getFileName(const QString &path)
+{
     int lastSlash = path.lastIndexOf('/');
     int lastBack = path.lastIndexOf('\\');
     int last = (lastSlash > lastBack) ? lastSlash : lastBack;
@@ -73,7 +75,8 @@ DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     connect(m_refreshTimer, &QTimer::timeout, this, &DocumentModel::forceRefresh);
 
     m_refreshWatcher = new QFutureWatcher<QList<DocumentInfo>>(this);
-    connect(m_refreshWatcher, &QFutureWatcher<QList<DocumentInfo>>::finished, this, &DocumentModel::onRefreshFinished);
+    connect(m_refreshWatcher, &QFutureWatcher<QList<DocumentInfo>>::finished, this,
+            &DocumentModel::onRefreshFinished);
 
     forceRefresh();
 }
@@ -327,7 +330,8 @@ void DocumentModel::forceRefresh()
     }
 
     m_isRefreshing = true;
-    QFuture<QList<DocumentInfo>> future = QtConcurrent::run(&computeRefreshSnapshotOffThread, m_dbMgr);
+    QFuture<QList<DocumentInfo>> future =
+        QtConcurrent::run(&computeRefreshSnapshotOffThread, m_dbMgr);
     m_refreshWatcher->setFuture(future);
 }
 
@@ -450,7 +454,7 @@ void DocumentModel::onRefreshFinished()
                 endInsertRows();
             }
         }
-        
+
         if (isReconciling) {
             emit reconciled();
         }
@@ -505,7 +509,8 @@ QVariantMap DocumentModel::getDocument(int docId) const
             }
 
             if (doc.isFolder) {
-                map["itemCountStr"] = QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
+                map["itemCountStr"] =
+                    QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
             } else {
                 map["itemCountStr"] = "";
             }
