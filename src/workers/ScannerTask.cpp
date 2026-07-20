@@ -126,15 +126,10 @@ void ScannerTask::run()
     QElapsedTimer progressTimer;
     progressTimer.start();
 
-    bool inTransaction = false;
-    int transactionBatchCount = 0;
     const int BATCH_SIZE = 50;
 
     for (const QString &filePath : filesToProcess) {
         if (m_cancelled) {
-            if (inTransaction) {
-                QSqlQuery(db).exec("COMMIT");
-            }
             emit finished(m_folderPath);
             return;
         }
@@ -149,10 +144,6 @@ void ScannerTask::run()
         }
 
         if (s_scanPaused) {
-            if (inTransaction) {
-                QSqlQuery(db).exec("COMMIT");
-                inTransaction = false;
-            }
             QMutexLocker locker(&s_pauseMutex);
             while (s_scanPaused) {
                 s_pauseCondition.wait(&s_pauseMutex);
@@ -166,26 +157,12 @@ void ScannerTask::run()
             checkWatched.bindValue(":id", folderId);
             if (!checkWatched.exec() || !checkWatched.next()) {
                 qDebug() << "ScannerTask: Folder was unwatched during scan, aborting immediately:"
-                          << m_folderPath;
-                if (inTransaction) {
-                    QSqlQuery(db).exec("ROLLBACK");
-                }
+                         << m_folderPath;
                 emit finished(m_folderPath);
                 return;
             }
         }
 
-        if (!inTransaction) {
-            QSqlQuery beginWrite(db);
-            if (beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
-                inTransaction = true;
-                transactionBatchCount = 0;
-            } else {
-                qWarning() << "ScannerTask: Failed to start transaction, retrying shortly...";
-                QThread::msleep(50);
-                continue;
-            }
-        }
 
         filesOnDisk.insert(filePath);
         QFileInfo fileInfo(filePath);
@@ -259,6 +236,14 @@ void ScannerTask::run()
                     }
                 }
 
+                QSqlQuery beginWrite(db);
+                if (!beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                    qWarning() << "ScannerTask: Failed to begin immediate transaction for modified "
+                                  "document:"
+                               << beginWrite.lastError().text();
+                    continue;
+                }
+
                 QSqlQuery updateQuery(db);
                 updateQuery.prepare(
                     "UPDATE documents SET file_size = :size, date_modified = :modified, "
@@ -302,38 +287,55 @@ void ScannerTask::run()
                 }
 
                 if (ok) {
-                    bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
-                                    ext == "bmp");
-                    if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
-                        pendingOcr.append({docId, filePath});
+                    QSqlQuery commitWrite(db);
+                    if (!commitWrite.exec("COMMIT")) {
+                        qWarning() << "ScannerTask: Commit failed on modified, rolling back:"
+                                   << commitWrite.lastError().text();
+                        QSqlQuery(db).exec("ROLLBACK");
+                    } else {
+                        bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" ||
+                                        ext == "tiff" || ext == "bmp");
+                        if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
+                            pendingOcr.append({docId, filePath});
+                        }
+                        if (isImage || ext == "pdf") {
+                            pendingThumbnails.append({docId, filePath});
+                        }
                     }
-                    if (isImage || ext == "pdf") {
-                        pendingThumbnails.append({docId, filePath});
-                    }
-                    transactionBatchCount++;
                 } else {
-                    qWarning() << "ScannerTask: Modified document updates failed, rolling back batch:"
+                    qWarning() << "ScannerTask: Modified document updates failed, rolling back:"
                                << updateQuery.lastError().text();
                     QSqlQuery(db).exec("ROLLBACK");
-                    inTransaction = false;
                 }
             } else if (isOffline) {
                 // File came back online
+                QSqlQuery beginWrite(db);
+                if (!beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                    qWarning() << "ScannerTask: Failed to begin immediate transaction for offline "
+                                  "document:"
+                               << beginWrite.lastError().text();
+                    continue;
+                }
                 QSqlQuery updateOffline(db);
                 updateOffline.prepare("UPDATE documents SET is_offline = 0 WHERE id = :id;");
                 updateOffline.bindValue(":id", docId);
                 if (updateOffline.exec()) {
-                    bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
-                                    ext == "bmp");
-                    if (isImage || ext == "pdf") {
-                        pendingThumbnails.append({docId, filePath});
+                    QSqlQuery commitWrite(db);
+                    if (!commitWrite.exec("COMMIT")) {
+                        qWarning() << "ScannerTask: Commit failed on offline, rolling back:"
+                                   << commitWrite.lastError().text();
+                        QSqlQuery(db).exec("ROLLBACK");
+                    } else {
+                        bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" ||
+                                        ext == "tiff" || ext == "bmp");
+                        if (isImage || ext == "pdf") {
+                            pendingThumbnails.append({docId, filePath});
+                        }
                     }
-                    transactionBatchCount++;
                 } else {
-                    qWarning() << "ScannerTask: Failed to update offline status, rolling back batch:"
+                    qWarning() << "ScannerTask: Failed to update offline status, rolling back:"
                                << updateOffline.lastError().text();
                     QSqlQuery(db).exec("ROLLBACK");
-                    inTransaction = false;
                 }
             }
         } else {
@@ -390,6 +392,13 @@ void ScannerTask::run()
                 }
             }
 
+            QSqlQuery beginWrite(db);
+            if (!beginWrite.exec("BEGIN IMMEDIATE TRANSACTION")) {
+                qWarning() << "ScannerTask: Failed to begin immediate transaction for new document:"
+                           << beginWrite.lastError().text();
+                continue;
+            }
+
             QSqlQuery insertDoc(db);
             insertDoc.prepare(
                 "INSERT INTO documents (folder_id, file_name, absolute_path, file_size, "
@@ -439,55 +448,39 @@ void ScannerTask::run()
             }
 
             if (ok && docId != -1) {
-                bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" ||
-                                ext == "tiff" || ext == "bmp");
-                if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
-                    pendingOcr.append({docId, filePath});
+                QSqlQuery commitWrite(db);
+                if (!commitWrite.exec("COMMIT")) {
+                    qWarning() << "ScannerTask: Commit failed on new, rolling back:"
+                               << commitWrite.lastError().text();
+                    QSqlQuery(db).exec("ROLLBACK");
+                } else {
+                    bool isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" ||
+                                    ext == "tiff" || ext == "bmp");
+                    if (isImage || (ext == "pdf" && countWords(extractedText) < 10)) {
+                        pendingOcr.append({docId, filePath});
+                    }
+                    if (isImage || ext == "pdf") {
+                        pendingThumbnails.append({docId, filePath});
+                    }
                 }
-                if (isImage || ext == "pdf") {
-                    pendingThumbnails.append({docId, filePath});
-                }
-                transactionBatchCount++;
             } else {
                 qWarning() << "Failed to insert document" << filePath << ":"
                            << insertDoc.lastError().text();
                 QSqlQuery(db).exec("ROLLBACK");
-                inTransaction = false;
-            }
-        }
-
-        if (inTransaction && transactionBatchCount >= BATCH_SIZE) {
-            QSqlQuery commitWrite(db);
-            if (commitWrite.exec("COMMIT")) {
-                inTransaction = false;
-            } else {
-                qWarning() << "ScannerTask: Batch commit failed, rolling back:" << commitWrite.lastError().text();
-                QSqlQuery(db).exec("ROLLBACK");
-                inTransaction = false;
             }
         }
 
         processedCount++;
-        if (processedCount == totalFiles || progressTimer.elapsed() >= 250) {
+        if (processedCount % BATCH_SIZE == 0 || processedCount == totalFiles
+            || progressTimer.elapsed() >= 250) {
             emit progress(m_folderPath, processedCount, totalFiles);
             progressTimer.restart();
         }
+
         if (m_cancelled) {
-            if (inTransaction) {
-                QSqlQuery(db).exec("COMMIT");
-            }
             emit finished(m_folderPath);
             return;
         }
-    }
-
-    if (inTransaction) {
-        QSqlQuery commitWrite(db);
-        if (!commitWrite.exec("COMMIT")) {
-            qWarning() << "ScannerTask: Final batch commit failed, rolling back:" << commitWrite.lastError().text();
-            QSqlQuery(db).exec("ROLLBACK");
-        }
-        inTransaction = false;
     }
 
     if (m_cancelled) {

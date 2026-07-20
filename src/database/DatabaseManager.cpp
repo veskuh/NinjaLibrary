@@ -142,11 +142,7 @@ QSqlDatabase DatabaseManager::getDatabaseConnection()
         QSqlQuery query(db);
         query.exec("PRAGMA foreign_keys = ON;");
         query.exec("PRAGMA journal_mode = WAL;");
-        if (QThread::currentThread() == QCoreApplication::instance()->thread()) {
-            query.exec("PRAGMA busy_timeout = 100;");
-        } else {
-            query.exec("PRAGMA busy_timeout = 5000;");
-        }
+        query.exec("PRAGMA busy_timeout = 5000;");
         query.exec("PRAGMA synchronous = NORMAL;");
     }
 

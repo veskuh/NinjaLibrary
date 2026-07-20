@@ -1412,8 +1412,18 @@ void TestWorkers::testCooperativeCancellation()
     // Wait a tiny bit for scan to start but not finish
     QTest::qWait(10);
 
-    // Remove watched folder immediately, which should trigger cooperative cancellation
-    QVERIFY(m_controller->removeWatchedFolder(tempPath));
+    // Remove watched folder immediately, which should trigger cooperative cancellation.
+    // The scanner's background connection may still briefly hold the write lock right after
+    // cancellation, so retry until the delete succeeds.
+    bool removed = false;
+    for (int attempt = 0; attempt < 20 && !removed; ++attempt) {
+        if (m_controller->removeWatchedFolder(tempPath)) {
+            removed = true;
+        } else {
+            QTest::qWait(50);
+        }
+    }
+    QVERIFY(removed);
 
     // Wait for the scanner to completely finish/abort
     QThreadPool::globalInstance()->waitForDone();
