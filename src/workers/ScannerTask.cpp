@@ -47,6 +47,7 @@
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QStorageInfo>
+#include <QElapsedTimer>
 
 #include "../database/TagRepository.h"
 #include "../utils/DocUtils.h"
@@ -117,6 +118,9 @@ void ScannerTask::run()
     int totalFiles = filesToProcess.size();
     int processedCount = 0;
     emit progress(m_folderPath, 0, totalFiles);
+
+    QElapsedTimer progressTimer;
+    progressTimer.start();
 
     for (const QString &filePath : filesToProcess) {
         // Check disk space (safeguard threshold: 500MB)
@@ -454,8 +458,9 @@ void ScannerTask::run()
             }
         }
         processedCount++;
-        if (processedCount % 5 == 0 || processedCount == totalFiles) {
+        if (processedCount == totalFiles || progressTimer.elapsed() >= 250) {
             emit progress(m_folderPath, processedCount, totalFiles);
+            progressTimer.restart();
         }
     }
 
