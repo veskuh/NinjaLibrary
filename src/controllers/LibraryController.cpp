@@ -129,6 +129,7 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     QThreadPool::globalInstance()->setMaxThreadCount(maxThreads);
 
     m_thumbnailThreadPool.setMaxThreadCount(2);
+    m_postScanThreadPool.setMaxThreadCount(1);
 
     connect(this, &LibraryController::scanRequested, this, &LibraryController::onScanRequested);
 
@@ -150,6 +151,8 @@ LibraryController::~LibraryController()
     resumeScan();
     m_thumbnailThreadPool.clear();
     m_thumbnailThreadPool.waitForDone();
+    m_postScanThreadPool.clear();
+    m_postScanThreadPool.waitForDone();
 }
 
 QStringList LibraryController::watchedFolders() const { return m_watchedFoldersCache; }
@@ -924,6 +927,7 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
         }
     }
 
+    bool runCleanup = false;
     if (m_scanProgressMap.isEmpty()) {
         if (m_isScanning) {
             m_isScanning = false;
@@ -935,20 +939,54 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
             m_scanProgress = 0.0;
             emit scanProgressChanged();
         }
-        cleanupSidecars();
+        runCleanup = true;
     } else {
         updateScanProgress();
     }
 
     // Clean up watched subdirectories that no longer exist on disk
     QStringList watchedPaths = m_watcher->directories();
+    QStringList pathsToRemove;
     for (const QString &path : watchedPaths) {
         if (path.startsWith(folderPath + "/") && !QDir(path).exists()) {
-            m_watcher->removePath(path);
+            pathsToRemove.append(path);
         }
     }
-    // Watch any new subdirectories recursively
-    watchFolderRecursively(folderPath);
+    if (!pathsToRemove.isEmpty()) {
+        m_watcher->removePaths(pathsToRemove);
+    }
+
+    // Run cleanupSidecars and recursive directory scan on background thread
+    QRunnable *task = QRunnable::create([this, folderPath, runCleanup]() {
+        if (runCleanup) {
+            cleanupSidecars();
+        }
+
+        QStringList pathsToWatch;
+        if (!folderPath.isEmpty() && QDir(folderPath).exists()) {
+            pathsToWatch.append(folderPath);
+            QDirIterator it(folderPath, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+            while (it.hasNext()) {
+                QString subDirPath = it.next();
+                QFileInfo dirInfo(subDirPath);
+                QString absSubDirPath = dirInfo.canonicalFilePath();
+                if (absSubDirPath.isEmpty()) {
+                    absSubDirPath = dirInfo.absoluteFilePath();
+                }
+                if (!DocUtils::isInsideIgnoredDir(absSubDirPath)) {
+                    pathsToWatch.append(absSubDirPath);
+                }
+            }
+        }
+
+        // Apply watchers back on the UI thread
+        QMetaObject::invokeMethod(this, [this, pathsToWatch]() {
+            if (!pathsToWatch.isEmpty()) {
+                m_watcher->addPaths(pathsToWatch);
+            }
+        }, Qt::QueuedConnection);
+    });
+    m_postScanThreadPool.start(task, -10);
 
     emit scanStatusTextChanged();
     emit libraryChanged();

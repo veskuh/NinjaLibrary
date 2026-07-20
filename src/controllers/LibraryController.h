@@ -143,6 +143,7 @@ private:
     QMap<QString, QPair<int, int>> m_scanProgressMap;
     QMap<QString, bool> m_pendingScanRequests;
     QThreadPool m_thumbnailThreadPool;
+    QThreadPool m_postScanThreadPool;
     QSet<int> m_inFlightThumbnails;
     void updateScanProgress();
 };
