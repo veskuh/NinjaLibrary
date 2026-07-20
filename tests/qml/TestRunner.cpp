@@ -16,8 +16,9 @@ class MockController : public QObject
         double scanProgress READ scanProgress WRITE setScanProgress NOTIFY scanProgressChanged)
     Q_PROPERTY(QString scanStatusText READ scanStatusText WRITE setScanStatusText NOTIFY
                    scanStatusTextChanged)
+    Q_PROPERTY(QStringList mockTags READ mockTags WRITE setMockTags NOTIFY mockTagsChanged)
 public:
-    explicit MockController(QObject *parent = nullptr) : QObject(parent) {}
+    explicit MockController(QObject *parent = nullptr) : QObject(parent), m_mockTags({"work", "2026"}) {}
     QStringList watchedFolders() const { return QStringList(); }
     bool isScanning() const { return m_isScanning; }
     void setIsScanning(bool s)
@@ -66,7 +67,15 @@ public:
     }
     Q_INVOKABLE void addWatchedFolder(const QString &path) { emit folderAdded(path); }
     Q_INVOKABLE void removeWatchedFolder(const QString &) {}
-    Q_INVOKABLE QStringList getUniqueTags() const { return QStringList{"work", "2026"}; }
+    Q_INVOKABLE QStringList getUniqueTags() const { return m_mockTags; }
+    QStringList mockTags() const { return m_mockTags; }
+    void setMockTags(const QStringList &tags)
+    {
+        if (m_mockTags != tags) {
+            m_mockTags = tags;
+            emit mockTagsChanged();
+        }
+    }
     Q_INVOKABLE QVariantMap handleDroppedUrl(const QString &) { return QVariantMap(); }
     Q_INVOKABLE void batchUpdateRating(const QVariantList &, int) { emit libraryChanged(); }
     Q_INVOKABLE void batchRemoveTags(const QVariantList &, const QStringList &) {}
@@ -92,10 +101,14 @@ signals:
     void scanStatusTextChanged();
     void scanRequested(const QString &folderPath);
 
+signals:
+    void mockTagsChanged();
+
 private:
     bool m_isScanning = false;
     double m_scanProgress = 0.0;
     QString m_scanStatusText;
+    QStringList m_mockTags;
 };
 
 #include <QByteArray>

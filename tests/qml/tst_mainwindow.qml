@@ -1469,4 +1469,70 @@ TestCase {
 
         win.destroy();
     }
+
+    function test_sidebar_tags_debounce_and_refresh() {
+        let win = mainWindowComponent.createObject(this);
+        verify(win !== null, "MainWindow should be instantiated");
+        wait(200);
+
+        let sidebar = findChildByType(win, "Sidebar");
+        verify(sidebar !== null, "Sidebar should exist");
+
+        // 1. Initial tags should be "work" and "2026"
+        let sidebarModel = sidebar.model;
+        let originalTagCount = 0;
+        let workTagIndex = -1;
+        for (let i = 0; i < sidebarModel.count; i++) {
+            if (sidebarModel.get(i).type === "tag") {
+                originalTagCount++;
+                if (sidebarModel.get(i).target === "work") {
+                    workTagIndex = i;
+                }
+            }
+        }
+        compare(originalTagCount, 2, "Should have 2 tags initially");
+        verify(workTagIndex !== -1, "Should find 'work' tag");
+
+        // Select the 'work' tag
+        sidebar.currentIndex = workTagIndex;
+        wait(50);
+        compare(sidebarModel.get(sidebar.currentIndex).target, "work", "Selection should be 'work'");
+
+        // 2. Modify mock tags in controller (simulate tag addition)
+        libraryController.mockTags = ["work", "2026", "newtag"];
+
+        // 3. Emit libraryChanged to trigger the debounced tag refresh
+        libraryController.libraryChanged();
+
+        // 4. Assert that tags have NOT refreshed immediately (coalesced/debounced)
+        let tagCountAfterChange = 0;
+        for (let i = 0; i < sidebarModel.count; i++) {
+            if (sidebarModel.get(i).type === "tag") {
+                tagCountAfterChange++;
+            }
+        }
+        compare(tagCountAfterChange, 2, "Tags should not refresh immediately due to debounce");
+
+        // 5. Wait for the debounce timer (250ms) to fire (using 300ms to be safe)
+        wait(300);
+
+        // 6. Assert that tags are now updated and the selection on 'work' is preserved
+        let finalTagCount = 0;
+        let newtagFound = false;
+        for (let i = 0; i < sidebarModel.count; i++) {
+            if (sidebarModel.get(i).type === "tag") {
+                finalTagCount++;
+                if (sidebarModel.get(i).target === "newtag") {
+                    newtagFound = true;
+                }
+            }
+        }
+        compare(finalTagCount, 3, "Tags should update to 3");
+        verify(newtagFound, "New tag 'newtag' should be added");
+        compare(sidebarModel.get(sidebar.currentIndex).target, "work", "Selection on 'work' tag should be preserved");
+
+        // Reset mock tags to defaults to prevent test side-effects
+        libraryController.mockTags = ["work", "2026"];
+        win.destroy();
+    }
 }

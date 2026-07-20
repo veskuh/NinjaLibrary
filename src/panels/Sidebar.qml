@@ -128,39 +128,7 @@ KaakaoSidebar {
             });
         }
 
-        // Restore selection
-        var restored = false;
-        if (prevTarget !== "") {
-            for (var j = 0; j < sidebarModel.count; j++) {
-                var item = sidebarModel.get(j);
-                if (item.target === prevTarget && item.type === prevType) {
-                    sidebar.currentIndex = j;
-                    restored = true;
-                    break;
-                }
-            }
-        }
-
-        // Fallback to select first item (All Documents)
-        if (!restored && sidebarModel.count > 0) {
-            sidebar.currentIndex = 0;
-        }
-
-        sidebar.rebuilding = false;
-
-        // Only fire selection change signals if the target or type actually changed
-        var currentItem = currentIndex >= 0 ? sidebarModel.get(currentIndex) : null;
-        if (currentItem) {
-            if (currentItem.target !== prevTarget || currentItem.type !== prevType) {
-                if (currentItem.type === "section") {
-                    sidebar.sectionSelected(currentItem.target);
-                } else if (currentItem.type === "folder") {
-                    sidebar.folderSelected(currentItem.target);
-                } else if (currentItem.type === "tag") {
-                    sidebar.tagSelected(currentItem.target);
-                }
-            }
-        }
+        restoreSelectionAndEmit(prevTarget, prevType);
     }
 
     Component.onCompleted: {
@@ -179,7 +147,7 @@ KaakaoSidebar {
 
     Timer {
         id: tagRefreshTimer
-        interval: 1000
+        interval: 250
         repeat: false
         onTriggered: {
             updateTags();
@@ -218,6 +186,10 @@ KaakaoSidebar {
         }
 
         // Restore selection
+        restoreSelectionAndEmit(prevTarget, prevType);
+    }
+
+    function restoreSelectionAndEmit(prevTarget, prevType) {
         var restored = false;
         if (prevTarget !== "") {
             for (var j = 0; j < sidebarModel.count; j++) {
@@ -230,13 +202,12 @@ KaakaoSidebar {
             }
         }
 
-        if (!restored && prevType === "tag" && sidebarModel.count > 0) {
+        if (!restored && sidebarModel.count > 0) {
             sidebar.currentIndex = 0;
         }
 
         sidebar.rebuilding = false;
 
-        // Only fire selection change signals if the target or type actually changed
         var currentItem = currentIndex >= 0 ? sidebarModel.get(currentIndex) : null;
         if (currentItem) {
             if (currentItem.target !== prevTarget || currentItem.type !== prevType) {
