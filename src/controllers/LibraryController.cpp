@@ -145,7 +145,12 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     }
 }
 
-LibraryController::~LibraryController() { resumeScan(); }
+LibraryController::~LibraryController()
+{
+    resumeScan();
+    m_thumbnailThreadPool.clear();
+    m_thumbnailThreadPool.waitForDone();
+}
 
 QStringList LibraryController::watchedFolders() const { return m_watchedFoldersCache; }
 
