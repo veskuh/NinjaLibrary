@@ -170,7 +170,83 @@ KaakaoSidebar {
                 libraryController.watchedFoldersChanged.connect(rebuildModel);
             }
             if (libraryController.libraryChanged) {
-                libraryController.libraryChanged.connect(rebuildModel);
+                libraryController.libraryChanged.connect(function() {
+                    tagRefreshTimer.restart();
+                });
+            }
+        }
+    }
+
+    Timer {
+        id: tagRefreshTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            updateTags();
+        }
+    }
+
+    function updateTags() {
+        var prevIndex = sidebar.currentIndex;
+        var prevTarget = "";
+        var prevType = "";
+
+        if (prevIndex >= 0 && prevIndex < sidebarModel.count) {
+            var prevItem = sidebarModel.get(prevIndex);
+            prevTarget = prevItem.target;
+            prevType = prevItem.type;
+        }
+
+        sidebar.rebuilding = true;
+
+        for (var i = sidebarModel.count - 1; i >= 0; i--) {
+            if (sidebarModel.get(i).type === "tag") {
+                sidebarModel.remove(i);
+            }
+        }
+
+        var tags = libraryController.getUniqueTags();
+        for (var k = 0; k < tags.length; k++) {
+            var tag = tags[k];
+            sidebarModel.append({
+                "name": tag,
+                "icon": "🏷️",
+                "category": "Tags",
+                "type": "tag",
+                "target": tag
+            });
+        }
+
+        // Restore selection
+        var restored = false;
+        if (prevTarget !== "") {
+            for (var j = 0; j < sidebarModel.count; j++) {
+                var item = sidebarModel.get(j);
+                if (item.target === prevTarget && item.type === prevType) {
+                    sidebar.currentIndex = j;
+                    restored = true;
+                    break;
+                }
+            }
+        }
+
+        if (!restored && prevType === "tag" && sidebarModel.count > 0) {
+            sidebar.currentIndex = 0;
+        }
+
+        sidebar.rebuilding = false;
+
+        // Only fire selection change signals if the target or type actually changed
+        var currentItem = currentIndex >= 0 ? sidebarModel.get(currentIndex) : null;
+        if (currentItem) {
+            if (currentItem.target !== prevTarget || currentItem.type !== prevType) {
+                if (currentItem.type === "section") {
+                    sidebar.sectionSelected(currentItem.target);
+                } else if (currentItem.type === "folder") {
+                    sidebar.folderSelected(currentItem.target);
+                } else if (currentItem.type === "tag") {
+                    sidebar.tagSelected(currentItem.target);
+                }
             }
         }
     }
