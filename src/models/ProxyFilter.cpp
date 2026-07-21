@@ -297,10 +297,10 @@ void ProxyFilter::updateSearchMatches()
             for (const QString &term : terms) {
                 QSet<int> termMatched;
 
-                // 1. FTS match (file_name, text_snippet, notes)
+                // 1. FTS match (file_name, text_snippet, notes) using LIKE for exact substring semantics
                 QSqlQuery qFts(db);
-                qFts.prepare("SELECT rowid FROM document_search WHERE document_search MATCH :ftsQuery");
-                qFts.bindValue(":ftsQuery", "\"" + term + "\"*");
+                qFts.prepare("SELECT rowid FROM document_search WHERE file_name LIKE :likeQuery OR text_snippet LIKE :likeQuery OR notes LIKE :likeQuery");
+                qFts.bindValue(":likeQuery", "%" + term + "%");
                 if (qFts.exec()) {
                     while (qFts.next()) termMatched.insert(qFts.value(0).toInt());
                 } else {
