@@ -160,6 +160,10 @@ private:
     QMap<QString, bool> m_pendingScanRequests;
     QThreadPool m_thumbnailThreadPool;
     QThreadPool m_postScanThreadPool;
+    
+public:
+    QThreadPool* postScanPoolForTesting() { return &m_postScanThreadPool; }
+private:
     QSet<int> m_inFlightThumbnails;
     QStringList m_pendingStartupResumes;
     QTimer *m_startupResumeTimer;

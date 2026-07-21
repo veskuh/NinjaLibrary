@@ -68,7 +68,7 @@ struct ModelDiff {
     QList<DocumentInfo> finalDocuments;
     QList<int> rowsToRemove; // descending order
     QList<QPair<int, DocumentInfo>> rowsToUpdate;
-    QList<QPair<int, DocumentInfo>> rowsToInsert;
+    QList<DocumentInfo> rowsToInsert;
 };
 
 class DocumentModel : public QAbstractListModel

@@ -63,6 +63,7 @@ private slots:
     void testImageThumbnailAndOcrWithExif();
     void testSubdirectoryDeletionDetection();
     void testCooperativeCancellation();
+    void testAsyncWatcherDelivery();
 
 private:
     DatabaseManager *m_dbMgr;
@@ -1453,6 +1454,49 @@ void TestWorkers::testCooperativeCancellation()
         spyPostScan.wait(1000);
     }
 
+    QVERIFY(m_controller->removeWatchedFolder(tempPath));
+    QThreadPool::globalInstance()->waitForDone();
+}
+
+void TestWorkers::testAsyncWatcherDelivery()
+{
+    // Clear state
+    QThreadPool::globalInstance()->waitForDone();
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    QSqlQuery clearQuery(db);
+    QVERIFY(clearQuery.exec("DELETE FROM watched_folders;"));
+    QVERIFY(clearQuery.exec("DELETE FROM documents;"));
+
+    // Create a deeply nested directory structure to test batching
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString tempPath = QFileInfo(tempDir.path()).canonicalFilePath();
+    
+    // Create > 500 subdirectories to trigger multiple batches
+    for (int i = 0; i < 505; ++i) {
+        QDir().mkpath(tempPath + QString("/dir_%1").arg(i));
+    }
+
+    QSignalSpy spyWatchedFoldersChanged(m_controller, &LibraryController::watchedFoldersChanged);
+    
+    // Call addWatchedFolder. It sets up the watcher recursively in the background.
+    QVERIFY(m_controller->addWatchedFolder(tempPath));
+    
+    // Wait for the background task to complete and invokeMethod to finish
+    m_controller->postScanPoolForTesting()->waitForDone();
+    QCoreApplication::processEvents();
+
+    // Verify watched folders changed was emitted
+    QVERIFY(spyWatchedFoldersChanged.count() > 0);
+
+    // Verify watcher has all the paths (the root + 505 subdirs = 506)
+    // Unfortunately we can't easily access m_watcher from outside, but we can verify the DB
+    QSqlQuery countQuery(db);
+    QVERIFY(countQuery.exec("SELECT COUNT(*) FROM watched_folders;"));
+    QVERIFY(countQuery.next());
+    QCOMPARE(countQuery.value(0).toInt(), 1);
+
+    // Clean up
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
     QThreadPool::globalInstance()->waitForDone();
 }

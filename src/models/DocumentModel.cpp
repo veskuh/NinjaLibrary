@@ -369,7 +369,7 @@ static ModelDiff computeRefreshSnapshotOffThread(DatabaseManager *dbMgr, const Q
     // 3. Add new items
     for (const auto &newDoc : newDocs) {
         if (!currentMap.contains(newDoc.absolutePath)) {
-            diff.rowsToInsert.append(qMakePair(-1, newDoc));
+            diff.rowsToInsert.append(newDoc);
         }
     }
     
@@ -492,9 +492,7 @@ void DocumentModel::onRefreshFinished()
             ensureReconciling();
             int startRow = m_documents.size();
             beginInsertRows(QModelIndex(), startRow, startRow + diff.rowsToInsert.size() - 1);
-            for (const auto &pair : diff.rowsToInsert) {
-                m_documents.append(pair.second);
-            }
+            m_documents.append(diff.rowsToInsert);
             endInsertRows();
         }
 
@@ -540,35 +538,35 @@ QVariantMap DocumentModel::getDocument(int docId) const
     map["docId"] = doc.id;
     map["fileName"] = doc.fileName;
     map["absolutePath"] = doc.absolutePath;
-            map["fileSize"] = doc.fileSize;
-            map["pageCount"] = doc.pageCount;
-            map["starRating"] = doc.starRating;
-            map["isOffline"] = doc.isOffline;
-            map["tags"] = doc.tags;
-            map["textSnippet"] = doc.textSnippet;
-            map["notes"] = doc.notes;
-            map["thumbnailPath"] = doc.thumbnailPath;
-            map["dateCreated"] = doc.dateCreated;
-            map["dateModified"] = doc.dateModified;
-            map["dateAdded"] = doc.dateAdded;
-            map["lastOpened"] = doc.lastOpened;
-            map["isFolder"] = doc.isFolder;
-            map["itemCount"] = doc.itemCount;
+    map["fileSize"] = doc.fileSize;
+    map["pageCount"] = doc.pageCount;
+    map["starRating"] = doc.starRating;
+    map["isOffline"] = doc.isOffline;
+    map["tags"] = doc.tags;
+    map["textSnippet"] = doc.textSnippet;
+    map["notes"] = doc.notes;
+    map["thumbnailPath"] = doc.thumbnailPath;
+    map["dateCreated"] = doc.dateCreated;
+    map["dateModified"] = doc.dateModified;
+    map["dateAdded"] = doc.dateAdded;
+    map["lastOpened"] = doc.lastOpened;
+    map["isFolder"] = doc.isFolder;
+    map["itemCount"] = doc.itemCount;
 
-            // Formatted fields
-            qint64 kb = doc.fileSize / 1024;
-            if (kb > 1024) {
-                map["fileSizeStr"] = QString("%1 MB").arg(double(kb) / 1024.0, 0, 'f', 1);
-            } else {
-                map["fileSizeStr"] = QString("%1 KB").arg(kb);
-            }
+    // Formatted fields
+    qint64 kb = doc.fileSize / 1024;
+    if (kb > 1024) {
+        map["fileSizeStr"] = QString("%1 MB").arg(double(kb) / 1024.0, 0, 'f', 1);
+    } else {
+        map["fileSizeStr"] = QString("%1 KB").arg(kb);
+    }
 
-            if (doc.isFolder) {
-                map["itemCountStr"] =
-                    QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
-            } else {
-                map["itemCountStr"] = "";
-            }
+    if (doc.isFolder) {
+        map["itemCountStr"] =
+            QString("%1 item%2").arg(doc.itemCount).arg(doc.itemCount == 1 ? "" : "s");
+    } else {
+        map["itemCountStr"] = "";
+    }
 
             return map;
     return QVariantMap();
