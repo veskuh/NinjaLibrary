@@ -270,13 +270,20 @@ void ProxyFilter::updateSearchMatches()
         return;
     }
 
+    uint64_t currentGen = ++m_searchGeneration;
+    
     if (!m_searchWatcher) {
         m_searchWatcher = new QFutureWatcher<QSet<int>>(this);
-        connect(m_searchWatcher, &QFutureWatcher<QSet<int>>::finished, this, [this]() {
+    }
+    
+    // Disconnect old finished signals to avoid multiple/stale lambda invocations
+    disconnect(m_searchWatcher, &QFutureWatcher<QSet<int>>::finished, nullptr, nullptr);
+    connect(m_searchWatcher, &QFutureWatcher<QSet<int>>::finished, this, [this, currentGen]() {
+        if (m_searchGeneration == currentGen) {
             m_matchedDocIds = m_searchWatcher->result();
             invalidateAndRecalculate();
-        });
-    }
+        }
+    });
 
     QString queryStr = m_filterString;
     DatabaseManager* dbMgr = m_dbMgr;

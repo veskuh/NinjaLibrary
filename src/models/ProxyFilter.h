@@ -150,6 +150,7 @@ private:
     mutable QHash<QString, int> m_roleNameToKey;
     QTimer *m_modelChangeTimer;
     QFutureWatcher<QSet<int>> *m_searchWatcher = nullptr;
+    uint64_t m_searchGeneration = 0;
 
     void invalidateAndRecalculate();
 };
