@@ -126,12 +126,16 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     m_sidecarDir = dataDir + "/sidecars/";
     QDir().mkpath(m_sidecarDir);
 
-    // Cap thread pool concurrency to hardware_concurrency / 2
+    // Cap global thread pool concurrency to hardware_concurrency / 2 (legacy tasks)
     int maxThreads = qMax(1, (int)(std::thread::hardware_concurrency() / 2));
     QThreadPool::globalInstance()->setMaxThreadCount(maxThreads);
 
     m_thumbnailThreadPool.setMaxThreadCount(2);
     m_postScanThreadPool.setMaxThreadCount(1);
+    
+    // Bounded dedicated pools as per #14
+    m_scannerThreadPool.setMaxThreadCount(2);
+    m_ocrThreadPool.setMaxThreadCount(qMax(1, (int)(std::thread::hardware_concurrency() / 4)));
 
     connect(this, &LibraryController::scanRequested, this, &LibraryController::onScanRequested);
 
@@ -283,8 +287,6 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (!db.isOpen()) return false;
 
-    db.transaction();
-
     // Build possible paths to handle macOS NFC/NFD Unicode normalization discrepancies
     QStringList possiblePaths;
     possiblePaths << folderPath << absPath
@@ -311,7 +313,6 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
 
     if (folderId == -1) {
         qWarning() << "removeWatchedFolder: no matching watched folder for" << folderPath;
-        db.rollback();
         return false;
     }
 
@@ -320,7 +321,7 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         QPointer<ScannerTask> task = m_activeScans.value(matchedPath).task;
         if (task) {
             task->cancel();
-            if (QThreadPool::globalInstance()->tryTake(task.data())) {
+            if (m_scannerThreadPool.tryTake(task.data())) {
                 // QThreadPool::tryTake only succeeds if the task hasn't started running yet.
                 // It is safe to delete it here since it was never run.
                 delete task.data();
@@ -335,6 +336,8 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         }
         m_activeScans.remove(matchedPath);
     }
+
+    db.transaction();
 
     // Delete active scan for this folder if exists
     {
@@ -956,7 +959,7 @@ void LibraryController::onScanRequested(const QString &folderPath)
     connect(task, &ScannerTask::lowDiskSpaceDetected, this,
             &LibraryController::onLowDiskSpaceDetected);
     task->setAutoDelete(true);
-    QThreadPool::globalInstance()->start(task);
+    m_scannerThreadPool.start(task);
 }
 
 void LibraryController::onOcrRequested(int docId, const QString &filePath)
@@ -977,7 +980,7 @@ void LibraryController::onOcrRequested(int docId, const QString &filePath)
     OcrTask *task = new OcrTask(m_dbMgr, docId, filePath);
     connect(task, &OcrTask::finished, this, &LibraryController::onOcrTaskFinished);
     task->setAutoDelete(true);
-    QThreadPool::globalInstance()->start(task);
+    m_ocrThreadPool.start(task);
 
     emit scanProgressChanged();
     emit scanStatusTextChanged();

@@ -160,9 +160,16 @@ private:
     QMap<QString, bool> m_pendingScanRequests;
     QThreadPool m_thumbnailThreadPool;
     QThreadPool m_postScanThreadPool;
+    QThreadPool m_scannerThreadPool;
+    QThreadPool m_ocrThreadPool;
     
 public:
-    QThreadPool* postScanPoolForTesting() { return &m_postScanThreadPool; }
+    void waitForWorkersForTesting() {
+        m_scannerThreadPool.waitForDone();
+        m_ocrThreadPool.waitForDone();
+        m_thumbnailThreadPool.waitForDone();
+        m_postScanThreadPool.waitForDone();
+    }
 private:
     QSet<int> m_inFlightThumbnails;
     QStringList m_pendingStartupResumes;

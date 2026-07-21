@@ -78,6 +78,8 @@ DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     connect(m_refreshWatcher, &QFutureWatcher<ModelDiff>::finished, this,
             &DocumentModel::onRefreshFinished);
 
+    m_snapshotThreadPool.setMaxThreadCount(1);
+
     forceRefresh();
 }
 
@@ -393,7 +395,7 @@ void DocumentModel::forceRefresh()
     m_isRefreshing = true;
     QList<DocumentInfo> currentDocs = m_documents;
     QFuture<ModelDiff> future =
-        QtConcurrent::run(&computeRefreshSnapshotOffThread, m_dbMgr, currentDocs);
+        QtConcurrent::run(&m_snapshotThreadPool, &computeRefreshSnapshotOffThread, m_dbMgr, currentDocs);
     m_refreshWatcher->setFuture(future);
 }
 
@@ -568,8 +570,7 @@ QVariantMap DocumentModel::getDocument(int docId) const
         map["itemCountStr"] = "";
     }
 
-            return map;
-    return QVariantMap();
+    return map;
 }
 
 int DocumentModel::findDocIdByPath(const QString &path) const

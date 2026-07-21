@@ -118,7 +118,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     // Wait for the scanner to finish
     QSignalSpy spyLibrary(m_controller, &LibraryController::libraryChanged);
     QVERIFY(spyLibrary.wait(5000));
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -141,7 +141,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -166,7 +166,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     QVERIFY(spyLibrary.wait(5000));
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -190,7 +190,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -212,7 +212,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -234,7 +234,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -260,7 +260,7 @@ void TestWorkers::testIngestionAndOfflineDetection()
     spyLibrary.clear();
     emit m_controller->scanRequested(tempPath);
     spyLibrary.wait(1000);
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -440,7 +440,7 @@ void TestWorkers::testLibraryControllerAPIs()
 
     // Process queued signals and wait for background OCR/Thumbnail tasks to complete
     QCoreApplication::processEvents();
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 
     // Test UI getters while idle
     if (m_controller->isScanning()) {
@@ -739,7 +739,7 @@ void TestWorkers::testLibraryControllerAPIs()
 
     // Wait for any pending thread pool tasks to complete before modifying tables
     QCoreApplication::processEvents();
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 
     // Clean up watched folder for tempDir2
     QVERIFY(m_controller->removeWatchedFolder(newFolderPath));
@@ -770,7 +770,7 @@ void TestWorkers::testLibraryControllerAPIs()
         // By checking both forms in our removal function, we are resilient against this.
 
         QCoreApplication::processEvents();
-        QThreadPool::globalInstance()->waitForDone();
+        m_controller->waitForWorkersForTesting();
 
         // Pass the explicitly decomposed (NFD) string to removeWatchedFolder
         QString nfdDirPath = nfcDirPath.normalized(QString::NormalizationForm_D);
@@ -823,7 +823,7 @@ void TestWorkers::testLibraryControllerAPIs()
         QVERIFY(m_controller->watchedFolders().contains(subDir));
 
         QCoreApplication::processEvents();
-        QThreadPool::globalInstance()->waitForDone();
+        m_controller->waitForWorkersForTesting();
 
         // Try to add sub-subfolder (should conflict)
         QString subSubDir = subDir + "/subSubFolder";
@@ -839,13 +839,13 @@ void TestWorkers::testLibraryControllerAPIs()
         QVERIFY(!m_controller->watchedFolders().contains(subDir));
 
         QCoreApplication::processEvents();
-        QThreadPool::globalInstance()->waitForDone();
+        m_controller->waitForWorkersForTesting();
 
         // Clean up
         QVERIFY(m_controller->removeWatchedFolder(parentDir));
 
         QCoreApplication::processEvents();
-        QThreadPool::globalInstance()->waitForDone();
+        m_controller->waitForWorkersForTesting();
     }
 
     // Test Feature 5: Low disk space detection and pause
@@ -871,12 +871,12 @@ void TestWorkers::testLibraryControllerAPIs()
         }
 
         QCoreApplication::processEvents();
-        QThreadPool::globalInstance()->waitForDone();
+        m_controller->waitForWorkersForTesting();
 
         QVERIFY(m_controller->removeWatchedFolder(diskSpacePath));
 
         QCoreApplication::processEvents();
-        QThreadPool::globalInstance()->waitForDone();
+        m_controller->waitForWorkersForTesting();
     }
 }
 
@@ -1282,7 +1282,7 @@ void TestWorkers::testImageThumbnailAndOcrWithExif()
 void TestWorkers::testSubdirectoryDeletionDetection()
 {
     // Ensure thread pool is completely idle from previous tests
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 
     // Clear database to ensure a completely clean state
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -1329,7 +1329,7 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     QVERIFY(m_controller->addWatchedFolder(tempPath));
 
     // Wait for the scanner and all background tasks to finish completely
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -1360,7 +1360,7 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     QMetaObject::invokeMethod(m_controller, "processDirtyRoots", Qt::DirectConnection);
 
     // Wait for the second scan to finish completely
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -1378,13 +1378,13 @@ void TestWorkers::testSubdirectoryDeletionDetection()
 
     // Clean up watched folder
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 }
 
 void TestWorkers::testCooperativeCancellation()
 {
     // Ensure thread pool is completely idle
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 
     // Clear database to ensure a completely clean state
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
@@ -1430,7 +1430,7 @@ void TestWorkers::testCooperativeCancellation()
     QVERIFY(removed);
 
     // Wait for the scanner to completely finish/abort
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -1446,7 +1446,7 @@ void TestWorkers::testCooperativeCancellation()
     emit m_controller->scanRequested(tempPath); // Re-request immediately, should cancel/queued take
 
     // Clean up
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     while (m_controller->isScanning()) {
         QTest::qWait(50);
     }
@@ -1455,13 +1455,13 @@ void TestWorkers::testCooperativeCancellation()
     }
 
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 }
 
 void TestWorkers::testAsyncWatcherDelivery()
 {
     // Clear state
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     QSqlQuery clearQuery(db);
     QVERIFY(clearQuery.exec("DELETE FROM watched_folders;"));
@@ -1483,7 +1483,7 @@ void TestWorkers::testAsyncWatcherDelivery()
     QVERIFY(m_controller->addWatchedFolder(tempPath));
     
     // Wait for the background task to complete and invokeMethod to finish
-    m_controller->postScanPoolForTesting()->waitForDone();
+    m_controller->waitForWorkersForTesting();
     QCoreApplication::processEvents();
 
     // Verify watched folders changed was emitted
@@ -1498,7 +1498,7 @@ void TestWorkers::testAsyncWatcherDelivery()
 
     // Clean up
     QVERIFY(m_controller->removeWatchedFolder(tempPath));
-    QThreadPool::globalInstance()->waitForDone();
+    m_controller->waitForWorkersForTesting();
 }
 
 QTEST_MAIN(TestWorkers)

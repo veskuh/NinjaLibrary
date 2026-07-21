@@ -161,6 +161,7 @@ private:
     
     QFutureWatcher<ModelDiff> *m_refreshWatcher = nullptr;
     bool m_isRefreshing = false;
+    QThreadPool m_snapshotThreadPool;
 };
 
 #endif  // DOCUMENTMODEL_H
