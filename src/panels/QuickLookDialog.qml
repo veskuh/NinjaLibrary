@@ -23,6 +23,12 @@ Dialog {
         }
     }
     
+    onOpened: {
+        if (contentItem) {
+            contentItem.forceActiveFocus();
+        }
+    }
+    
     // Center in window
     x: parent ? (parent.width - width) / 2 : 100
     y: parent ? (parent.height - height) / 2 : 100

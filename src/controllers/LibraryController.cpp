@@ -337,9 +337,28 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         m_activeScans.remove(matchedPath);
     }
 
-    db.transaction();
+    // 2. Collect document IDs to delete BEFORE starting any write queries or transactions
+    QList<int> docsToDelete;
+    {
+        QSqlQuery selectDocs(db);
+        selectDocs.prepare("SELECT id FROM documents WHERE folder_id = :folderId;");
+        selectDocs.bindValue(":folderId", folderId);
+        if (selectDocs.exec()) {
+            while (selectDocs.next()) {
+                docsToDelete.append(selectDocs.value(0).toInt());
+            }
+        } else {
+            qWarning() << "Failed to query documents on stopwatching:" << selectDocs.lastError().text();
+            return false;
+        }
+    }
 
-    // Delete active scan for this folder if exists
+    // 3. Execute all deletions inside a clean database transaction
+    if (!db.transaction()) {
+        qWarning() << "removeWatchedFolder: failed to begin transaction";
+        return false;
+    }
+
     {
         QSqlQuery removeScan(db);
         removeScan.prepare("DELETE FROM active_scans WHERE folder_path = :path;");
@@ -347,42 +366,29 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
         removeScan.exec();
     }
 
-    // Delete the watched folder record first and commit early so scanner self-aborts if it checks
-    QSqlQuery query(db);
-    query.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
-    query.bindValue(":path", matchedPath);
-
-    if (!query.exec()) {
-        qWarning() << "Failed to remove watched folder from database:" << query.lastError().text();
-        db.rollback();
-        return false;
-    }
-
-    db.commit();
-
-    // Now start a new transaction for the cascading deletion of documents
-    db.transaction();
-
-    if (folderId != -1) {
-        QSqlQuery selectDocs(db);
-        selectDocs.prepare("SELECT id FROM documents WHERE folder_id = :folderId;");
-        selectDocs.bindValue(":folderId", folderId);
-        if (selectDocs.exec()) {
-            while (selectDocs.next()) {
-                int docId = selectDocs.value(0).toInt();
-                if (!DatabaseManager::deleteDocumentCascade(db, docId)) {
-                    db.rollback();
-                    return false;
-                }
-            }
-        } else {
-            qWarning() << "Failed to query documents on stopwatching:" << selectDocs.lastError().text();
+    {
+        QSqlQuery query(db);
+        query.prepare("DELETE FROM watched_folders WHERE absolute_path = :path;");
+        query.bindValue(":path", matchedPath);
+        if (!query.exec()) {
+            qWarning() << "Failed to remove watched folder from database:" << query.lastError().text();
             db.rollback();
             return false;
         }
     }
 
-    db.commit();
+    for (int docId : docsToDelete) {
+        if (!DatabaseManager::deleteDocumentCascade(db, docId)) {
+            db.rollback();
+            return false;
+        }
+    }
+
+    if (!db.commit()) {
+        qWarning() << "Failed to commit removeWatchedFolder transaction:" << db.lastError().text();
+        db.rollback();
+        return false;
+    }
 
     m_watcher->removePath(matchedPath);
     updateFoldersCache();
@@ -952,8 +958,8 @@ void LibraryController::onScanRequested(const QString &folderPath)
     ScannerTask *task = new ScannerTask(m_dbMgr, absPath);
     m_activeScans[absPath].task = task;
 
-    connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
-    connect(task, &ScannerTask::thumbnailRequested, this, &LibraryController::onThumbnailRequested);
+    connect(task, &ScannerTask::ocrBatchRequested, this, &LibraryController::onOcrBatchRequested);
+    connect(task, &ScannerTask::thumbnailBatchRequested, this, &LibraryController::onThumbnailBatchRequested);
     connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
     connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
     connect(task, &ScannerTask::lowDiskSpaceDetected, this,
@@ -962,33 +968,66 @@ void LibraryController::onScanRequested(const QString &folderPath)
     m_scannerThreadPool.start(task);
 }
 
-void LibraryController::onOcrRequested(int docId, const QString &filePath)
+void LibraryController::onOcrBatchRequested(const QList<QPair<int, QString>> &batch)
 {
+    if (batch.isEmpty()) return;
+
     if (m_activeOcrTasks == 0) {
         m_totalOcrTasks = 0;
         bool wasScanning = isScanning();
-        m_activeOcrTasks++;
-        m_totalOcrTasks++;
+        m_activeOcrTasks += batch.size();
+        m_totalOcrTasks += batch.size();
         if (!wasScanning) {
             emit isScanningChanged();
         }
     } else {
-        m_activeOcrTasks++;
-        m_totalOcrTasks++;
+        m_activeOcrTasks += batch.size();
+        m_totalOcrTasks += batch.size();
     }
-
-    OcrTask *task = new OcrTask(m_dbMgr, docId, filePath);
-    connect(task, &OcrTask::finished, this, &LibraryController::onOcrTaskFinished);
-    task->setAutoDelete(true);
-    m_ocrThreadPool.start(task);
 
     emit scanProgressChanged();
     emit scanStatusTextChanged();
+
+    m_postScanThreadPool.start([this, batch]() {
+        for (const auto &job : batch) {
+            int docId = job.first;
+            QString filePath = job.second;
+            
+            OcrTask *task = new OcrTask(m_dbMgr, docId, filePath);
+            QObject::connect(task, &OcrTask::finished, this, &LibraryController::onOcrTaskFinished);
+            task->setAutoDelete(true);
+            m_ocrThreadPool.start(task);
+        }
+    });
 }
 
-void LibraryController::onThumbnailRequested(int docId, const QString &filePath)
+void LibraryController::onThumbnailBatchRequested(const QList<QPair<int, QString>> &batch)
 {
-    requestThumbnail(docId, filePath, false);
+    if (batch.isEmpty()) return;
+
+    m_postScanThreadPool.start([this, batch]() {
+        for (const auto &job : batch) {
+            int docId = job.first;
+            QString filePath = job.second;
+            
+            if (DocUtils::isSupportedTextDocument(filePath)) {
+                continue;
+            }
+            
+            {
+                QMutexLocker locker(&m_inFlightThumbnailsMutex);
+                if (m_inFlightThumbnails.contains(docId)) {
+                    continue;
+                }
+                m_inFlightThumbnails.insert(docId);
+            }
+
+            ThumbnailTask *task = new ThumbnailTask(m_dbMgr, docId, filePath);
+            QObject::connect(task, &ThumbnailTask::finished, this, &LibraryController::onThumbnailTaskFinished);
+            task->setAutoDelete(true);
+            m_thumbnailThreadPool.start(task, 0); // low priority
+        }
+    });
 }
 
 void LibraryController::requestThumbnail(int docId, const QString &filePath, bool highPriority)
@@ -996,13 +1035,16 @@ void LibraryController::requestThumbnail(int docId, const QString &filePath, boo
     if (DocUtils::isSupportedTextDocument(filePath)) {
         return;
     }
-    if (m_inFlightThumbnails.contains(docId)) {
-        return;
+    {
+        QMutexLocker locker(&m_inFlightThumbnailsMutex);
+        if (m_inFlightThumbnails.contains(docId)) {
+            return;
+        }
+        m_inFlightThumbnails.insert(docId);
     }
-    m_inFlightThumbnails.insert(docId);
 
     ThumbnailTask *task = new ThumbnailTask(m_dbMgr, docId, filePath);
-    connect(task, &ThumbnailTask::finished, this, &LibraryController::onThumbnailTaskFinished);
+    QObject::connect(task, SIGNAL(finished(int,QString)), this, SLOT(onThumbnailTaskFinished(int,QString)));
     task->setAutoDelete(true);
     m_thumbnailThreadPool.start(task, highPriority ? 10 : 0);
 }
@@ -1152,7 +1194,10 @@ void LibraryController::onOcrTaskFinished(int docId)
 
 void LibraryController::onThumbnailTaskFinished(int docId, const QString &thumbnailPath)
 {
-    m_inFlightThumbnails.remove(docId);
+    {
+        QMutexLocker locker(&m_inFlightThumbnailsMutex);
+        m_inFlightThumbnails.remove(docId);
+    }
     emit thumbnailGenerated(docId, thumbnailPath);
 }
 
@@ -1399,9 +1444,9 @@ void LibraryController::resumeScan()
                 it.value().task = task;
                 connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
                 connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
-                connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
-                connect(task, &ScannerTask::thumbnailRequested, this,
-                        &LibraryController::onThumbnailRequested);
+                connect(task, &ScannerTask::ocrBatchRequested, this, &LibraryController::onOcrBatchRequested);
+                connect(task, &ScannerTask::thumbnailBatchRequested, this,
+                        &LibraryController::onThumbnailBatchRequested);
                 connect(task, &ScannerTask::lowDiskSpaceDetected, this,
                         &LibraryController::onLowDiskSpaceDetected);
                 task->setAutoDelete(true);

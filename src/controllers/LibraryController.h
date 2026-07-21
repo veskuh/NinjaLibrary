@@ -41,6 +41,8 @@
 #include <QTimer>
 #include <QVariantMap>
 #include <QElapsedTimer>
+#include <QMutex>
+#include <QPair>
 
 #include "../database/DatabaseManager.h"
 
@@ -49,6 +51,7 @@ class ScannerTask;
 class LibraryController : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LibraryController)
     Q_PROPERTY(QStringList watchedFolders READ watchedFolders NOTIFY watchedFoldersChanged)
     Q_PROPERTY(bool isScanning READ isScanning NOTIFY isScanningChanged)
     Q_PROPERTY(double scanProgress READ scanProgress NOTIFY scanProgressChanged)
@@ -123,9 +126,8 @@ private slots:
 
     // Worker slots
     void onScanRequested(const QString &folderPath);
-    void onOcrRequested(int docId, const QString &filePath);
-    void onThumbnailRequested(int docId, const QString &filePath);
-
+    void onOcrBatchRequested(const QList<QPair<int, QString>> &batch);
+    void onThumbnailBatchRequested(const QList<QPair<int, QString>> &batch);
     void onScannerTaskFinished(const QString &folderPath);
     void onScanProgress(const QString &folderPath, int processed, int total);
     void onLowDiskSpaceDetected();
@@ -172,6 +174,7 @@ public:
     }
 private:
     QSet<int> m_inFlightThumbnails;
+    QMutex m_inFlightThumbnailsMutex;
     QStringList m_pendingStartupResumes;
     QTimer *m_startupResumeTimer;
     QElapsedTimer m_lastCoarseRefreshTimer;

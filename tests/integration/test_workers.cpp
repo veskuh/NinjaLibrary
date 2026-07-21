@@ -334,16 +334,20 @@ void TestWorkers::testPdfAndOcr()
     int thumbReqDocId = -1;
     QString thumbReqPath;
 
-    connect(&scanner, &ScannerTask::ocrRequested, [&](int docId, const QString &filePath) {
-        if (filePath == pdfPath) {
-            ocrReqDocId = docId;
-            ocrReqPath = filePath;
+    connect(&scanner, &ScannerTask::ocrBatchRequested, [&](const QList<QPair<int, QString>> &batch) {
+        for (const auto &item : batch) {
+            if (item.second == pdfPath) {
+                ocrReqDocId = item.first;
+                ocrReqPath = item.second;
+            }
         }
     });
-    connect(&scanner, &ScannerTask::thumbnailRequested, [&](int docId, const QString &filePath) {
-        if (filePath == pdfPath) {
-            thumbReqDocId = docId;
-            thumbReqPath = filePath;
+    connect(&scanner, &ScannerTask::thumbnailBatchRequested, [&](const QList<QPair<int, QString>> &batch) {
+        for (const auto &item : batch) {
+            if (item.second == pdfPath) {
+                thumbReqDocId = item.first;
+                thumbReqPath = item.second;
+            }
         }
     });
 
@@ -949,8 +953,8 @@ void TestWorkers::testTextAndDocIngestion()
     ScannerTask scanner(m_dbMgr, tempPath);
 
     QSignalSpy spyFinished(&scanner, &ScannerTask::finished);
-    QSignalSpy spyOcr(&scanner, &ScannerTask::ocrRequested);
-    QSignalSpy spyThumb(&scanner, &ScannerTask::thumbnailRequested);
+    QSignalSpy spyOcr(&scanner, &ScannerTask::ocrBatchRequested);
+    QSignalSpy spyThumb(&scanner, &ScannerTask::thumbnailBatchRequested);
 
     scanner.run();
 

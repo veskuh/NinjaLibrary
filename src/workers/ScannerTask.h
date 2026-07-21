@@ -61,8 +61,8 @@ public:
 signals:
     void finished(const QString &folderPath);
     void progress(const QString &folderPath, int processed, int total);
-    void ocrRequested(int docId, const QString &filePath);
-    void thumbnailRequested(int docId, const QString &filePath);
+    void ocrBatchRequested(const QList<QPair<int, QString>> &batch);
+    void thumbnailBatchRequested(const QList<QPair<int, QString>> &batch);
     void lowDiskSpaceDetected();
 
 private:
