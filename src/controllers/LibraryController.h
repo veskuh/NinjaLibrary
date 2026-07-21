@@ -127,6 +127,7 @@ private slots:
     void triggerBackgroundCrawl();
     void processNextStartupResume();
     void addWatcherPathsBatch(const QStringList &paths);
+    void onScannerTaskFinished(const QString &folderPath, bool runCleanup);
 
 private:
     DatabaseManager *m_dbMgr;

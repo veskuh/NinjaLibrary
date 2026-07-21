@@ -28,9 +28,14 @@ public:
     explicit ScanTaskManager(DatabaseManager *dbMgr, QObject *parent = nullptr);
     ~ScanTaskManager() override;
 
-    bool isScanning() const { return m_isScanning; }
-    double scanProgress() const { return m_scanProgress; }
+    bool isScanning() const { return m_isScanning || m_activeOcrTasks > 0; }
+    bool isScannerActive() const { return m_isScanning; }
+    int activeOcrTasks() const { return m_activeOcrTasks; }
+    int totalOcrTasks() const { return m_totalOcrTasks; }
+    double scanProgress() const;
     bool isScanPaused() const;
+
+    QThreadPool *postScanThreadPool() { return &m_postScanThreadPool; }
 
     void requestScan(const QString &absPath);
     void requestThumbnail(int docId, const QString &filePath, bool highPriority = false);
@@ -48,6 +53,7 @@ signals:
     void scanStatusTextChanged(const QString &statusText);
     void isScanPausedChanged(bool isPaused);
     void thumbnailGenerated(int docId, const QString &thumbnailPath);
+    void scannerTaskFinished(const QString &folderPath, bool runCleanup);
     void postScanFinished();
     void libraryChanged();
 

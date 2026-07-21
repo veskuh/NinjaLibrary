@@ -44,8 +44,6 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QSaveFile>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QtConcurrent>
@@ -73,6 +71,7 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     connect(m_taskManager, &ScanTaskManager::scanStatusTextChanged, this, &LibraryController::scanStatusTextChanged);
     connect(m_taskManager, &ScanTaskManager::isScanPausedChanged, this, &LibraryController::isScanPausedChanged);
     connect(m_taskManager, &ScanTaskManager::thumbnailGenerated, this, &LibraryController::thumbnailGenerated);
+    connect(m_taskManager, &ScanTaskManager::scannerTaskFinished, this, &LibraryController::onScannerTaskFinished);
     connect(m_taskManager, &ScanTaskManager::postScanFinished, this, &LibraryController::postScanFinished);
     connect(m_taskManager, &ScanTaskManager::libraryChanged, this, &LibraryController::libraryChanged);
 
@@ -123,7 +122,7 @@ double LibraryController::scanProgress() const { return m_taskManager->scanProgr
 
 QString LibraryController::scanStatusText() const
 {
-    if (isScanning()) {
+    if (m_taskManager->isScannerActive()) {
         if (ScannerTask::s_lowDiskSpace) {
             return "Scanning Paused: Low Disk Space (< 500MB)";
         }
@@ -131,6 +130,10 @@ QString LibraryController::scanStatusText() const
             return QString("Scanning Paused: %1%").arg(qRound(scanProgress() * 100));
         }
         return QString("Scanning: %1%").arg(qRound(scanProgress() * 100));
+    } else if (m_taskManager->activeOcrTasks() > 0) {
+        return QString("Extracting Text: %1/%2")
+            .arg(m_taskManager->totalOcrTasks() - m_taskManager->activeOcrTasks())
+            .arg(m_taskManager->totalOcrTasks());
     }
     return "";
 }
@@ -574,18 +577,13 @@ void LibraryController::updateFoldersCache()
         QString resolvedPath = path;
 #ifdef Q_OS_MAC
         // Attempt bookmark resolution if available
-        QSqlQuery query(db);
-        query.prepare("SELECT macos_bookmark FROM watched_folders WHERE absolute_path = :path;");
-        query.bindValue(":path", path);
-        if (query.exec() && query.next()) {
-            QByteArray bookmark = query.value(0).toByteArray();
-            if (!bookmark.isEmpty()) {
-                QString tmpResolved;
-                if (MacBookmarks::resolveAndAccessBookmark(bookmark, tmpResolved)) {
-                    resolvedPath = tmpResolved;
-                    if (resolvedPath != path) {
-                        pathsToUpdate.append({path, resolvedPath});
-                    }
+        QByteArray bookmark = WatchedFolderRepository::getBookmark(db, path);
+        if (!bookmark.isEmpty()) {
+            QString tmpResolved;
+            if (MacBookmarks::resolveAndAccessBookmark(bookmark, tmpResolved)) {
+                resolvedPath = tmpResolved;
+                if (resolvedPath != path) {
+                    pathsToUpdate.append({path, resolvedPath});
                 }
             }
         }
@@ -638,10 +636,50 @@ QStringList LibraryController::collectSubdirectories(const QString &folderPath, 
     return paths;
 }
 
+void LibraryController::onScannerTaskFinished(const QString &folderPath, bool runCleanup)
+{
+    // Clean up watched subdirectories that no longer exist on disk
+    QStringList watchedPaths = m_watcher->directories();
+    QStringList pathsToRemove;
+    for (const QString &path : watchedPaths) {
+        if (path.startsWith(folderPath + "/") && !QDir(path).exists()) {
+            pathsToRemove.append(path);
+        }
+    }
+    if (!pathsToRemove.isEmpty()) {
+        m_watcher->removePaths(pathsToRemove);
+    }
+
+    // Run cleanupSidecars and recursive directory scan on background thread (post-scan pool)
+    QPointer<LibraryController> self(this);
+    QRunnable *task = QRunnable::create([self, folderPath, runCleanup]() {
+        if (!self) return;
+
+        if (runCleanup) {
+            self->cleanupSidecars();
+        }
+
+        if (!self) return;
+
+        QStringList pathsToWatch = collectSubdirectories(folderPath, self);
+
+        if (!self) return;
+
+        QMetaObject::invokeMethod(self.data(), [self, pathsToWatch]() {
+            if (!self) return;
+            if (!pathsToWatch.isEmpty()) {
+                self->m_watcher->addPaths(pathsToWatch);
+            }
+            emit self->postScanFinished();
+        }, Qt::QueuedConnection);
+    });
+    m_taskManager->postScanThreadPool()->start(task, -10);
+}
+
 void LibraryController::watchFolderRecursively(const QString &folderPath)
 {
     QPointer<LibraryController> self(this);
-    QtConcurrent::run([self, folderPath]() {
+    QRunnable *task = QRunnable::create([self, folderPath]() {
         if (!self) return;
         
         QStringList paths = collectSubdirectories(folderPath, self);
@@ -656,6 +694,7 @@ void LibraryController::watchFolderRecursively(const QString &folderPath)
                                       Q_ARG(QStringList, batch));
         }
     });
+    m_taskManager->postScanThreadPool()->start(task);
 }
 
 void LibraryController::addWatcherPathsBatch(const QStringList &batch)

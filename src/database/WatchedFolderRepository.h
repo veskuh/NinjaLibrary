@@ -19,6 +19,7 @@ public:
     static QStringList getWatchedFolders(QSqlDatabase &db);
     static int findFolderIdAndMatchedPath(QSqlDatabase &db, const QStringList &possiblePaths, QString &outMatchedPath);
     static bool updateFolderPath(QSqlDatabase &db, const QString &oldPath, const QString &newPath);
+    static QByteArray getBookmark(QSqlDatabase &db, const QString &path);
     
     // Active scans tracking
     static bool recordActiveScan(QSqlDatabase &db, const QString &absPath);

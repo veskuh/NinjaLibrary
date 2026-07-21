@@ -19,15 +19,28 @@
 ScanTaskManager::ScanTaskManager(DatabaseManager *dbMgr, QObject *parent)
     : QObject(parent), m_dbMgr(dbMgr)
 {
+    int maxThreads = qMax(1, (int)(std::thread::hardware_concurrency() / 2));
+    QThreadPool::globalInstance()->setMaxThreadCount(maxThreads);
+
     m_thumbnailThreadPool.setMaxThreadCount(2);
     m_postScanThreadPool.setMaxThreadCount(1);
     m_scannerThreadPool.setMaxThreadCount(2);
-    m_ocrThreadPool.setMaxThreadCount(1);
+    m_ocrThreadPool.setMaxThreadCount(qMax(1, (int)(std::thread::hardware_concurrency() / 4)));
 }
 
 ScanTaskManager::~ScanTaskManager()
 {
     waitForWorkersForTesting();
+}
+
+double ScanTaskManager::scanProgress() const
+{
+    if (m_isScanning) {
+        return m_scanProgress;
+    } else if (m_totalOcrTasks > 0) {
+        return static_cast<double>(m_totalOcrTasks - m_activeOcrTasks) / m_totalOcrTasks;
+    }
+    return 0.0;
 }
 
 bool ScanTaskManager::isScanPaused() const
@@ -165,14 +178,14 @@ void ScanTaskManager::onOcrBatchRequested(const QList<QPair<int, QString>> &batc
 {
     if (batch.isEmpty()) return;
 
-    if (!m_isScanning) {
-        m_isScanning = true;
-        emit isScanningChanged(m_isScanning);
-    }
-
+    bool wasScanning = isScanning();
     m_activeOcrTasks += batch.size();
     m_totalOcrTasks += batch.size();
-    emit scanProgressChanged(m_scanProgress);
+    if (!wasScanning) {
+        emit isScanningChanged(isScanning());
+    }
+
+    emit scanProgressChanged(scanProgress());
     emit scanStatusTextChanged("OCR processing...");
 
     for (const auto &item : batch) {
@@ -217,6 +230,7 @@ void ScanTaskManager::onScannerTaskFinished(const QString &folderPath)
         WatchedFolderRepository::removeActiveScan(db, folderPath);
     }
 
+    bool runCleanup = false;
     if (m_activeScans.isEmpty()) {
         m_lastCoarseRefreshTimer.invalidate();
         if (m_isScanning) {
@@ -229,13 +243,14 @@ void ScanTaskManager::onScannerTaskFinished(const QString &folderPath)
             m_scanProgress = 0.0;
             emit scanProgressChanged(0.0);
         }
+        runCleanup = true;
     } else {
         updateScanProgress();
     }
 
-    emit scanStatusTextChanged(m_isScanning ? "Scanning..." : "Idle");
+    emit scanStatusTextChanged(m_isScanning ? "Scanning..." : (m_activeOcrTasks > 0 ? "OCR processing..." : "Idle"));
     emit libraryChanged();
-    emit postScanFinished();
+    emit scannerTaskFinished(folderPath, runCleanup);
 
     if (m_pendingScanRequests.value(folderPath, false)) {
         m_pendingScanRequests.remove(folderPath);
@@ -251,9 +266,9 @@ void ScanTaskManager::onOcrTaskFinished(int docId)
         m_activeOcrTasks--;
         if (m_activeOcrTasks == 0) {
             m_totalOcrTasks = 0;
-            emit isScanningChanged(m_isScanning);
+            emit isScanningChanged(isScanning());
         }
-        emit scanProgressChanged(m_scanProgress);
+        emit scanProgressChanged(scanProgress());
         emit scanStatusTextChanged("OCR processing...");
     }
 

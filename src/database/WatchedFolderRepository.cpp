@@ -101,6 +101,19 @@ bool WatchedFolderRepository::recordActiveScan(QSqlDatabase &db, const QString &
     return true;
 }
 
+QByteArray WatchedFolderRepository::getBookmark(QSqlDatabase &db, const QString &path)
+{
+    if (!db.isOpen() || path.isEmpty()) return QByteArray();
+
+    QSqlQuery query(db);
+    query.prepare("SELECT macos_bookmark FROM watched_folders WHERE absolute_path = :path;");
+    query.bindValue(":path", path);
+    if (query.exec() && query.next()) {
+        return query.value(0).toByteArray();
+    }
+    return QByteArray();
+}
+
 bool WatchedFolderRepository::removeActiveScan(QSqlDatabase &db, const QString &folderPath)
 {
     if (!db.isOpen() || folderPath.isEmpty()) return false;
