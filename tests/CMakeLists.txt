@@ -54,6 +54,10 @@ if(APPLE)
         integration/test_workers.cpp
         ../src/database/DatabaseManager.h
         ../src/database/DatabaseManager.cpp
+        ../src/database/WatchedFolderRepository.h
+        ../src/database/WatchedFolderRepository.cpp
+        ../src/database/DocumentRepository.h
+        ../src/database/DocumentRepository.cpp
         ../src/controllers/LibraryController.h
         ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h
@@ -79,6 +83,10 @@ else()
         integration/test_workers.cpp
         ../src/database/DatabaseManager.h
         ../src/database/DatabaseManager.cpp
+        ../src/database/WatchedFolderRepository.h
+        ../src/database/WatchedFolderRepository.cpp
+        ../src/database/DocumentRepository.h
+        ../src/database/DocumentRepository.cpp
         ../src/controllers/LibraryController.h
         ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h

@@ -40,6 +40,20 @@
 class TagRepository
 {
 public:
+    static int getTagId(QSqlDatabase &db, const QString &tagName)
+    {
+        QString trimmed = tagName.trimmed();
+        if (trimmed.isEmpty()) return -1;
+
+        QSqlQuery getTag(db);
+        getTag.prepare("SELECT id FROM tags WHERE name = :name;");
+        getTag.bindValue(":name", trimmed);
+        if (getTag.exec() && getTag.next()) {
+            return getTag.value(0).toInt();
+        }
+        return -1;
+    }
+
     static bool ensureTagLinked(QSqlDatabase &db, int docId, const QString &tagName)
     {
         QString trimmed = tagName.trimmed();

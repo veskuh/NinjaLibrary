@@ -119,6 +119,10 @@ qt_add_qml_module(NinjaLibrary
         src/database/DatabaseManager.h
         src/database/DatabaseManager.cpp
         src/database/TagRepository.h
+        src/database/WatchedFolderRepository.h
+        src/database/WatchedFolderRepository.cpp
+        src/database/DocumentRepository.h
+        src/database/DocumentRepository.cpp
         src/models/DocumentModel.h
         src/models/DocumentModel.cpp
         src/models/ProxyFilter.h
