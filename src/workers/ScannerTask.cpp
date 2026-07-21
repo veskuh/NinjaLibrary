@@ -144,9 +144,25 @@ void ScannerTask::run()
         }
 
         if (s_scanPaused) {
-            QMutexLocker locker(&s_pauseMutex);
-            while (s_scanPaused) {
-                s_pauseCondition.wait(&s_pauseMutex);
+            if (s_lowDiskSpace) {
+                QMutexLocker locker(&s_pauseMutex);
+                while (s_scanPaused && !m_cancelled) {
+                    // Use timed wait to recheck disk space periodically
+                    s_pauseCondition.wait(&s_pauseMutex, 5000);
+                    
+                    if (m_cancelled) break;
+
+                    QStorageInfo storage(m_folderPath);
+                    if (storage.isValid() && storage.bytesAvailable() >= 500LL * 1024LL * 1024LL) {
+                        s_lowDiskSpace = false;
+                        s_scanPaused = false;
+                        break;
+                    }
+                }
+            } else {
+                // User pause: checkpoint and return to avoid holding a worker thread indefinitely
+                emit finished(m_folderPath);
+                return;
             }
         }
 

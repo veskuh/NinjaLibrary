@@ -48,7 +48,10 @@ public:
     ~ScannerTask();
 
     void run() override;
-    void cancel() { m_cancelled = true; }
+    void cancel() {
+        m_cancelled = true;
+        s_pauseCondition.wakeAll();
+    }
 
     static std::atomic<bool> s_scanPaused;
     static QMutex s_pauseMutex;

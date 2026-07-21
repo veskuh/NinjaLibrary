@@ -1023,6 +1023,11 @@ void LibraryController::onScanProgress(const QString &folderPath, int processed,
 
 void LibraryController::onScannerTaskFinished(const QString &folderPath)
 {
+    // If the scanner returned early due to a pause, keep the record so it can be resumed
+    if (ScannerTask::s_scanPaused) {
+        return;
+    }
+
     m_activeScans.remove(folderPath);
 
     // Remove active scan record from database
@@ -1386,6 +1391,24 @@ void LibraryController::resumeScan()
             QMutexLocker locker(&ScannerTask::s_pauseMutex);
             ScannerTask::s_pauseCondition.wakeAll();
         }
+        
+        // Restart tasks that checkpointed and returned early
+        for (auto it = m_activeScans.begin(); it != m_activeScans.end(); ++it) {
+            if (!it.value().task) {
+                ScannerTask *task = new ScannerTask(m_dbMgr, it.key());
+                it.value().task = task;
+                connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
+                connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
+                connect(task, &ScannerTask::ocrRequested, this, &LibraryController::onOcrRequested);
+                connect(task, &ScannerTask::thumbnailRequested, this,
+                        &LibraryController::onThumbnailRequested);
+                connect(task, &ScannerTask::lowDiskSpaceDetected, this,
+                        &LibraryController::onLowDiskSpaceDetected);
+                task->setAutoDelete(true);
+                m_scannerThreadPool.start(task);
+            }
+        }
+        
         emit isScanPausedChanged();
         emit scanStatusTextChanged();
     }
