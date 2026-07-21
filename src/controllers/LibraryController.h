@@ -40,6 +40,7 @@
 #include <QThreadPool>
 #include <QTimer>
 #include <QVariantMap>
+#include <QElapsedTimer>
 
 #include "../database/DatabaseManager.h"
 
@@ -160,6 +161,7 @@ private:
     QSet<int> m_inFlightThumbnails;
     QStringList m_pendingStartupResumes;
     QTimer *m_startupResumeTimer;
+    QElapsedTimer m_lastCoarseRefreshTimer;
     void updateScanProgress();
 };
 

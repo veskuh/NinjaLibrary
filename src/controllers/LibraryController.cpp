@@ -984,7 +984,11 @@ void LibraryController::onScanProgress(const QString &folderPath, int processed,
         m_activeScans[folderPath].total = total;
     }
     updateScanProgress();
-    emit libraryUpdated();
+    
+    if (!m_lastCoarseRefreshTimer.isValid() || m_lastCoarseRefreshTimer.elapsed() > 2000) {
+        emit libraryUpdated();
+        m_lastCoarseRefreshTimer.restart();
+    }
 }
 
 void LibraryController::onScannerTaskFinished(const QString &folderPath)
@@ -1004,6 +1008,7 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
 
     bool runCleanup = false;
     if (m_activeScans.isEmpty()) {
+        m_lastCoarseRefreshTimer.invalidate();
         if (m_isScanning) {
             m_isScanning = false;
             if (m_activeOcrTasks == 0) {
