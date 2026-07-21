@@ -59,6 +59,11 @@ public:
             emit scanStatusTextChanged();
         }
     }
+    Q_INVOKABLE QString getDocumentText(int docId) const {
+        if (docId == 1) return "Hello World PDF Content. Here is some text.";
+        if (docId == 2) return "Mock text for document 2.";
+        return "";
+    }
     Q_INVOKABLE void requestThumbnail(int, const QString &, bool = false) {}
     Q_INVOKABLE void batchUpdateTags(const QVariantList &, const QStringList &) {}
     Q_INVOKABLE void updateNotes(int docId, const QString &notes)

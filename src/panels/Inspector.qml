@@ -41,6 +41,7 @@ Rectangle {
     property var selectedIds: []
     property int selectedId: selectedIds.length === 1 ? selectedIds[0] : -1
     property bool collapsed: false
+    property string loadedTextSnippet: ""
 
     property var docData: null
     property var multiDocData: []
@@ -83,6 +84,7 @@ Rectangle {
             if (notesArea) {
                 notesArea.text = "";
             }
+            loadedTextSnippet = "";
             return;
         }
         var data = documentModel.getDocument(selectedId);
@@ -91,12 +93,14 @@ Rectangle {
             if (notesArea) {
                 notesArea.text = docData.notes || "";
             }
+            loadedTextSnippet = libraryController.getDocumentText(selectedId);
             return;
         }
         docData = null;
         if (notesArea) {
             notesArea.text = "";
         }
+        loadedTextSnippet = "";
     }
 
     function updateMultiDocData() {
@@ -418,16 +422,16 @@ Rectangle {
                     id: previewDisclosure
                     text: "Extracted Text Preview"
                     expanded: false
-                    visible: d.textSnippet !== undefined && d.textSnippet !== "" && !d.isFolder
+                    visible: inspector.loadedTextSnippet !== undefined && inspector.loadedTextSnippet !== "" && !d.isFolder
                     Layout.fillWidth: true
                 }
 
                 Item {
                     id: previewContainer
                     Layout.fillWidth: true
-                    Layout.preferredHeight: (previewDisclosure.expanded && d.textSnippet !== undefined && d.textSnippet !== "" && !d.isFolder) ? 275 : 0
+                    Layout.preferredHeight: (previewDisclosure.expanded && inspector.loadedTextSnippet !== undefined && inspector.loadedTextSnippet !== "" && !d.isFolder) ? 275 : 0
                     clip: true
-                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && d.textSnippet !== undefined && d.textSnippet !== "" && !d.isFolder)
+                    visible: (Layout.preferredHeight > 0) || (previewDisclosure.expanded && inspector.loadedTextSnippet !== undefined && inspector.loadedTextSnippet !== "" && !d.isFolder)
 
                     Behavior on Layout.preferredHeight {
                         NumberAnimation {
@@ -452,7 +456,7 @@ Rectangle {
 
                             Text {
                                 width: previewContainer.width - 16
-                                text: d.textSnippet || ""
+                                text: inspector.loadedTextSnippet || ""
                                 font.family: Theme.defaultFont.family
                                 font.pixelSize: 11
                                 color: Theme.primaryText

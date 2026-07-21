@@ -94,7 +94,7 @@ SidecarInputs loadSidecarInputs(int docId, QSqlDatabase &db)
     }
 
     QSqlQuery notesQuery(db);
-    notesQuery.prepare("SELECT notes FROM document_search WHERE document_id = :docId;");
+    notesQuery.prepare("SELECT notes FROM document_search WHERE rowid = :docId;");
     notesQuery.bindValue(":docId", docId);
     if (notesQuery.exec() && notesQuery.next()) {
         inputs.notes = notesQuery.value(0).toString();
@@ -664,7 +664,7 @@ bool LibraryController::updateNotes(int docId, const QString &notes)
 
     db.transaction();
     QSqlQuery query(db);
-    query.prepare("UPDATE document_search SET notes = :notes WHERE document_id = :docId;");
+    query.prepare("UPDATE document_search SET notes = :notes WHERE rowid = :docId;");
     query.bindValue(":notes", notes);
     query.bindValue(":docId", docId);
     if (!query.exec()) {
@@ -1149,7 +1149,7 @@ QVariantList LibraryController::searchDocumentContent(int docId, const QString &
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     if (db.isOpen()) {
         QSqlQuery q(db);
-        q.prepare("SELECT text_snippet FROM document_search WHERE document_id = :docId;");
+        q.prepare("SELECT text_snippet FROM document_search WHERE rowid = :docId;");
         q.bindValue(":docId", docId);
         if (q.exec() && q.next()) {
             QString pageText = q.value(0).toString();
@@ -1189,8 +1189,8 @@ QVariantList LibraryController::searchDocuments(const QString &queryStr)
         "SELECT d.id, d.file_name, d.absolute_path, d.file_size, d.is_offline, d.star_rating, ds.text_snippet, "
         "       (SELECT group_concat(t.name) FROM document_tags dt JOIN tags t ON dt.tag_id = t.id WHERE dt.document_id = d.id) as tags "
         "FROM documents d "
-        "JOIN document_search ds ON d.id = ds.document_id "
-        "WHERE d.id IN (SELECT document_id FROM document_search WHERE document_search MATCH :ftsQuery) "
+        "JOIN document_search ds ON d.id = ds.rowid "
+        "WHERE d.id IN (SELECT rowid FROM document_search WHERE document_search MATCH :ftsQuery) "
         "ORDER BY d.file_name ASC;"
     );
 
@@ -1254,6 +1254,20 @@ QVariantList LibraryController::searchDocuments(const QString &queryStr)
     }
 
     return results;
+}
+
+QString LibraryController::getDocumentText(int docId) const
+{
+    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        q.prepare("SELECT text_snippet FROM document_search WHERE rowid = :docId;");
+        q.bindValue(":docId", docId);
+        if (q.exec() && q.next()) {
+            return q.value(0).toString();
+        }
+    }
+    return QString();
 }
 
 QString LibraryController::readTextFile(const QString &filePath)

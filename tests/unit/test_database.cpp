@@ -72,10 +72,10 @@ void TestDatabase::testInitialization()
     QSqlQuery query(db);
     QVERIFY(query.exec("SELECT * FROM document_search;"));
 
-    // Check user_version PRAGMA is 3
+    // Check user_version PRAGMA is 4
     QVERIFY(query.exec("PRAGMA user_version;"));
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 3);
+    QCOMPARE(query.value(0).toInt(), 4);
 }
 
 void TestDatabase::testThreadSafety()
@@ -174,8 +174,8 @@ void TestDatabase::testMigration()
                 "date_added DATETIME DEFAULT CURRENT_TIMESTAMP, page_count INTEGER DEFAULT 0, "
                 "star_rating INTEGER DEFAULT 0, is_offline BOOLEAN DEFAULT 0);"));
             QVERIFY(
-                query.exec("CREATE VIRTUAL TABLE document_search USING fts5(document_id UNINDEXED, "
-                           "file_name, text_snippet, notes);"));
+                query.exec("CREATE VIRTUAL TABLE document_search USING fts5( "
+                           "document_id UNINDEXED, file_name, text_snippet, notes);"));
 
             // Version 1 tags table without COLLATE NOCASE
             QVERIFY(
@@ -230,10 +230,10 @@ void TestDatabase::testMigration()
 
             QSqlQuery query(db);
 
-            // Check user_version PRAGMA is 3
+            // Check user_version PRAGMA is 4
             QVERIFY(query.exec("PRAGMA user_version;"));
             QVERIFY(query.next());
-            QCOMPARE(query.value(0).toInt(), 3);
+            QCOMPARE(query.value(0).toInt(), 4);
 
             // Check that the last_opened column exists on documents and defaults to 0
             QVERIFY(query.exec("SELECT last_opened FROM documents WHERE id = 1;"));

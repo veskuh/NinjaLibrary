@@ -378,7 +378,7 @@ void TestWorkers::testPdfAndOcr()
 
     // Verify OCR text has been saved (or task completed)
     QSqlQuery ftsQuery(db);
-    ftsQuery.prepare("SELECT text_snippet FROM document_search WHERE document_id = :id;");
+    ftsQuery.prepare("SELECT text_snippet FROM document_search WHERE rowid = :id;");
     ftsQuery.bindValue(":id", docId);
     QVERIFY(ftsQuery.exec());
     if (ftsQuery.next()) {
@@ -580,7 +580,7 @@ void TestWorkers::testLibraryControllerAPIs()
     // 5. Test updateNotes
     QVERIFY(m_controller->updateNotes(docId, "Notes for image file."));
     // Verify in DB
-    query.prepare("SELECT notes FROM document_search WHERE document_id = :id;");
+    query.prepare("SELECT notes FROM document_search WHERE rowid = :id;");
     query.bindValue(":id", docId);
     QVERIFY(query.exec());
     QVERIFY(query.next());
@@ -682,7 +682,7 @@ void TestWorkers::testLibraryControllerAPIs()
     {
         QSqlQuery ftsQuery(db);
         ftsQuery.prepare(
-            "INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES "
+            "INSERT INTO document_search (rowid, file_name, text_snippet, notes) VALUES "
             "(:id, 'trash_test.pdf', 'dummy text', 'trash-notes');");
         ftsQuery.bindValue(":id", trashDocId);
         QVERIFY(ftsQuery.exec());
@@ -729,7 +729,7 @@ void TestWorkers::testLibraryControllerAPIs()
         QCOMPARE(checkTagsQuery.value(0).toInt(), 0);
 
         QSqlQuery checkSearchQuery(db);
-        checkSearchQuery.prepare("SELECT COUNT(*) FROM document_search WHERE document_id = :id;");
+        checkSearchQuery.prepare("SELECT COUNT(*) FROM document_search WHERE rowid = :id;");
         checkSearchQuery.bindValue(":id", trashDocId);
         QVERIFY(checkSearchQuery.exec());
         QVERIFY(checkSearchQuery.next());
@@ -965,7 +965,7 @@ void TestWorkers::testTextAndDocIngestion()
         QSqlQuery verifyQuery(db);
         verifyQuery.prepare(
             "SELECT d.file_name, s.text_snippet FROM documents d JOIN document_search s ON d.id = "
-            "s.document_id WHERE d.folder_id = (SELECT id FROM watched_folders WHERE absolute_path "
+            "s.rowid WHERE d.folder_id = (SELECT id FROM watched_folders WHERE absolute_path "
             "= :path);");
         verifyQuery.bindValue(":path", tempPath);
         QVERIFY(verifyQuery.exec());
@@ -1060,7 +1060,7 @@ void TestWorkers::testOcrNonsenseRejection()
     // Insert empty search snippet
     QSqlQuery insertSearch(db);
     insertSearch.prepare(
-        "INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, "
+        "INSERT INTO document_search (rowid, file_name, text_snippet) VALUES (:docId, "
         "'blank.jpg', '');");
     insertSearch.bindValue(":docId", docId);
     QVERIFY(insertSearch.exec());
@@ -1071,7 +1071,7 @@ void TestWorkers::testOcrNonsenseRejection()
 
     // Verify search snippet remains empty or hasn't been populated with garbage
     QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT text_snippet FROM document_search WHERE document_id = :id;");
+    checkQuery.prepare("SELECT text_snippet FROM document_search WHERE rowid = :id;");
     checkQuery.bindValue(":id", docId);
     QVERIFY(checkQuery.exec());
     QVERIFY(checkQuery.next());
@@ -1080,7 +1080,7 @@ void TestWorkers::testOcrNonsenseRejection()
 
     // Clean up blank image DB entries
     QSqlQuery cleanupQuery(db);
-    cleanupQuery.prepare("DELETE FROM document_search WHERE document_id = :id;");
+    cleanupQuery.prepare("DELETE FROM document_search WHERE rowid = :id;");
     cleanupQuery.bindValue(":id", docId);
     QVERIFY(cleanupQuery.exec());
 
@@ -1118,7 +1118,7 @@ void TestWorkers::testOcrNonsenseRejection()
     // Insert empty search snippet
     QSqlQuery insertSearch2(db);
     insertSearch2.prepare(
-        "INSERT INTO document_search (document_id, file_name, text_snippet) VALUES (:docId, "
+        "INSERT INTO document_search (rowid, file_name, text_snippet) VALUES (:docId, "
         "'text_image.png', '');");
     insertSearch2.bindValue(":docId", docId2);
     QVERIFY(insertSearch2.exec());
@@ -1129,7 +1129,7 @@ void TestWorkers::testOcrNonsenseRejection()
 
     // Verify search snippet contains our text
     QSqlQuery checkQuery2(db);
-    checkQuery2.prepare("SELECT text_snippet FROM document_search WHERE document_id = :id;");
+    checkQuery2.prepare("SELECT text_snippet FROM document_search WHERE rowid = :id;");
     checkQuery2.bindValue(":id", docId2);
     QVERIFY(checkQuery2.exec());
     QVERIFY(checkQuery2.next());
@@ -1141,7 +1141,7 @@ void TestWorkers::testOcrNonsenseRejection()
 
     // Clean up text image DB entries
     QSqlQuery cleanupQuery2(db);
-    cleanupQuery2.prepare("DELETE FROM document_search WHERE document_id = :id;");
+    cleanupQuery2.prepare("DELETE FROM document_search WHERE rowid = :id;");
     cleanupQuery2.bindValue(":id", docId2);
     QVERIFY(cleanupQuery2.exec());
 

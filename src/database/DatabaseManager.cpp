@@ -201,7 +201,6 @@ bool DatabaseManager::initializeDatabase()
             // FTS5 Virtual Table for Instant Search
             ok &= query.exec(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS document_search USING fts5("
-                "    document_id UNINDEXED,"
                 "    file_name,"
                 "    text_snippet,"
                 "    notes"
@@ -230,8 +229,11 @@ bool DatabaseManager::initializeDatabase()
                 "    query_json TEXT NOT NULL"
                 ");");
 
+            ok &= query.exec(
+                "CREATE INDEX IF NOT EXISTS idx_documents_folder_id ON documents(folder_id);");
+
             if (ok) {
-                ok &= query.exec("PRAGMA user_version = 3;");
+                ok &= query.exec("PRAGMA user_version = 4;");
             }
         }
 
@@ -396,6 +398,31 @@ bool DatabaseManager::initializeDatabase()
         }
     }
 
+    if (currentVersion > 0 && currentVersion < 4) {
+        db.transaction();
+        QSqlQuery q(db);
+        bool ok = true;
+        
+        ok &= q.exec("CREATE VIRTUAL TABLE document_search_new USING fts5(file_name, text_snippet, notes);");
+        if (ok) ok &= q.exec("INSERT INTO document_search_new(rowid, file_name, text_snippet, notes) "
+                             "SELECT document_id, file_name, text_snippet, notes FROM document_search;");
+        if (ok) ok &= q.exec("DROP TABLE document_search;");
+        if (ok) ok &= q.exec("ALTER TABLE document_search_new RENAME TO document_search;");
+        
+        if (ok) ok &= q.exec("CREATE INDEX IF NOT EXISTS idx_documents_folder_id ON documents(folder_id);");
+        
+        if (ok) ok &= q.exec("PRAGMA user_version = 4;");
+
+        if (ok) {
+            db.commit();
+            currentVersion = 4;
+        } else {
+            db.rollback();
+            qWarning() << "Database migration to version 4 failed:" << q.lastError().text();
+            return false;
+        }
+    }
+
     // Ensure active_scans table exists for interrupted scan tracking
     {
         QSqlQuery query(db);
@@ -414,7 +441,7 @@ bool DatabaseManager::deleteDocumentCascade(QSqlDatabase &db, int docId)
 {
     // 1. Delete search index entries first
     QSqlQuery deleteSearch(db);
-    deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
+    deleteSearch.prepare("DELETE FROM document_search WHERE rowid = :docId;");
     deleteSearch.bindValue(":docId", docId);
     if (!deleteSearch.exec()) {
         qWarning() << "Failed to clean up document search index:" << deleteSearch.lastError().text();

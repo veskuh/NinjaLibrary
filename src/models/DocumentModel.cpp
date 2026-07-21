@@ -74,8 +74,8 @@ DocumentModel::DocumentModel(DatabaseManager *dbMgr, QObject *parent)
     m_refreshTimer->setSingleShot(true);
     connect(m_refreshTimer, &QTimer::timeout, this, &DocumentModel::forceRefresh);
 
-    m_refreshWatcher = new QFutureWatcher<QList<DocumentInfo>>(this);
-    connect(m_refreshWatcher, &QFutureWatcher<QList<DocumentInfo>>::finished, this,
+    m_refreshWatcher = new QFutureWatcher<ModelDiff>(this);
+    connect(m_refreshWatcher, &QFutureWatcher<ModelDiff>::finished, this,
             &DocumentModel::onRefreshFinished);
 
     forceRefresh();
@@ -202,11 +202,12 @@ void DocumentModel::refresh()
     m_refreshTimer->start(200);  // Debounce by 200ms
 }
 
-static QList<DocumentInfo> computeRefreshSnapshotOffThread(DatabaseManager *dbMgr)
+static ModelDiff computeRefreshSnapshotOffThread(DatabaseManager *dbMgr, const QList<DocumentInfo>& oldDocs)
 {
+    ModelDiff diff;
     QList<DocumentInfo> newDocs;
     QSqlDatabase db = dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return newDocs;
+    if (!db.isOpen()) return diff;
 
     QList<QSqlRecord> records;
     {
@@ -216,9 +217,7 @@ static QList<DocumentInfo> computeRefreshSnapshotOffThread(DatabaseManager *dbMg
             "d.is_offline, "
             "       d.last_opened, "
             "       (SELECT group_concat(t.name, ',') FROM tags t JOIN document_tags dt ON t.id = "
-            "dt.tag_id WHERE dt.document_id = d.id) as tags_list, "
-            "       (SELECT text_snippet FROM document_search WHERE document_id = d.id) as text, "
-            "       (SELECT notes FROM document_search WHERE document_id = d.id) as notes "
+            "dt.tag_id WHERE dt.document_id = d.id) as tags_list "
             "FROM documents d;",
             db);
         while (query.next()) {
@@ -269,8 +268,8 @@ static QList<DocumentInfo> computeRefreshSnapshotOffThread(DatabaseManager *dbMg
             doc.tags = QStringList();
         }
 
-        doc.textSnippet = record.value(14).toString();
-        doc.notes = record.value(15).toString();
+        doc.textSnippet = QString();
+        doc.notes = QString();
 
         // Calculate expected thumbnail location
         QCryptographicHash hasher(QCryptographicHash::Sha256);
@@ -317,7 +316,69 @@ static QList<DocumentInfo> computeRefreshSnapshotOffThread(DatabaseManager *dbMg
         newDocs.append(folderDoc);
     }
 
-    return newDocs;
+    diff.finalDocuments = newDocs;
+
+    if (oldDocs.isEmpty()) {
+        diff.requiresReset = true;
+        return diff;
+    }
+
+    QMap<QString, DocumentInfo> currentMap;
+    for (const auto &doc : oldDocs) {
+        currentMap[doc.absolutePath] = doc;
+    }
+
+    QMap<QString, DocumentInfo> newMap;
+    for (const auto &doc : newDocs) {
+        newMap[doc.absolutePath] = doc;
+    }
+
+    // 1. Remove items no longer present (descending order)
+    for (int i = oldDocs.size() - 1; i >= 0; --i) {
+        if (!newMap.contains(oldDocs.at(i).absolutePath)) {
+            diff.rowsToRemove.append(i);
+        }
+    }
+
+    // 2. Update existing items
+    for (int i = 0; i < oldDocs.size(); ++i) {
+        const QString &path = oldDocs.at(i).absolutePath;
+        if (newMap.contains(path)) {
+            const DocumentInfo &newDoc = newMap.value(path);
+            const DocumentInfo &oldDoc = oldDocs.at(i);
+
+            bool itemChanged =
+                (oldDoc.id != newDoc.id || oldDoc.folderId != newDoc.folderId ||
+                 oldDoc.fileName != newDoc.fileName || oldDoc.fileSize != newDoc.fileSize ||
+                 oldDoc.fileHash != newDoc.fileHash ||
+                 oldDoc.dateCreated != newDoc.dateCreated ||
+                 oldDoc.dateModified != newDoc.dateModified ||
+                 oldDoc.dateAdded != newDoc.dateAdded || oldDoc.pageCount != newDoc.pageCount ||
+                 oldDoc.starRating != newDoc.starRating ||
+                 oldDoc.isOffline != newDoc.isOffline || oldDoc.tags != newDoc.tags ||
+                 oldDoc.thumbnailPath != newDoc.thumbnailPath ||
+                 oldDoc.lastOpened != newDoc.lastOpened || oldDoc.isFolder != newDoc.isFolder ||
+                 oldDoc.itemCount != newDoc.itemCount);
+
+            if (itemChanged) {
+                diff.rowsToUpdate.append(qMakePair(i, newDoc));
+            }
+        }
+    }
+
+    // 3. Add new items
+    for (const auto &newDoc : newDocs) {
+        if (!currentMap.contains(newDoc.absolutePath)) {
+            diff.rowsToInsert.append(newDoc);
+        }
+    }
+    
+    // Fallback to reset if changes are too massive (e.g. over 1000 individual operations)
+    if (diff.rowsToRemove.size() + diff.rowsToUpdate.size() + diff.rowsToInsert.size() > 1000) {
+        diff.requiresReset = true;
+    }
+
+    return diff;
 }
 
 void DocumentModel::forceRefresh()
@@ -330,15 +391,17 @@ void DocumentModel::forceRefresh()
     }
 
     m_isRefreshing = true;
-    QFuture<QList<DocumentInfo>> future =
-        QtConcurrent::run(&computeRefreshSnapshotOffThread, m_dbMgr);
+    QList<DocumentInfo> currentDocs = m_documents;
+    QFuture<ModelDiff> future =
+        QtConcurrent::run(&computeRefreshSnapshotOffThread, m_dbMgr, currentDocs);
     m_refreshWatcher->setFuture(future);
 }
 
 void DocumentModel::onRefreshFinished()
 {
     m_isRefreshing = false;
-    QList<DocumentInfo> newDocs = m_refreshWatcher->result();
+    ModelDiff diff = m_refreshWatcher->result();
+    const QList<DocumentInfo> &newDocs = diff.finalDocuments;
 
     // Calculate count changes
     int tempPdf = 0;
@@ -348,38 +411,26 @@ void DocumentModel::onRefreshFinished()
     int tempUnavailable = 0;
 
     for (const auto &doc : newDocs) {
-        if (doc.isFolder) {
-            continue;
-        }
+        if (doc.isFolder) continue;
 
-        if (doc.isOffline) {
-            tempUnavailable++;
-        } else {
-            tempLocal++;
-        }
+        if (doc.isOffline) tempUnavailable++;
+        else tempLocal++;
 
         QString ext = doc.fileName.split('.').last().toLower();
-        if (ext == "pdf") {
-            tempPdf++;
-        } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "bmp" ||
-                   ext == "tiff") {
-            tempImage++;
-        } else {
-            tempText++;
-        }
+        if (ext == "pdf") tempPdf++;
+        else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "bmp" || ext == "tiff") tempImage++;
+        else tempText++;
     }
 
-    bool changed = (m_pdfCount != tempPdf || m_imageCount != tempImage || m_textCount != tempText ||
-                    m_localCount != tempLocal || m_unavailableCount != tempUnavailable);
-
+    bool countsChanged = (m_pdfCount != tempPdf || m_imageCount != tempImage || m_textCount != tempText ||
+                          m_localCount != tempLocal || m_unavailableCount != tempUnavailable);
     m_pdfCount = tempPdf;
     m_imageCount = tempImage;
     m_textCount = tempText;
     m_localCount = tempLocal;
     m_unavailableCount = tempUnavailable;
 
-    // Check if the current model is completely empty
-    if (m_documents.isEmpty()) {
+    if (diff.requiresReset) {
         beginResetModel();
         m_documents = newDocs;
         endResetModel();
@@ -392,67 +443,27 @@ void DocumentModel::onRefreshFinished()
             }
         };
 
-        // Reconcile changes incrementally
-        QMap<QString, DocumentInfo> currentMap;
-        for (const auto &doc : m_documents) {
-            currentMap[doc.absolutePath] = doc;
+        for (int row : diff.rowsToRemove) {
+            ensureReconciling();
+            beginRemoveRows(QModelIndex(), row, row);
+            m_documents.removeAt(row);
+            endRemoveRows();
         }
 
-        QMap<QString, DocumentInfo> newMap;
-        for (const auto &doc : newDocs) {
-            newMap[doc.absolutePath] = doc;
+        for (const auto &pair : diff.rowsToUpdate) {
+            ensureReconciling();
+            int row = pair.first;
+            m_documents[row] = pair.second;
+            QModelIndex idx = index(row);
+            emit dataChanged(idx, idx);
         }
 
-        // 1. Remove items no longer present (descending order to preserve indices)
-        for (int i = m_documents.size() - 1; i >= 0; --i) {
-            const QString &path = m_documents.at(i).absolutePath;
-            if (!newMap.contains(path)) {
-                ensureReconciling();
-                beginRemoveRows(QModelIndex(), i, i);
-                m_documents.removeAt(i);
-                endRemoveRows();
-            }
-        }
-
-        // 2. Update existing items
-        for (int i = 0; i < m_documents.size(); ++i) {
-            const QString &path = m_documents.at(i).absolutePath;
-            if (newMap.contains(path)) {
-                const DocumentInfo &newDoc = newMap.value(path);
-                const DocumentInfo &oldDoc = m_documents.at(i);
-
-                bool itemChanged =
-                    (oldDoc.id != newDoc.id || oldDoc.folderId != newDoc.folderId ||
-                     oldDoc.fileName != newDoc.fileName || oldDoc.fileSize != newDoc.fileSize ||
-                     oldDoc.fileHash != newDoc.fileHash ||
-                     oldDoc.dateCreated != newDoc.dateCreated ||
-                     oldDoc.dateModified != newDoc.dateModified ||
-                     oldDoc.dateAdded != newDoc.dateAdded || oldDoc.pageCount != newDoc.pageCount ||
-                     oldDoc.starRating != newDoc.starRating ||
-                     oldDoc.isOffline != newDoc.isOffline || oldDoc.tags != newDoc.tags ||
-                     oldDoc.textSnippet != newDoc.textSnippet || oldDoc.notes != newDoc.notes ||
-                     oldDoc.thumbnailPath != newDoc.thumbnailPath ||
-                     oldDoc.lastOpened != newDoc.lastOpened || oldDoc.isFolder != newDoc.isFolder ||
-                     oldDoc.itemCount != newDoc.itemCount);
-
-                if (itemChanged) {
-                    ensureReconciling();
-                    m_documents[i] = newDoc;
-                    QModelIndex idx = index(i);
-                    emit dataChanged(idx, idx);
-                }
-            }
-        }
-
-        // 3. Add new items
-        for (const auto &newDoc : newDocs) {
-            if (!currentMap.contains(newDoc.absolutePath)) {
-                ensureReconciling();
-                int insertPos = m_documents.size();
-                beginInsertRows(QModelIndex(), insertPos, insertPos);
-                m_documents.append(newDoc);
-                endInsertRows();
-            }
+        if (!diff.rowsToInsert.isEmpty()) {
+            ensureReconciling();
+            int startRow = m_documents.size();
+            beginInsertRows(QModelIndex(), startRow, startRow + diff.rowsToInsert.size() - 1);
+            m_documents.append(diff.rowsToInsert);
+            endInsertRows();
         }
 
         if (isReconciling) {
@@ -460,9 +471,11 @@ void DocumentModel::onRefreshFinished()
         }
     }
 
-    if (changed) {
-        emit countsChanged();
+    if (countsChanged || !diff.rowsToRemove.isEmpty() || !diff.rowsToUpdate.isEmpty() || !diff.rowsToInsert.isEmpty() || diff.requiresReset) {
+        emit this->countsChanged();
     }
+    
+    emit refreshCompleted();
 }
 
 void DocumentModel::updateThumbnail(int docId, const QString &thumbnailPath)

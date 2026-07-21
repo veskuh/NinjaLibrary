@@ -134,7 +134,7 @@ void OcrTask::run()
             QString existingText;
             QSqlQuery fetchQuery(db);
             fetchQuery.prepare(
-                "SELECT text_snippet FROM document_search WHERE document_id = :docId;");
+                "SELECT text_snippet FROM document_search WHERE rowid = :docId;");
             fetchQuery.bindValue(":docId", m_docId);
             if (fetchQuery.exec()) {
                 if (fetchQuery.next()) {
@@ -155,7 +155,7 @@ void OcrTask::run()
 
                 QSqlQuery updateQuery(db);
                 updateQuery.prepare(
-                    "UPDATE document_search SET text_snippet = :text WHERE document_id = :docId;");
+                    "UPDATE document_search SET text_snippet = :text WHERE rowid = :docId;");
                 updateQuery.bindValue(":text", updatedText);
                 updateQuery.bindValue(":docId", m_docId);
                 if (!updateQuery.exec()) {

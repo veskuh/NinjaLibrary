@@ -204,6 +204,7 @@ target_link_libraries(NinjaLibraryApp PRIVATE
     Qt6::Core5Compat
     Qt6::Pdf
     Qt6::PdfQuick
+    Qt6::Concurrent
     Kaakao
 )
 

@@ -258,13 +258,13 @@ void ScannerTask::run()
 
                 // Reset search entry
                 QSqlQuery deleteSearch(db);
-                deleteSearch.prepare("DELETE FROM document_search WHERE document_id = :docId;");
+                deleteSearch.prepare("DELETE FROM document_search WHERE rowid = :docId;");
                 deleteSearch.bindValue(":docId", docId);
                 ok &= deleteSearch.exec();
 
                 QSqlQuery insertSearch(db);
                 insertSearch.prepare(
-                    "INSERT INTO document_search (document_id, file_name, text_snippet, notes) "
+                    "INSERT INTO document_search (rowid, file_name, text_snippet, notes) "
                     "VALUES (:docId, :fileName, :text, :notes);");
                 insertSearch.bindValue(":docId", docId);
                 insertSearch.bindValue(":fileName", fileInfo.fileName());
@@ -423,7 +423,7 @@ void ScannerTask::run()
             if (ok && docId != -1) {
                 QSqlQuery insertSearch(db);
                 insertSearch.prepare(
-                    "INSERT INTO document_search (document_id, file_name, text_snippet, notes) "
+                    "INSERT INTO document_search (rowid, file_name, text_snippet, notes) "
                     "VALUES (:docId, :fileName, :text, :notes);");
                 insertSearch.bindValue(":docId", docId);
                 insertSearch.bindValue(":fileName", fileInfo.fileName());

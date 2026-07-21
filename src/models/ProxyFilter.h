@@ -35,6 +35,9 @@
 #include <QSortFilterProxyModel>
 #include <QStringList>
 #include <QTimer>
+#include <QSet>
+#include <QFutureWatcher>
+#include <QtConcurrent>
 
 #include "../database/DatabaseManager.h"
 
@@ -146,6 +149,7 @@ private:
     bool m_searchActive;
     mutable QHash<QString, int> m_roleNameToKey;
     QTimer *m_modelChangeTimer;
+    QFutureWatcher<QSet<int>> *m_searchWatcher = nullptr;
 
     void invalidateAndRecalculate();
 };

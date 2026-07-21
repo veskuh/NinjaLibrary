@@ -105,6 +105,9 @@ void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
         disconnect(this->sourceModel(), SIGNAL(aboutToReconcile()), this, SLOT(onAboutToReconcile()));
         disconnect(this->sourceModel(), SIGNAL(reconciled()), this, SLOT(onReconciled()));
         
+        disconnect(this->sourceModel(), SIGNAL(refreshCompleted()), this,
+                   SLOT(scheduleModelDrivenUpdate()));
+        
         disconnect(this->sourceModel(), &QAbstractItemModel::modelReset, this,
                    &ProxyFilter::scheduleModelDrivenUpdate);
         disconnect(this->sourceModel(), &QAbstractItemModel::rowsInserted, this,
@@ -119,6 +122,8 @@ void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
         connect(sourceModel, SIGNAL(aboutToReconcile()), this, SLOT(onAboutToReconcile()));
         connect(sourceModel, SIGNAL(reconciled()), this, SLOT(onReconciled()));
         
+        connect(sourceModel, SIGNAL(refreshCompleted()), this, SLOT(scheduleModelDrivenUpdate()));
+
         connect(sourceModel, &QAbstractItemModel::modelReset, this,
                 &ProxyFilter::scheduleModelDrivenUpdate);
         connect(sourceModel, &QAbstractItemModel::rowsInserted, this,
@@ -257,76 +262,77 @@ void ProxyFilter::updateDuplicateHashes()
 
 void ProxyFilter::updateSearchMatches()
 {
-    m_matchedDocIds.clear();
+    qWarning() << "updateSearchMatches called, filter=" << m_filterString;
     m_searchActive = !m_filterString.trimmed().isEmpty();
     if (!m_searchActive) {
+        m_matchedDocIds.clear();
         invalidateAndRecalculate();
         return;
     }
 
-    QAbstractItemModel *model = sourceModel();
-    if (!model) {
-        invalidateAndRecalculate();
-        return;
+    if (!m_searchWatcher) {
+        m_searchWatcher = new QFutureWatcher<QSet<int>>(this);
+        connect(m_searchWatcher, &QFutureWatcher<QSet<int>>::finished, this, [this]() {
+            m_matchedDocIds = m_searchWatcher->result();
+            invalidateAndRecalculate();
+        });
     }
 
-    QStringList terms = m_filterString.split(" ", Qt::SkipEmptyParts);
-    if (terms.isEmpty()) {
-        m_searchActive = false;
-        invalidateAndRecalculate();
-        return;
-    }
+    QString queryStr = m_filterString;
+    DatabaseManager* dbMgr = m_dbMgr;
 
-    int rows = model->rowCount();
-    for (int i = 0; i < rows; ++i) {
-        QModelIndex idx = model->index(i, 0);
-        int docId = model->data(idx, DocumentModel::IdRole).toInt();
-        QString fileName = model->data(idx, DocumentModel::FileNameRole).toString();
-        QString textSnippet = model->data(idx, DocumentModel::TextSnippetRole).toString();
-        QString notes = model->data(idx, DocumentModel::NotesRole).toString();
-        QStringList tags = model->data(idx, DocumentModel::TagsRole).toStringList();
+    m_searchWatcher->setFuture(QtConcurrent::run([dbMgr, queryStr]() {
+        QSet<int> matched;
+        QSqlDatabase db = dbMgr->getDatabaseConnection();
+        if (db.isOpen()) {
+            QStringList terms = queryStr.split(" ", Qt::SkipEmptyParts);
+            bool first = true;
+            for (const QString &term : terms) {
+                QSet<int> termMatched;
 
-        bool allTermsMatch = true;
-        for (const QString &term : terms) {
-            bool termMatches = false;
-
-            if (fileName.contains(term, Qt::CaseInsensitive)) {
-                termMatches = true;
-            } else if (textSnippet.contains(term, Qt::CaseInsensitive)) {
-                termMatches = true;
-            } else if (notes.contains(term, Qt::CaseInsensitive)) {
-                termMatches = true;
-            } else {
-                for (const QString &tag : tags) {
-                    if (tag.contains(term, Qt::CaseInsensitive)) {
-                        termMatches = true;
-                        break;
-                    }
+                // 1. FTS match (file_name, text_snippet, notes)
+                QSqlQuery qFts(db);
+                qFts.prepare("SELECT rowid FROM document_search WHERE document_search MATCH :ftsQuery");
+                qFts.bindValue(":ftsQuery", "\"" + term + "\"*");
+                if (qFts.exec()) {
+                    while (qFts.next()) termMatched.insert(qFts.value(0).toInt());
+                } else {
+                    qWarning() << "FTS query failed:" << qFts.lastError().text();
                 }
-            }
 
-            if (!termMatches) {
-                allTermsMatch = false;
-                break;
+                // 2. Tag match
+                QSqlQuery qTags(db);
+                qTags.prepare("SELECT document_id FROM document_tags dt JOIN tags t ON dt.tag_id = t.id WHERE t.name LIKE :likeQuery");
+                qTags.bindValue(":likeQuery", "%" + term + "%");
+                if (qTags.exec()) {
+                    while (qTags.next()) termMatched.insert(qTags.value(0).toInt());
+                }
+                
+                qWarning() << "Search thread term:" << term << "matches:" << termMatched.size();
+
+                if (first) {
+                    matched = termMatched;
+                    first = false;
+                } else {
+                    matched.intersect(termMatched);
+                }
+
+                if (matched.isEmpty()) break;
             }
         }
-
-        if (allTermsMatch) {
-            m_matchedDocIds.insert(docId);
-        }
-    }
-
-    invalidateAndRecalculate();
+        return matched;
+    }));
 }
 
 void ProxyFilter::scheduleModelDrivenUpdate()
 {
-    // Coalesce bursts of model changes (e.g. background indexing) into one update
+    qWarning() << "scheduleModelDrivenUpdate called";
     m_modelChangeTimer->start();
 }
 
 void ProxyFilter::processModelDrivenUpdate()
 {
+    qWarning() << "processModelDrivenUpdate called, m_searchActive=" << m_searchActive;
     if (m_searchActive) {
         // Match set may have changed along with the data; recompute everything
         updateSearchMatches();

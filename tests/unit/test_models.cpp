@@ -94,14 +94,16 @@ void TestModels::initTestCase()
     int docCId = query.lastInsertId().toInt();
 
     // Insert FTS text
-    QVERIFY(query.exec(
-        QString("INSERT INTO document_search (document_id, file_name, text_snippet, notes) VALUES "
+    bool okA = query.exec(
+        QString("INSERT INTO document_search (rowid, file_name, text_snippet, notes) VALUES "
                 "(%1, 'fileA.pdf', 'Hello world PDF text.', 'Boss notes');")
-            .arg(docAId)));
-    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, "
+            .arg(docAId));
+    if (!okA) qWarning() << "Error A:" << query.lastError().text();
+    QVERIFY(okA);
+    QVERIFY(query.exec(QString("INSERT INTO document_search (rowid, file_name, text_snippet, "
                                "notes) VALUES (%1, 'fileB.png', 'Scanned image content.', '');")
                            .arg(docBId)));
-    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, text_snippet, "
+    QVERIFY(query.exec(QString("INSERT INTO document_search (rowid, file_name, text_snippet, "
                                "notes) VALUES (%1, 'fileC.pdf', 'Hello duplicate test.', 'Clone');")
                            .arg(docCId)));
 
@@ -177,15 +179,11 @@ void TestModels::testModelFiltering()
     // Test FTS5 search (debounced search update)
     // Search "world" (matches File A)
     proxyFilter.setFilterString("world");
-    QTRY_COMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
-             QString("fileA.pdf"));
+    QTRY_VERIFY(proxyFilter.rowCount() == 1 && proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString() == "fileA.pdf");
 
     // Search "duplicate" (matches File C)
     proxyFilter.setFilterString("duplicate");
-    QTRY_COMPARE(proxyFilter.rowCount(), 1);
-    QCOMPARE(proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString(),
-             QString("fileC.pdf"));
+    QTRY_VERIFY(proxyFilter.rowCount() == 1 && proxyFilter.data(proxyFilter.index(0, 0), DocumentModel::FileNameRole).toString() == "fileC.pdf");
 
     proxyFilter.setFilterString("");
     QTRY_COMPARE(proxyFilter.rowCount(), 3);
@@ -538,7 +536,7 @@ void TestModels::testModelChangeScopeDebounce()
                                "0, 0, datetime('now', 'localtime'));")
                            .arg(folderId)));
     int docDId = query.lastInsertId().toInt();
-    QVERIFY(query.exec(QString("INSERT INTO document_search (document_id, file_name, "
+    QVERIFY(query.exec(QString("INSERT INTO document_search (rowid, file_name, "
                                "text_snippet, notes) VALUES (%1, 'fileD.txt', 'Plain text "
                                "content.', '');")
                            .arg(docDId)));
@@ -554,7 +552,7 @@ void TestModels::testModelChangeScopeDebounce()
     QVERIFY(proxyFilter.activeScopes().contains("TXT"));
 
     // Clean up
-    QVERIFY(query.exec(QString("DELETE FROM document_search WHERE document_id = %1;").arg(docDId)));
+    QVERIFY(query.exec(QString("DELETE FROM document_search WHERE rowid = %1;").arg(docDId)));
     QVERIFY(query.exec(QString("DELETE FROM documents WHERE id = %1;").arg(docDId)));
 }
 
@@ -575,15 +573,16 @@ void TestModels::testSearchMatchDebounce()
     // Change fileB's indexed text so it also matches the active search
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
     QSqlQuery query(db);
-    QVERIFY(
-        query.exec("UPDATE document_search SET text_snippet = 'world peace' WHERE file_name = "
-                   "'fileB.png';"));
+    bool okUpdate = query.exec("UPDATE document_search SET text_snippet = 'world peace' WHERE file_name = 'fileB.png';");
+    if (!okUpdate) qWarning() << "Update failed:" << query.lastError().text();
+    else if (query.numRowsAffected() == 0) qWarning() << "Update affected 0 rows!";
+    QVERIFY(okUpdate && query.numRowsAffected() > 0);
+
     sourceModel.forceRefresh();
     QTRY_VERIFY(!sourceModel.isRefreshing());
 
     // Recompute is debounced; applied once the 400ms timer fires
-    QTest::qWait(500);
-    QTRY_COMPARE(proxyFilter.rowCount(), 2);
+    QTRY_VERIFY(proxyFilter.rowCount() == 2);
 
     // Clearing the search stays synchronous
     proxyFilter.setFilterString("");

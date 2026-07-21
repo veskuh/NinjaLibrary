@@ -63,6 +63,14 @@ struct DocumentInfo
     int itemCount = 0;
 };
 
+struct ModelDiff {
+    bool requiresReset = false;
+    QList<DocumentInfo> finalDocuments;
+    QList<int> rowsToRemove; // descending order
+    QList<QPair<int, DocumentInfo>> rowsToUpdate;
+    QList<DocumentInfo> rowsToInsert;
+};
+
 class DocumentModel : public QAbstractListModel
 {
     Q_OBJECT
@@ -124,6 +132,7 @@ signals:
     void countsChanged();
     void aboutToReconcile();
     void reconciled();
+    void refreshCompleted();
 
 public slots:
     void refresh();
@@ -143,7 +152,7 @@ private:
     int m_localCount = 0;
     int m_unavailableCount = 0;
     
-    QFutureWatcher<QList<DocumentInfo>> *m_refreshWatcher = nullptr;
+    QFutureWatcher<ModelDiff> *m_refreshWatcher = nullptr;
     bool m_isRefreshing = false;
 };
 
