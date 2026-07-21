@@ -369,7 +369,7 @@ static ModelDiff computeRefreshSnapshotOffThread(DatabaseManager *dbMgr, const Q
     // 3. Add new items
     for (const auto &newDoc : newDocs) {
         if (!currentMap.contains(newDoc.absolutePath)) {
-            diff.rowsToInsert.append(newDoc);
+            diff.rowsToInsert.append(qMakePair(-1, newDoc));
         }
     }
     
@@ -434,6 +434,7 @@ void DocumentModel::onRefreshFinished()
         beginResetModel();
         m_documents = newDocs;
         endResetModel();
+        rebuildIndexes();
     } else {
         bool isReconciling = false;
         auto ensureReconciling = [this, &isReconciling]() {
@@ -443,30 +444,62 @@ void DocumentModel::onRefreshFinished()
             }
         };
 
-        for (int row : diff.rowsToRemove) {
-            ensureReconciling();
-            beginRemoveRows(QModelIndex(), row, row);
-            m_documents.removeAt(row);
-            endRemoveRows();
-        }
-
+        // 1. Update rows first so original indices from diff.rowsToUpdate are valid
+        int updateStart = -1;
+        int updateEnd = -1;
         for (const auto &pair : diff.rowsToUpdate) {
             ensureReconciling();
             int row = pair.first;
             m_documents[row] = pair.second;
-            QModelIndex idx = index(row);
-            emit dataChanged(idx, idx);
+            if (updateStart == -1) {
+                updateStart = updateEnd = row;
+            } else if (row == updateEnd + 1) {
+                updateEnd = row;
+            } else {
+                emit dataChanged(index(updateStart), index(updateEnd));
+                updateStart = updateEnd = row;
+            }
+        }
+        if (updateStart != -1) {
+            emit dataChanged(index(updateStart), index(updateEnd));
         }
 
+        // 2. Remove rows in contiguous batches (rowsToRemove is descending)
+        int removeEnd = -1;
+        int removeStart = -1;
+        for (int row : diff.rowsToRemove) {
+            if (removeEnd == -1) {
+                removeEnd = removeStart = row;
+            } else if (row == removeStart - 1) {
+                removeStart = row;
+            } else {
+                ensureReconciling();
+                beginRemoveRows(QModelIndex(), removeStart, removeEnd);
+                m_documents.erase(m_documents.begin() + removeStart, m_documents.begin() + removeEnd + 1);
+                endRemoveRows();
+                removeEnd = removeStart = row;
+            }
+        }
+        if (removeEnd != -1) {
+            ensureReconciling();
+            beginRemoveRows(QModelIndex(), removeStart, removeEnd);
+            m_documents.erase(m_documents.begin() + removeStart, m_documents.begin() + removeEnd + 1);
+            endRemoveRows();
+        }
+
+        // 3. Insert new rows in a single batch
         if (!diff.rowsToInsert.isEmpty()) {
             ensureReconciling();
             int startRow = m_documents.size();
             beginInsertRows(QModelIndex(), startRow, startRow + diff.rowsToInsert.size() - 1);
-            m_documents.append(diff.rowsToInsert);
+            for (const auto &pair : diff.rowsToInsert) {
+                m_documents.append(pair.second);
+            }
             endInsertRows();
         }
 
         if (isReconciling) {
+            rebuildIndexes();
             emit reconciled();
         }
     }
@@ -478,26 +511,35 @@ void DocumentModel::onRefreshFinished()
     emit refreshCompleted();
 }
 
+void DocumentModel::rebuildIndexes()
+{
+    m_idToRow.clear();
+    m_pathToRow.clear();
+    for (int i = 0; i < m_documents.size(); ++i) {
+        m_idToRow[m_documents.at(i).id] = i;
+        m_pathToRow[m_documents.at(i).absolutePath] = i;
+    }
+}
+
 void DocumentModel::updateThumbnail(int docId, const QString &thumbnailPath)
 {
-    for (int i = 0; i < m_documents.size(); ++i) {
-        if (m_documents.at(i).id == docId) {
-            m_documents[i].thumbnailPath = "file://" + thumbnailPath;
-            QModelIndex idx = index(i);
-            emit dataChanged(idx, idx, {ThumbnailPathRole});
-            break;
-        }
-    }
+    if (!m_idToRow.contains(docId)) return;
+    int row = m_idToRow.value(docId);
+    m_documents[row].thumbnailPath = "file://" + thumbnailPath;
+    QModelIndex idx = index(row);
+    emit dataChanged(idx, idx, {ThumbnailPathRole});
 }
 
 QVariantMap DocumentModel::getDocument(int docId) const
 {
-    for (const auto &doc : m_documents) {
-        if (doc.id == docId) {
-            QVariantMap map;
-            map["docId"] = doc.id;
-            map["fileName"] = doc.fileName;
-            map["absolutePath"] = doc.absolutePath;
+    if (!m_idToRow.contains(docId)) return QVariantMap();
+    int row = m_idToRow.value(docId);
+    const auto &doc = m_documents.at(row);
+
+    QVariantMap map;
+    map["docId"] = doc.id;
+    map["fileName"] = doc.fileName;
+    map["absolutePath"] = doc.absolutePath;
             map["fileSize"] = doc.fileSize;
             map["pageCount"] = doc.pageCount;
             map["starRating"] = doc.starRating;
@@ -529,17 +571,12 @@ QVariantMap DocumentModel::getDocument(int docId) const
             }
 
             return map;
-        }
-    }
     return QVariantMap();
 }
 
 int DocumentModel::findDocIdByPath(const QString &path) const
 {
-    for (const auto &doc : m_documents) {
-        if (doc.absolutePath == path) {
-            return doc.id;
-        }
-    }
-    return -1;
+    if (!m_pathToRow.contains(path)) return -1;
+    int row = m_pathToRow.value(path);
+    return m_documents.at(row).id;
 }

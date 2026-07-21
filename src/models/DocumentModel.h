@@ -68,7 +68,7 @@ struct ModelDiff {
     QList<DocumentInfo> finalDocuments;
     QList<int> rowsToRemove; // descending order
     QList<QPair<int, DocumentInfo>> rowsToUpdate;
-    QList<DocumentInfo> rowsToInsert;
+    QList<QPair<int, DocumentInfo>> rowsToInsert;
 };
 
 class DocumentModel : public QAbstractListModel
@@ -145,6 +145,13 @@ private slots:
 private:
     DatabaseManager *m_dbMgr;
     QList<DocumentInfo> m_documents;
+    
+    // Indexes for O(1) lookups
+    QHash<int, int> m_idToRow;
+    QHash<QString, int> m_pathToRow;
+    
+    void rebuildIndexes();
+
     QTimer *m_refreshTimer;
     int m_pdfCount = 0;
     int m_imageCount = 0;
