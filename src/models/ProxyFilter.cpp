@@ -102,12 +102,13 @@ ProxyFilter::~ProxyFilter() {}
 void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
 {
     if (this->sourceModel()) {
-        disconnect(this->sourceModel(), SIGNAL(aboutToReconcile()), this, SLOT(onAboutToReconcile()));
+        disconnect(this->sourceModel(), SIGNAL(aboutToReconcile()), this,
+                   SLOT(onAboutToReconcile()));
         disconnect(this->sourceModel(), SIGNAL(reconciled()), this, SLOT(onReconciled()));
-        
+
         disconnect(this->sourceModel(), SIGNAL(refreshCompleted()), this,
                    SLOT(scheduleModelDrivenUpdate()));
-        
+
         disconnect(this->sourceModel(), &QAbstractItemModel::modelReset, this,
                    &ProxyFilter::scheduleModelDrivenUpdate);
         disconnect(this->sourceModel(), &QAbstractItemModel::rowsInserted, this,
@@ -121,7 +122,7 @@ void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
     if (sourceModel) {
         connect(sourceModel, SIGNAL(aboutToReconcile()), this, SLOT(onAboutToReconcile()));
         connect(sourceModel, SIGNAL(reconciled()), this, SLOT(onReconciled()));
-        
+
         connect(sourceModel, SIGNAL(refreshCompleted()), this, SLOT(scheduleModelDrivenUpdate()));
 
         connect(sourceModel, &QAbstractItemModel::modelReset, this,
@@ -136,10 +137,7 @@ void ProxyFilter::setSourceModel(QAbstractItemModel *sourceModel)
     updateSearchMatches();
 }
 
-void ProxyFilter::onAboutToReconcile()
-{
-    setDynamicSortFilter(false);
-}
+void ProxyFilter::onAboutToReconcile() { setDynamicSortFilter(false); }
 
 void ProxyFilter::onReconciled()
 {
@@ -271,11 +269,11 @@ void ProxyFilter::updateSearchMatches()
     }
 
     uint64_t currentGen = ++m_searchGeneration;
-    
+
     if (!m_searchWatcher) {
         m_searchWatcher = new QFutureWatcher<QSet<int>>(this);
     }
-    
+
     // Disconnect old finished signals to avoid multiple/stale lambda invocations
     disconnect(m_searchWatcher, &QFutureWatcher<QSet<int>>::finished, nullptr, nullptr);
     connect(m_searchWatcher, &QFutureWatcher<QSet<int>>::finished, this, [this, currentGen]() {
@@ -286,7 +284,7 @@ void ProxyFilter::updateSearchMatches()
     });
 
     QString queryStr = m_filterString;
-    DatabaseManager* dbMgr = m_dbMgr;
+    DatabaseManager *dbMgr = m_dbMgr;
 
     m_searchWatcher->setFuture(QtConcurrent::run([dbMgr, queryStr]() {
         QSet<int> matched;
@@ -297,10 +295,14 @@ void ProxyFilter::updateSearchMatches()
             for (const QString &term : terms) {
                 QSet<int> termMatched;
 
-                // 1. FTS match (file_name, text_snippet, notes) using LIKE for exact substring semantics
+                // 1. Substring match on filename + FTS match on text/notes
                 QSqlQuery qFts(db);
-                qFts.prepare("SELECT rowid FROM document_search WHERE file_name LIKE :likeQuery OR text_snippet LIKE :likeQuery OR notes LIKE :likeQuery");
+                qFts.prepare(
+                    "SELECT id FROM documents WHERE file_name LIKE :likeQuery "
+                    "UNION "
+                    "SELECT rowid FROM document_search WHERE document_search MATCH :ftsQuery");
                 qFts.bindValue(":likeQuery", "%" + term + "%");
+                qFts.bindValue(":ftsQuery", "\"" + term + "\"*");
                 if (qFts.exec()) {
                     while (qFts.next()) termMatched.insert(qFts.value(0).toInt());
                 } else {
@@ -309,12 +311,14 @@ void ProxyFilter::updateSearchMatches()
 
                 // 2. Tag match
                 QSqlQuery qTags(db);
-                qTags.prepare("SELECT document_id FROM document_tags dt JOIN tags t ON dt.tag_id = t.id WHERE t.name LIKE :likeQuery");
+                qTags.prepare(
+                    "SELECT document_id FROM document_tags dt JOIN tags t ON dt.tag_id = t.id "
+                    "WHERE t.name LIKE :likeQuery");
                 qTags.bindValue(":likeQuery", "%" + term + "%");
                 if (qTags.exec()) {
                     while (qTags.next()) termMatched.insert(qTags.value(0).toInt());
                 }
-                
+
                 qWarning() << "Search thread term:" << term << "matches:" << termMatched.size();
 
                 if (first) {
