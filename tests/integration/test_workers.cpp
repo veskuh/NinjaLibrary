@@ -1355,6 +1355,9 @@ void TestWorkers::testSubdirectoryDeletionDetection()
     spyPostScan.clear();
     QMetaObject::invokeMethod(m_controller, "onDirectoryChanged", Q_ARG(QString, subDirPath));
 
+    // Force the debounce timer to fire immediately for the test
+    QMetaObject::invokeMethod(m_controller, "processDirtyRoots", Qt::DirectConnection);
+
     // Wait for the second scan to finish completely
     QThreadPool::globalInstance()->waitForDone();
     while (m_controller->isScanning()) {

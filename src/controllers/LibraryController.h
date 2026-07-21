@@ -141,7 +141,7 @@ private:
     QStringList m_watchedFoldersCache;
     QString m_sidecarDir;
 
-    static QStringList collectSubdirectories(const QString &folderPath);
+    static QStringList collectSubdirectories(const QString &folderPath, const QPointer<LibraryController> &self);
     void updateFoldersCache();
     void watchFolderRecursively(const QString &folderPath);
     QString getSidecarPath(const QString &documentPath) const;
@@ -164,6 +164,14 @@ private:
     QStringList m_pendingStartupResumes;
     QTimer *m_startupResumeTimer;
     QElapsedTimer m_lastCoarseRefreshTimer;
+    
+    QTimer *m_scanDebounceTimer;
+    QSet<QString> m_dirtyRoots;
+
+private slots:
+    void processDirtyRoots();
+
+private:
     void updateScanProgress();
 };
 

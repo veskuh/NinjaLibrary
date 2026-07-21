@@ -138,6 +138,10 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     m_startupResumeTimer = new QTimer(this);
     connect(m_startupResumeTimer, &QTimer::timeout, this, &LibraryController::processNextStartupResume);
 
+    m_scanDebounceTimer = new QTimer(this);
+    m_scanDebounceTimer->setSingleShot(true);
+    connect(m_scanDebounceTimer, &QTimer::timeout, this, &LibraryController::processDirtyRoots);
+
     updateFoldersCache();
 
     // Resume scans that were active when the app quit (staggered)
@@ -751,10 +755,21 @@ void LibraryController::onDirectoryChanged(const QString &path)
     }
 
     if (!topLevelPath.isEmpty()) {
-        emit scanRequested(topLevelPath);
+        m_dirtyRoots.insert(topLevelPath);
     } else {
-        emit scanRequested(path);
+        m_dirtyRoots.insert(path);
     }
+    
+    // Coalesce filesystem events with a 3 second quiet period
+    m_scanDebounceTimer->start(3000);
+}
+
+void LibraryController::processDirtyRoots()
+{
+    for (const QString &root : std::as_const(m_dirtyRoots)) {
+        emit scanRequested(root);
+    }
+    m_dirtyRoots.clear();
 }
 
 void LibraryController::triggerBackgroundCrawl()
@@ -825,7 +840,7 @@ void LibraryController::updateFoldersCache()
     emit watchedFoldersChanged();
 }
 
-QStringList LibraryController::collectSubdirectories(const QString &folderPath)
+QStringList LibraryController::collectSubdirectories(const QString &folderPath, const QPointer<LibraryController> &self)
 {
     QStringList paths;
     if (folderPath.isEmpty() || !QDir(folderPath).exists()) {
@@ -836,6 +851,10 @@ QStringList LibraryController::collectSubdirectories(const QString &folderPath)
 
     QDirIterator it(folderPath, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext()) {
+        if (!self) { // Controller destroyed
+            return paths;
+        }
+        
         QString subDirPath = it.next();
         QFileInfo dirInfo(subDirPath);
         QString absSubDirPath = dirInfo.canonicalFilePath();
@@ -853,15 +872,21 @@ QStringList LibraryController::collectSubdirectories(const QString &folderPath)
 
 void LibraryController::watchFolderRecursively(const QString &folderPath)
 {
+    QPointer<LibraryController> self(this);
     // Offload synchronous directory walking to the post-scan pool to keep the UI responsive
-    QtConcurrent::run(&m_postScanThreadPool, [this, folderPath]() {
-        QStringList paths = collectSubdirectories(folderPath);
+    QtConcurrent::run(&m_postScanThreadPool, [self, folderPath]() {
+        if (!self) return;
+        
+        QStringList paths = collectSubdirectories(folderPath, self);
+        
+        if (!self) return;
         
         // Batch adds into chunks of 500 to avoid blocking the UI thread during large additions
         const int batchSize = 500;
         for (int i = 0; i < paths.size(); i += batchSize) {
+            if (!self) return;
             QStringList batch = paths.mid(i, batchSize);
-            QMetaObject::invokeMethod(this, "addWatcherPathsBatch", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(self.data(), "addWatcherPathsBatch", Qt::QueuedConnection,
                                       Q_ARG(QStringList, batch));
         }
     });
@@ -892,25 +917,8 @@ void LibraryController::onScanRequested(const QString &folderPath)
     if (absPath.isEmpty()) absPath = QDir(folderPath).absolutePath();
 
     if (m_activeScans.contains(absPath)) {
-        QPointer<ScannerTask> task = m_activeScans.value(absPath).task;
-        if (task) {
-            task->cancel();
-            if (QThreadPool::globalInstance()->tryTake(task.data())) {
-                // QThreadPool::tryTake only succeeds if the task hasn't started running yet.
-                // It is safe to delete it here since it was never run.
-                delete task.data();
-                m_activeScans.remove(absPath);
-            } else {
-                // Task is already running, wait for it to finish and restart
-                m_pendingScanRequests[absPath] = true;
-                return;
-            }
-        } else {
-            m_activeScans.remove(absPath);
-        }
-    }
-
-    if (m_activeScans.contains(absPath)) {
+        // If a root is already scanning, set the pending request flag
+        // instead of cancelling the active scan. The scan will restart upon finish.
         m_pendingScanRequests[absPath] = true;
         return;
     }
@@ -1056,23 +1064,31 @@ void LibraryController::onScannerTaskFinished(const QString &folderPath)
     }
 
     // Run cleanupSidecars and recursive directory scan on background thread
-    QRunnable *task = QRunnable::create([this, folderPath, runCleanup]() {
+    QPointer<LibraryController> self(this);
+    QRunnable *task = QRunnable::create([self, folderPath, runCleanup]() {
+        if (!self) return;
+
         if (runCleanup) {
-            cleanupSidecars();
+            self->cleanupSidecars();
         }
+
+        if (!self) return;
 
         // Watch any new subdirectories recursively.
         // Note: There is a transient window between the scan-finish and when
         // this background QDirIterator finishes where newly created subdirs
         // will not trigger filesystem watcher events.
-        QStringList pathsToWatch = collectSubdirectories(folderPath);
+        QStringList pathsToWatch = collectSubdirectories(folderPath, self);
+
+        if (!self) return;
 
         // Apply watchers back on the UI thread
-        QMetaObject::invokeMethod(this, [this, pathsToWatch]() {
+        QMetaObject::invokeMethod(self.data(), [self, pathsToWatch]() {
+            if (!self) return;
             if (!pathsToWatch.isEmpty()) {
-                m_watcher->addPaths(pathsToWatch);
+                self->m_watcher->addPaths(pathsToWatch);
             }
-            emit postScanFinished();
+            emit self->postScanFinished();
         }, Qt::QueuedConnection);
     });
     m_postScanThreadPool.start(task, -10);
