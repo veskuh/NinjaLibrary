@@ -45,6 +45,7 @@
 #include <QPair>
 
 #include "../database/DatabaseManager.h"
+#include "../utils/SidecarManager.h"
 
 class ScannerTask;
 
@@ -141,7 +142,7 @@ private:
     QFileSystemWatcher *m_watcher;
     QTimer *m_crawlTimer;
     QStringList m_watchedFoldersCache;
-    QString m_sidecarDir;
+    SidecarManager m_sidecarManager;
 
     static QStringList collectSubdirectories(const QString &folderPath, const QPointer<LibraryController> &self);
     void updateFoldersCache();

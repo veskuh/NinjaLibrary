@@ -68,6 +68,8 @@ if(APPLE)
         ../src/workers/ThumbnailTask.cpp
         ../src/utils/HashUtils.h
         ../src/utils/HashUtils.cpp
+        ../src/utils/SidecarManager.h
+        ../src/utils/SidecarManager.cpp
         ../src/utils/PdfUtils.h
         ../src/utils/DocUtils.h
         ../src/utils/OcrUtils.h
@@ -97,6 +99,8 @@ else()
         ../src/workers/ThumbnailTask.cpp
         ../src/utils/HashUtils.h
         ../src/utils/HashUtils.cpp
+        ../src/utils/SidecarManager.h
+        ../src/utils/SidecarManager.cpp
         ../src/utils/PdfUtils.h
         ../src/utils/DocUtils.h
         ../src/utils/OcrUtils.h

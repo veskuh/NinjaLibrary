@@ -135,6 +135,8 @@ qt_add_qml_module(NinjaLibrary
         src/workers/OcrTask.cpp
         src/utils/HashUtils.h
         src/utils/HashUtils.cpp
+        src/utils/SidecarManager.h
+        src/utils/SidecarManager.cpp
         src/utils/PdfUtils.h
         src/utils/DocUtils.h
         src/utils/OcrUtils.h

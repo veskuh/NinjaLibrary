@@ -64,50 +64,6 @@
 #include "../utils/MacBookmarks.h"
 #endif
 
-namespace {
-struct SidecarInputs {
-    QString docPath;
-    QStringList tags;
-    int rating = 0;
-    QString notes;
-    bool success = false;
-};
-
-SidecarInputs loadSidecarInputs(int docId, QSqlDatabase &db)
-{
-    SidecarInputs inputs;
-    QSqlQuery docQuery(db);
-    docQuery.prepare("SELECT absolute_path, star_rating FROM documents WHERE id = :docId;");
-    docQuery.bindValue(":docId", docId);
-    if (!docQuery.exec() || !docQuery.next()) {
-        return inputs;
-    }
-    inputs.docPath = docQuery.value(0).toString();
-    inputs.rating = docQuery.value(1).toInt();
-
-    QSqlQuery tagQuery(db);
-    tagQuery.prepare(
-        "SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE "
-        "dt.document_id = :docId;");
-    tagQuery.bindValue(":docId", docId);
-    if (tagQuery.exec()) {
-        while (tagQuery.next()) {
-            inputs.tags << tagQuery.value(0).toString();
-        }
-    }
-
-    QSqlQuery notesQuery(db);
-    notesQuery.prepare("SELECT notes FROM document_search WHERE rowid = :docId;");
-    notesQuery.bindValue(":docId", docId);
-    if (notesQuery.exec() && notesQuery.next()) {
-        inputs.notes = notesQuery.value(0).toString();
-    }
-
-    inputs.success = true;
-    return inputs;
-}
-} // namespace
-
 LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     : QObject(parent), m_dbMgr(dbMgr)
 {
@@ -119,14 +75,6 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     m_crawlTimer = new QTimer(this);
     connect(m_crawlTimer, &QTimer::timeout, this, &LibraryController::triggerBackgroundCrawl);
     m_crawlTimer->start(30 * 60 * 1000);  // 30 minutes in milliseconds
-
-    // Initialize sidecar storage location
-    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    if (dataDir.isEmpty()) {
-        dataDir = QDir::homePath() + "/.local/share/NinjaLibrary";
-    }
-    m_sidecarDir = dataDir + "/sidecars/";
-    QDir().mkpath(m_sidecarDir);
 
     // Cap global thread pool concurrency to hardware_concurrency / 2 (legacy tasks)
     int maxThreads = qMax(1, (int)(std::thread::hardware_concurrency() / 2));
@@ -415,7 +363,7 @@ bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QSt
     }
 
     for (int docId : documentIds) {
-        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
         if (inputs.success) {
             writeSidecar(inputs.docPath, tags, inputs.rating, inputs.notes);
         }
@@ -440,7 +388,7 @@ bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStrin
     }
 
     for (int docId : documentIds) {
-        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
         if (inputs.success) {
             writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
         }
@@ -465,7 +413,7 @@ bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QSt
     }
 
     for (int docId : documentIds) {
-        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
         if (inputs.success) {
             writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
         }
@@ -557,7 +505,7 @@ bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rat
     }
 
     for (int docId : documentIds) {
-        SidecarInputs inputs = loadSidecarInputs(docId, db);
+        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
         if (inputs.success) {
             writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
         }
@@ -579,7 +527,7 @@ bool LibraryController::updateNotes(int docId, const QString &notes)
         return false;
     }
 
-    SidecarInputs inputs = loadSidecarInputs(docId, db);
+    SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
     if (inputs.success) {
         writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
     }
@@ -592,56 +540,13 @@ bool LibraryController::updateNotes(int docId, const QString &notes)
 bool LibraryController::writeSidecar(const QString &documentPath, const QStringList &tags,
                                      int rating, const QString &notes)
 {
-    QString sidecarPath = getSidecarPath(documentPath);
-    if (sidecarPath.isEmpty()) return false;
-
-    QJsonObject obj;
-    obj["document_path"] = documentPath;
-    obj["star_rating"] = rating;
-    obj["notes"] = notes;
-
-    QJsonArray tagsArray;
-    for (const QString &tag : tags) {
-        tagsArray.append(tag);
-    }
-    obj["tags"] = tagsArray;
-
-    QJsonDocument doc(obj);
-    QSaveFile file(sidecarPath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        return false;
-    }
-    file.write(doc.toJson());
-    return file.commit();
+    return m_sidecarManager.writeSidecar(documentPath, tags, rating, notes);
 }
 
 bool LibraryController::readSidecar(const QString &documentPath, QStringList &tags, int &rating,
                                     QString &notes)
 {
-    QString sidecarPath = getSidecarPath(documentPath);
-    if (sidecarPath.isEmpty()) return false;
-
-    QFile file(sidecarPath);
-    if (!file.exists() || !file.open(QIODevice::ReadOnly)) {
-        return false;
-    }
-
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    file.close();
-
-    if (!doc.isObject()) return false;
-    QJsonObject obj = doc.object();
-
-    rating = obj["star_rating"].toInt(0);
-    notes = obj["notes"].toString();
-
-    tags.clear();
-    QJsonArray tagsArray = obj["tags"].toArray();
-    for (int i = 0; i < tagsArray.size(); ++i) {
-        tags.append(tagsArray.at(i).toString());
-    }
-
-    return true;
+    return m_sidecarManager.readSidecar(documentPath, tags, rating, notes);
 }
 
 void LibraryController::onDirectoryChanged(const QString &path)
@@ -804,11 +709,7 @@ void LibraryController::addWatcherPathsBatch(const QStringList &batch)
 
 QString LibraryController::getSidecarPath(const QString &documentPath) const
 {
-    if (documentPath.isEmpty()) return QString();
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData(documentPath.toUtf8());
-    QString hashStr = hash.result().toHex();
-    return m_sidecarDir + hashStr + ".ninja";
+    return m_sidecarManager.getSidecarPath(documentPath);
 }
 
 void LibraryController::onScanRequested(const QString &folderPath)
@@ -1161,29 +1062,7 @@ bool LibraryController::markDocumentOpened(int docId)
 void LibraryController::cleanupSidecars()
 {
     QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return;
-
-    QSet<QString> activeHashes;
-    {
-        QSqlQuery query("SELECT absolute_path FROM documents;", db);
-        while (query.next()) {
-            QString docPath = query.value(0).toString();
-            QCryptographicHash hasher(QCryptographicHash::Sha256);
-            hasher.addData(docPath.toUtf8());
-            activeHashes.insert(hasher.result().toHex());
-        }
-    }
-
-    QDir dir(m_sidecarDir);
-    QStringList filters;
-    filters << "*.ninja";
-    QStringList files = dir.entryList(filters, QDir::Files);
-    for (const QString &filename : files) {
-        QString baseName = QFileInfo(filename).baseName();
-        if (!activeHashes.contains(baseName)) {
-            dir.remove(filename);
-        }
-    }
+    m_sidecarManager.cleanupOrphanSidecars(db);
 }
 
 bool LibraryController::isScanPaused() const { return ScannerTask::s_scanPaused; }
