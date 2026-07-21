@@ -58,6 +58,8 @@ if(APPLE)
         ../src/database/WatchedFolderRepository.cpp
         ../src/database/DocumentRepository.h
         ../src/database/DocumentRepository.cpp
+        ../src/services/ScanTaskManager.h
+        ../src/services/ScanTaskManager.cpp
         ../src/controllers/LibraryController.h
         ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h
@@ -89,6 +91,8 @@ else()
         ../src/database/WatchedFolderRepository.cpp
         ../src/database/DocumentRepository.h
         ../src/database/DocumentRepository.cpp
+        ../src/services/ScanTaskManager.h
+        ../src/services/ScanTaskManager.cpp
         ../src/controllers/LibraryController.h
         ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h

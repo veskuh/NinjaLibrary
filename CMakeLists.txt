@@ -123,6 +123,8 @@ qt_add_qml_module(NinjaLibrary
         src/database/WatchedFolderRepository.cpp
         src/database/DocumentRepository.h
         src/database/DocumentRepository.cpp
+        src/services/ScanTaskManager.h
+        src/services/ScanTaskManager.cpp
         src/models/DocumentModel.h
         src/models/DocumentModel.cpp
         src/models/ProxyFilter.h

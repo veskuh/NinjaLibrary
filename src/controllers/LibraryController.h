@@ -45,6 +45,7 @@
 #include <QPair>
 
 #include "../database/DatabaseManager.h"
+#include "../services/ScanTaskManager.h"
 #include "../utils/SidecarManager.h"
 
 class ScannerTask;
@@ -124,21 +125,12 @@ signals:
 private slots:
     void onDirectoryChanged(const QString &path);
     void triggerBackgroundCrawl();
-
-    // Worker slots
-    void onScanRequested(const QString &folderPath);
-    void onOcrBatchRequested(const QList<QPair<int, QString>> &batch);
-    void onThumbnailBatchRequested(const QList<QPair<int, QString>> &batch);
-    void onScannerTaskFinished(const QString &folderPath);
-    void onScanProgress(const QString &folderPath, int processed, int total);
-    void onLowDiskSpaceDetected();
-    void onOcrTaskFinished(int docId);
-    void onThumbnailTaskFinished(int docId, const QString &thumbnailPath);
     void processNextStartupResume();
     void addWatcherPathsBatch(const QStringList &paths);
 
 private:
     DatabaseManager *m_dbMgr;
+    ScanTaskManager *m_taskManager;
     QFileSystemWatcher *m_watcher;
     QTimer *m_crawlTimer;
     QStringList m_watchedFoldersCache;
@@ -147,47 +139,21 @@ private:
     static QStringList collectSubdirectories(const QString &folderPath, const QPointer<LibraryController> &self);
     void updateFoldersCache();
     void watchFolderRecursively(const QString &folderPath);
-    QString getSidecarPath(const QString &documentPath) const;
 
-private:
-    bool m_isScanning = false;
-    double m_scanProgress = 0.0;
-    int m_activeOcrTasks = 0;
-    int m_totalOcrTasks = 0;
-    struct ActiveScan {
-        QPointer<ScannerTask> task;
-        int processed = 0;
-        int total = 0;
-    };
-    QMap<QString, ActiveScan> m_activeScans;
-    QMap<QString, bool> m_pendingScanRequests;
-    QThreadPool m_thumbnailThreadPool;
-    QThreadPool m_postScanThreadPool;
-    QThreadPool m_scannerThreadPool;
-    QThreadPool m_ocrThreadPool;
-    
 public:
     void waitForWorkersForTesting() {
-        m_scannerThreadPool.waitForDone();
-        m_ocrThreadPool.waitForDone();
-        m_thumbnailThreadPool.waitForDone();
-        m_postScanThreadPool.waitForDone();
+        if (m_taskManager) m_taskManager->waitForWorkersForTesting();
     }
+
 private:
-    QSet<int> m_inFlightThumbnails;
-    QMutex m_inFlightThumbnailsMutex;
     QStringList m_pendingStartupResumes;
     QTimer *m_startupResumeTimer;
-    QElapsedTimer m_lastCoarseRefreshTimer;
     
     QTimer *m_scanDebounceTimer;
     QSet<QString> m_dirtyRoots;
 
 private slots:
     void processDirtyRoots();
-
-private:
-    void updateScanProgress();
 };
 
 #endif  // LIBRARYCONTROLLER_H

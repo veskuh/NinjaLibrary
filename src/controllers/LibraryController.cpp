@@ -67,6 +67,15 @@
 LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     : QObject(parent), m_dbMgr(dbMgr)
 {
+    m_taskManager = new ScanTaskManager(m_dbMgr, this);
+    connect(m_taskManager, &ScanTaskManager::isScanningChanged, this, &LibraryController::isScanningChanged);
+    connect(m_taskManager, &ScanTaskManager::scanProgressChanged, this, &LibraryController::scanProgressChanged);
+    connect(m_taskManager, &ScanTaskManager::scanStatusTextChanged, this, &LibraryController::scanStatusTextChanged);
+    connect(m_taskManager, &ScanTaskManager::isScanPausedChanged, this, &LibraryController::isScanPausedChanged);
+    connect(m_taskManager, &ScanTaskManager::thumbnailGenerated, this, &LibraryController::thumbnailGenerated);
+    connect(m_taskManager, &ScanTaskManager::postScanFinished, this, &LibraryController::postScanFinished);
+    connect(m_taskManager, &ScanTaskManager::libraryChanged, this, &LibraryController::libraryChanged);
+
     m_watcher = new QFileSystemWatcher(this);
     connect(m_watcher, &QFileSystemWatcher::directoryChanged, this,
             &LibraryController::onDirectoryChanged);
@@ -76,18 +85,7 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     connect(m_crawlTimer, &QTimer::timeout, this, &LibraryController::triggerBackgroundCrawl);
     m_crawlTimer->start(30 * 60 * 1000);  // 30 minutes in milliseconds
 
-    // Cap global thread pool concurrency to hardware_concurrency / 2 (legacy tasks)
-    int maxThreads = qMax(1, (int)(std::thread::hardware_concurrency() / 2));
-    QThreadPool::globalInstance()->setMaxThreadCount(maxThreads);
-
-    m_thumbnailThreadPool.setMaxThreadCount(2);
-    m_postScanThreadPool.setMaxThreadCount(1);
-    
-    // Bounded dedicated pools as per #14
-    m_scannerThreadPool.setMaxThreadCount(2);
-    m_ocrThreadPool.setMaxThreadCount(qMax(1, (int)(std::thread::hardware_concurrency() / 4)));
-
-    connect(this, &LibraryController::scanRequested, this, &LibraryController::onScanRequested);
+    connect(this, &LibraryController::scanRequested, m_taskManager, &ScanTaskManager::requestScan);
 
     m_startupResumeTimer = new QTimer(this);
     connect(m_startupResumeTimer, &QTimer::timeout, this, &LibraryController::processNextStartupResume);
@@ -110,11 +108,6 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
 
 LibraryController::~LibraryController()
 {
-    resumeScan();
-    m_thumbnailThreadPool.clear();
-    m_thumbnailThreadPool.waitForDone();
-    m_postScanThreadPool.clear();
-    m_postScanThreadPool.waitForDone();
 }
 
 QStringList LibraryController::watchedFolders() const { return m_watchedFoldersCache; }
@@ -124,32 +117,20 @@ QStringList LibraryController::watchedDirectories() const
     return m_watcher ? m_watcher->directories() : QStringList();
 }
 
-bool LibraryController::isScanning() const { return m_isScanning || m_activeOcrTasks > 0; }
+bool LibraryController::isScanning() const { return m_taskManager->isScanning(); }
 
-double LibraryController::scanProgress() const
-{
-    if (m_isScanning) {
-        return m_scanProgress;
-    } else if (m_totalOcrTasks > 0) {
-        return static_cast<double>(m_totalOcrTasks - m_activeOcrTasks) / m_totalOcrTasks;
-    }
-    return 0.0;
-}
+double LibraryController::scanProgress() const { return m_taskManager->scanProgress(); }
 
 QString LibraryController::scanStatusText() const
 {
-    if (m_isScanning) {
+    if (isScanning()) {
         if (ScannerTask::s_lowDiskSpace) {
             return "Scanning Paused: Low Disk Space (< 500MB)";
         }
         if (isScanPaused()) {
-            return QString("Scanning Paused: %1%").arg(qRound(m_scanProgress * 100));
+            return QString("Scanning Paused: %1%").arg(qRound(scanProgress() * 100));
         }
-        return QString("Scanning: %1%").arg(qRound(m_scanProgress * 100));
-    } else if (m_activeOcrTasks > 0) {
-        return QString("Extracting Text: %1/%2")
-            .arg(m_totalOcrTasks - m_activeOcrTasks)
-            .arg(m_totalOcrTasks);
+        return QString("Scanning: %1%").arg(qRound(scanProgress() * 100));
     }
     return "";
 }
@@ -244,25 +225,7 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
     }
 
     // Cancel active/queued scanner task if exists and wait for database lock release
-    if (m_activeScans.contains(matchedPath)) {
-        QPointer<ScannerTask> task = m_activeScans.value(matchedPath).task;
-        if (task) {
-            task->cancel();
-            if (m_scannerThreadPool.tryTake(task.data())) {
-                // QThreadPool::tryTake only succeeds if the task hasn't started running yet.
-                // It is safe to delete it here since it was never run.
-                delete task.data();
-            } else {
-                // Task is currently running. Wait for it to abort and emit finished() cleanly.
-                QEventLoop loop;
-                connect(task.data(), &ScannerTask::finished, &loop, &QEventLoop::quit);
-                if (task) {
-                    loop.exec();
-                }
-            }
-        }
-        m_activeScans.remove(matchedPath);
-    }
+    m_taskManager->cancelScanForFolder(matchedPath);
 
     // 2. Collect document IDs to delete BEFORE starting any write queries or transactions
     QList<int> docsToDelete = DocumentRepository::getDocIdsByFolderId(db, folderId);
@@ -317,7 +280,7 @@ bool LibraryController::moveToTrash(int documentId, const QString &filePath)
     }
 
     // Clean up sidecar file if exists
-    QString sidecarPath = getSidecarPath(localPath);
+    QString sidecarPath = m_sidecarManager.getSidecarPath(localPath);
     if (!sidecarPath.isEmpty() && QFile::exists(sidecarPath)) {
         QFile::remove(sidecarPath);
     }
@@ -678,15 +641,13 @@ QStringList LibraryController::collectSubdirectories(const QString &folderPath, 
 void LibraryController::watchFolderRecursively(const QString &folderPath)
 {
     QPointer<LibraryController> self(this);
-    // Offload synchronous directory walking to the post-scan pool to keep the UI responsive
-    QtConcurrent::run(&m_postScanThreadPool, [self, folderPath]() {
+    QtConcurrent::run([self, folderPath]() {
         if (!self) return;
         
         QStringList paths = collectSubdirectories(folderPath, self);
         
         if (!self) return;
         
-        // Batch adds into chunks of 500 to avoid blocking the UI thread during large additions
         const int batchSize = 500;
         for (int i = 0; i < paths.size(); i += batchSize) {
             if (!self) return;
@@ -707,285 +668,9 @@ void LibraryController::addWatcherPathsBatch(const QStringList &batch)
     }
 }
 
-QString LibraryController::getSidecarPath(const QString &documentPath) const
-{
-    return m_sidecarManager.getSidecarPath(documentPath);
-}
-
-void LibraryController::onScanRequested(const QString &folderPath)
-{
-    QString absPath = QDir(folderPath).canonicalPath();
-    if (absPath.isEmpty()) absPath = QDir(folderPath).absolutePath();
-
-    if (m_activeScans.contains(absPath)) {
-        // If a root is already scanning, set the pending request flag
-        // instead of cancelling the active scan. The scan will restart upon finish.
-        m_pendingScanRequests[absPath] = true;
-        return;
-    }
-
-    ActiveScan scanInfo;
-    scanInfo.processed = 0;
-    scanInfo.total = 0;
-    m_activeScans.insert(absPath, scanInfo);
-
-    if (!m_isScanning) {
-        m_isScanning = true;
-        emit isScanningChanged();
-        emit scanStatusTextChanged();
-    }
-
-    // Record active scan in database
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (db.isOpen()) {
-        WatchedFolderRepository::recordActiveScan(db, absPath);
-    }
-
-    ScannerTask *task = new ScannerTask(m_dbMgr, absPath);
-    m_activeScans[absPath].task = task;
-
-    connect(task, &ScannerTask::ocrBatchRequested, this, &LibraryController::onOcrBatchRequested);
-    connect(task, &ScannerTask::thumbnailBatchRequested, this, &LibraryController::onThumbnailBatchRequested);
-    connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
-    connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
-    connect(task, &ScannerTask::lowDiskSpaceDetected, this,
-            &LibraryController::onLowDiskSpaceDetected);
-    task->setAutoDelete(true);
-    m_scannerThreadPool.start(task);
-}
-
-void LibraryController::onOcrBatchRequested(const QList<QPair<int, QString>> &batch)
-{
-    if (batch.isEmpty()) return;
-
-    if (m_activeOcrTasks == 0) {
-        m_totalOcrTasks = 0;
-        bool wasScanning = isScanning();
-        m_activeOcrTasks += batch.size();
-        m_totalOcrTasks += batch.size();
-        if (!wasScanning) {
-            emit isScanningChanged();
-        }
-    } else {
-        m_activeOcrTasks += batch.size();
-        m_totalOcrTasks += batch.size();
-    }
-
-    emit scanProgressChanged();
-    emit scanStatusTextChanged();
-
-    m_postScanThreadPool.start([this, batch]() {
-        for (const auto &job : batch) {
-            int docId = job.first;
-            QString filePath = job.second;
-            
-            OcrTask *task = new OcrTask(m_dbMgr, docId, filePath);
-            QObject::connect(task, &OcrTask::finished, this, &LibraryController::onOcrTaskFinished);
-            task->setAutoDelete(true);
-            m_ocrThreadPool.start(task);
-        }
-    });
-}
-
-void LibraryController::onThumbnailBatchRequested(const QList<QPair<int, QString>> &batch)
-{
-    if (batch.isEmpty()) return;
-
-    m_postScanThreadPool.start([this, batch]() {
-        for (const auto &job : batch) {
-            int docId = job.first;
-            QString filePath = job.second;
-            
-            if (DocUtils::isSupportedTextDocument(filePath)) {
-                continue;
-            }
-            
-            {
-                QMutexLocker locker(&m_inFlightThumbnailsMutex);
-                if (m_inFlightThumbnails.contains(docId)) {
-                    continue;
-                }
-                m_inFlightThumbnails.insert(docId);
-            }
-
-            ThumbnailTask *task = new ThumbnailTask(m_dbMgr, docId, filePath);
-            QObject::connect(task, &ThumbnailTask::finished, this, &LibraryController::onThumbnailTaskFinished);
-            task->setAutoDelete(true);
-            m_thumbnailThreadPool.start(task, 0); // low priority
-        }
-    });
-}
-
 void LibraryController::requestThumbnail(int docId, const QString &filePath, bool highPriority)
 {
-    if (DocUtils::isSupportedTextDocument(filePath)) {
-        return;
-    }
-    {
-        QMutexLocker locker(&m_inFlightThumbnailsMutex);
-        if (m_inFlightThumbnails.contains(docId)) {
-            return;
-        }
-        m_inFlightThumbnails.insert(docId);
-    }
-
-    ThumbnailTask *task = new ThumbnailTask(m_dbMgr, docId, filePath);
-    QObject::connect(task, SIGNAL(finished(int,QString)), this, SLOT(onThumbnailTaskFinished(int,QString)));
-    task->setAutoDelete(true);
-    m_thumbnailThreadPool.start(task, highPriority ? 10 : 0);
-}
-
-void LibraryController::onScanProgress(const QString &folderPath, int processed, int total)
-{
-    if (m_activeScans.contains(folderPath)) {
-        m_activeScans[folderPath].processed = processed;
-        m_activeScans[folderPath].total = total;
-    }
-    updateScanProgress();
-    
-    if (!m_lastCoarseRefreshTimer.isValid() || m_lastCoarseRefreshTimer.elapsed() > 2000) {
-        emit libraryUpdated();
-        m_lastCoarseRefreshTimer.restart();
-    }
-}
-
-void LibraryController::onScannerTaskFinished(const QString &folderPath)
-{
-    // If the scanner returned early due to a pause, keep the record so it can be resumed
-    if (ScannerTask::s_scanPaused) {
-        return;
-    }
-
-    m_activeScans.remove(folderPath);
-
-    // Remove active scan record from database
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (db.isOpen()) {
-        WatchedFolderRepository::removeActiveScan(db, folderPath);
-    }
-
-    bool runCleanup = false;
-    if (m_activeScans.isEmpty()) {
-        m_lastCoarseRefreshTimer.invalidate();
-        if (m_isScanning) {
-            m_isScanning = false;
-            if (m_activeOcrTasks == 0) {
-                emit isScanningChanged();
-            }
-        }
-        if (m_scanProgress != 0.0) {
-            m_scanProgress = 0.0;
-            emit scanProgressChanged();
-        }
-        runCleanup = true;
-    } else {
-        updateScanProgress();
-    }
-
-    // Clean up watched subdirectories that no longer exist on disk
-    QStringList watchedPaths = m_watcher->directories();
-    QStringList pathsToRemove;
-    for (const QString &path : watchedPaths) {
-        if (path.startsWith(folderPath + "/") && !QDir(path).exists()) {
-            pathsToRemove.append(path);
-        }
-    }
-    if (!pathsToRemove.isEmpty()) {
-        m_watcher->removePaths(pathsToRemove);
-    }
-
-    // Run cleanupSidecars and recursive directory scan on background thread
-    QPointer<LibraryController> self(this);
-    QRunnable *task = QRunnable::create([self, folderPath, runCleanup]() {
-        if (!self) return;
-
-        if (runCleanup) {
-            self->cleanupSidecars();
-        }
-
-        if (!self) return;
-
-        // Watch any new subdirectories recursively.
-        // Note: There is a transient window between the scan-finish and when
-        // this background QDirIterator finishes where newly created subdirs
-        // will not trigger filesystem watcher events.
-        QStringList pathsToWatch = collectSubdirectories(folderPath, self);
-
-        if (!self) return;
-
-        // Apply watchers back on the UI thread
-        QMetaObject::invokeMethod(self.data(), [self, pathsToWatch]() {
-            if (!self) return;
-            if (!pathsToWatch.isEmpty()) {
-                self->m_watcher->addPaths(pathsToWatch);
-            }
-            emit self->postScanFinished();
-        }, Qt::QueuedConnection);
-    });
-    m_postScanThreadPool.start(task, -10);
-
-    emit scanStatusTextChanged();
-    emit libraryChanged();
-
-    // If there is a pending request for this folder, restart the scan
-    if (m_pendingScanRequests.value(folderPath, false)) {
-        m_pendingScanRequests.remove(folderPath);
-        onScanRequested(folderPath);
-    }
-}
-
-void LibraryController::updateScanProgress()
-{
-    int totalFiles = 0;
-    int totalProcessed = 0;
-
-    for (auto it = m_activeScans.constBegin(); it != m_activeScans.constEnd(); ++it) {
-        totalProcessed += it.value().processed;
-        totalFiles += it.value().total;
-    }
-
-    double progress = 0.0;
-    if (totalFiles > 0) {
-        progress = static_cast<double>(totalProcessed) / totalFiles;
-    }
-
-    if (qAbs(m_scanProgress - progress) > 0.00001) {
-        m_scanProgress = progress;
-        emit scanProgressChanged();
-        emit scanStatusTextChanged();
-    }
-}
-
-void LibraryController::onOcrTaskFinished(int docId)
-{
-    Q_UNUSED(docId);
-
-    if (m_activeOcrTasks > 0) {
-        m_activeOcrTasks--;
-        if (m_activeOcrTasks == 0) {
-            m_totalOcrTasks = 0;
-            emit isScanningChanged();
-        }
-        emit scanProgressChanged();
-        emit scanStatusTextChanged();
-    }
-
-    emit libraryChanged();
-}
-
-void LibraryController::onThumbnailTaskFinished(int docId, const QString &thumbnailPath)
-{
-    {
-        QMutexLocker locker(&m_inFlightThumbnailsMutex);
-        m_inFlightThumbnails.remove(docId);
-    }
-    emit thumbnailGenerated(docId, thumbnailPath);
-}
-
-void LibraryController::onLowDiskSpaceDetected()
-{
-    emit isScanPausedChanged();
-    emit scanStatusTextChanged();
+    m_taskManager->requestThumbnail(docId, filePath, highPriority);
 }
 
 void LibraryController::showInFinder(const QString &filePath)
@@ -1065,55 +750,21 @@ void LibraryController::cleanupSidecars()
     m_sidecarManager.cleanupOrphanSidecars(db);
 }
 
-bool LibraryController::isScanPaused() const { return ScannerTask::s_scanPaused; }
+bool LibraryController::isScanPaused() const { return m_taskManager->isScanPaused(); }
 
 void LibraryController::pauseScan()
 {
-    if (!ScannerTask::s_scanPaused) {
-        ScannerTask::s_scanPaused = true;
-        emit isScanPausedChanged();
-        emit scanStatusTextChanged();
-    }
+    m_taskManager->pauseScan();
 }
 
 void LibraryController::resumeScan()
 {
-    if (ScannerTask::s_scanPaused) {
-        ScannerTask::s_scanPaused = false;
-        {
-            QMutexLocker locker(&ScannerTask::s_pauseMutex);
-            ScannerTask::s_pauseCondition.wakeAll();
-        }
-        
-        // Restart tasks that checkpointed and returned early
-        for (auto it = m_activeScans.begin(); it != m_activeScans.end(); ++it) {
-            if (!it.value().task) {
-                ScannerTask *task = new ScannerTask(m_dbMgr, it.key());
-                it.value().task = task;
-                connect(task, &ScannerTask::finished, this, &LibraryController::onScannerTaskFinished);
-                connect(task, &ScannerTask::progress, this, &LibraryController::onScanProgress);
-                connect(task, &ScannerTask::ocrBatchRequested, this, &LibraryController::onOcrBatchRequested);
-                connect(task, &ScannerTask::thumbnailBatchRequested, this,
-                        &LibraryController::onThumbnailBatchRequested);
-                connect(task, &ScannerTask::lowDiskSpaceDetected, this,
-                        &LibraryController::onLowDiskSpaceDetected);
-                task->setAutoDelete(true);
-                m_scannerThreadPool.start(task);
-            }
-        }
-        
-        emit isScanPausedChanged();
-        emit scanStatusTextChanged();
-    }
+    m_taskManager->resumeScan();
 }
 
 void LibraryController::toggleScanPause()
 {
-    if (isScanPaused()) {
-        resumeScan();
-    } else {
-        pauseScan();
-    }
+    m_taskManager->toggleScanPause();
 }
 
 void LibraryController::processNextStartupResume()
