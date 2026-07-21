@@ -132,6 +132,7 @@ private slots:
     void onOcrTaskFinished(int docId);
     void onThumbnailTaskFinished(int docId, const QString &thumbnailPath);
     void processNextStartupResume();
+    void addWatcherPathsBatch(const QStringList &paths);
 
 private:
     DatabaseManager *m_dbMgr;

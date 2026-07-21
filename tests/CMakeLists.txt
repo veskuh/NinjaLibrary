@@ -104,6 +104,7 @@ target_link_libraries(test_workers PRIVATE
     Qt6::Gui
     Qt6::Sql
     Qt6::Test
+    Qt6::Concurrent
 )
 
 add_test(NAME test_workers COMMAND test_workers)

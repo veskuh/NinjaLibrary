@@ -48,6 +48,7 @@
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QtConcurrent>
 #include <thread>
 #include "../database/TagRepository.h"
 
@@ -852,9 +853,27 @@ QStringList LibraryController::collectSubdirectories(const QString &folderPath)
 
 void LibraryController::watchFolderRecursively(const QString &folderPath)
 {
-    QStringList paths = collectSubdirectories(folderPath);
-    if (!paths.isEmpty()) {
-        m_watcher->addPaths(paths);
+    // Offload synchronous directory walking to the post-scan pool to keep the UI responsive
+    QtConcurrent::run(&m_postScanThreadPool, [this, folderPath]() {
+        QStringList paths = collectSubdirectories(folderPath);
+        
+        // Batch adds into chunks of 500 to avoid blocking the UI thread during large additions
+        const int batchSize = 500;
+        for (int i = 0; i < paths.size(); i += batchSize) {
+            QStringList batch = paths.mid(i, batchSize);
+            QMetaObject::invokeMethod(this, "addWatcherPathsBatch", Qt::QueuedConnection,
+                                      Q_ARG(QStringList, batch));
+        }
+    });
+}
+
+void LibraryController::addWatcherPathsBatch(const QStringList &batch)
+{
+    if (!batch.isEmpty()) {
+        QStringList failed = m_watcher->addPaths(batch);
+        if (!failed.isEmpty()) {
+            qWarning() << "QFileSystemWatcher failed to watch" << failed.size() << "directories out of a batch of" << batch.size();
+        }
     }
 }
 
