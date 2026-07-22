@@ -66,6 +66,7 @@ LibraryController::LibraryController(DatabaseManager *dbMgr, QObject *parent)
     : QObject(parent), m_dbMgr(dbMgr)
 {
     m_taskManager = new ScanTaskManager(m_dbMgr, this);
+    m_batchService = new DocumentBatchService(m_dbMgr, &m_sidecarManager, this);
     connect(m_taskManager, &ScanTaskManager::isScanningChanged, this, &LibraryController::isScanningChanged);
     connect(m_taskManager, &ScanTaskManager::scanProgressChanged, this, &LibraryController::scanProgressChanged);
     connect(m_taskManager, &ScanTaskManager::scanStatusTextChanged, this, &LibraryController::scanStatusTextChanged);
@@ -269,125 +270,38 @@ bool LibraryController::removeWatchedFolder(const QString &folderPath)
 
 bool LibraryController::moveToTrash(int documentId, const QString &filePath)
 {
-    QUrl url(filePath);
-    QString localPath = url.isLocalFile() ? url.toLocalFile() : filePath;
-
-    if (localPath.isEmpty() || !QFile::exists(localPath)) {
-        qWarning() << "moveToTrash: File does not exist or path is empty:" << localPath;
-        return false;
+    bool res = m_batchService->moveToTrash(documentId, filePath);
+    if (res) {
+        emit libraryChanged();
     }
-
-    if (!QFile::moveToTrash(localPath)) {
-        qWarning() << "moveToTrash: Failed to move file to trash:" << localPath;
-        return false;
-    }
-
-    // Clean up sidecar file if exists
-    QString sidecarPath = m_sidecarManager.getSidecarPath(localPath);
-    if (!sidecarPath.isEmpty() && QFile::exists(sidecarPath)) {
-        QFile::remove(sidecarPath);
-    }
-
-    // Clean up cached thumbnail file if exists
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData(localPath.toUtf8());
-    QString hashStr = hash.result().toHex();
-    QString cacheDir =
-        QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbnails/";
-    QString thumbPath = cacheDir + hashStr + ".png";
-    if (QFile::exists(thumbPath)) {
-        QFile::remove(thumbPath);
-    }
-
-    // Now remove from database
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return false;
-
-    db.transaction();
-
-    if (!DatabaseManager::deleteDocumentCascade(db, documentId)) {
-        db.rollback();
-        return false;
-    }
-
-    db.commit();
-    emit libraryChanged();
-    return true;
+    return res;
 }
 
 bool LibraryController::batchUpdateTags(const QList<int> &documentIds, const QStringList &tags)
 {
-    if (documentIds.isEmpty()) return true;
-
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return false;
-
-    db.transaction();
-    if (!DocumentRepository::batchUpdateTags(db, documentIds, tags)) {
-        db.rollback();
-        return false;
+    bool res = m_batchService->batchUpdateTags(documentIds, tags);
+    if (res) {
+        emit libraryChanged();
     }
-
-    for (int docId : documentIds) {
-        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
-        if (inputs.success) {
-            writeSidecar(inputs.docPath, tags, inputs.rating, inputs.notes);
-        }
-    }
-
-    db.commit();
-    emit libraryChanged();
-    return true;
+    return res;
 }
 
 bool LibraryController::batchAddTags(const QList<int> &documentIds, const QStringList &tags)
 {
-    if (documentIds.isEmpty() || tags.isEmpty()) return true;
-
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return false;
-
-    db.transaction();
-    if (!DocumentRepository::batchAddTags(db, documentIds, tags)) {
-        db.rollback();
-        return false;
+    bool res = m_batchService->batchAddTags(documentIds, tags);
+    if (res) {
+        emit libraryChanged();
     }
-
-    for (int docId : documentIds) {
-        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
-        if (inputs.success) {
-            writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
-        }
-    }
-
-    db.commit();
-    emit libraryChanged();
-    return true;
+    return res;
 }
 
 bool LibraryController::batchRemoveTags(const QList<int> &documentIds, const QStringList &tags)
 {
-    if (documentIds.isEmpty() || tags.isEmpty()) return true;
-
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return false;
-
-    db.transaction();
-    if (!DocumentRepository::batchRemoveTags(db, documentIds, tags)) {
-        db.rollback();
-        return false;
+    bool res = m_batchService->batchRemoveTags(documentIds, tags);
+    if (res) {
+        emit libraryChanged();
     }
-
-    for (int docId : documentIds) {
-        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
-        if (inputs.success) {
-            writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
-        }
-    }
-
-    db.commit();
-    emit libraryChanged();
-    return true;
+    return res;
 }
 
 QStringList LibraryController::getUniqueTags() const
@@ -458,49 +372,20 @@ QVariantMap LibraryController::handleDroppedUrl(const QString &urlStr)
 
 bool LibraryController::batchUpdateRating(const QList<int> &documentIds, int rating)
 {
-    if (documentIds.isEmpty()) return true;
-    if (rating < 0 || rating > 5) return false;
-
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return false;
-
-    db.transaction();
-    if (!DocumentRepository::batchUpdateRating(db, documentIds, rating)) {
-        db.rollback();
-        return false;
+    bool res = m_batchService->batchUpdateRating(documentIds, rating);
+    if (res) {
+        emit libraryChanged();
     }
-
-    for (int docId : documentIds) {
-        SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
-        if (inputs.success) {
-            writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
-        }
-    }
-
-    db.commit();
-    emit libraryChanged();
-    return true;
+    return res;
 }
 
 bool LibraryController::updateNotes(int docId, const QString &notes)
 {
-    QSqlDatabase db = m_dbMgr->getDatabaseConnection();
-    if (!db.isOpen()) return false;
-
-    db.transaction();
-    if (!DocumentRepository::updateNotes(db, docId, notes)) {
-        db.rollback();
-        return false;
+    bool res = m_batchService->updateNotes(docId, notes);
+    if (res) {
+        emit libraryChanged();
     }
-
-    SidecarInputs inputs = SidecarManager::loadSidecarInputs(docId, db);
-    if (inputs.success) {
-        writeSidecar(inputs.docPath, inputs.tags, inputs.rating, inputs.notes);
-    }
-
-    db.commit();
-    emit libraryChanged();
-    return true;
+    return res;
 }
 
 bool LibraryController::writeSidecar(const QString &documentPath, const QStringList &tags,

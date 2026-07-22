@@ -45,6 +45,7 @@
 #include <QPair>
 
 #include "../database/DatabaseManager.h"
+#include "../services/DocumentBatchService.h"
 #include "../services/ScanTaskManager.h"
 #include "../utils/SidecarManager.h"
 
@@ -132,6 +133,7 @@ private slots:
 private:
     DatabaseManager *m_dbMgr;
     ScanTaskManager *m_taskManager;
+    DocumentBatchService *m_batchService;
     QFileSystemWatcher *m_watcher;
     QTimer *m_crawlTimer;
     QStringList m_watchedFoldersCache;

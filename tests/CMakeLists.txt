@@ -60,6 +60,8 @@ if(APPLE)
         ../src/database/DocumentRepository.cpp
         ../src/services/ScanTaskManager.h
         ../src/services/ScanTaskManager.cpp
+        ../src/services/DocumentBatchService.h
+        ../src/services/DocumentBatchService.cpp
         ../src/controllers/LibraryController.h
         ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h
@@ -93,6 +95,8 @@ else()
         ../src/database/DocumentRepository.cpp
         ../src/services/ScanTaskManager.h
         ../src/services/ScanTaskManager.cpp
+        ../src/services/DocumentBatchService.h
+        ../src/services/DocumentBatchService.cpp
         ../src/controllers/LibraryController.h
         ../src/controllers/LibraryController.cpp
         ../src/workers/ScannerTask.h

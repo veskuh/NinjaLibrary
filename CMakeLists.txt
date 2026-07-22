@@ -125,6 +125,8 @@ qt_add_qml_module(NinjaLibrary
         src/database/DocumentRepository.cpp
         src/services/ScanTaskManager.h
         src/services/ScanTaskManager.cpp
+        src/services/DocumentBatchService.h
+        src/services/DocumentBatchService.cpp
         src/models/DocumentModel.h
         src/models/DocumentModel.cpp
         src/models/ProxyFilter.h
