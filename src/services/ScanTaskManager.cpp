@@ -98,6 +98,23 @@ void ScanTaskManager::cancelScanForFolder(const QString &folderPath)
             }
         }
         m_activeScans.remove(folderPath);
+
+        if (m_activeScans.isEmpty()) {
+            m_lastCoarseRefreshTimer.invalidate();
+            if (m_isScanning) {
+                m_isScanning = false;
+                if (m_activeOcrTasks == 0) {
+                    emit isScanningChanged(false);
+                }
+            }
+            if (m_scanProgress != 0.0) {
+                m_scanProgress = 0.0;
+                emit scanProgressChanged(0.0);
+            }
+        } else {
+            updateScanProgress();
+        }
+        emit scanStatusTextChanged(m_isScanning ? "Scanning..." : (m_activeOcrTasks > 0 ? "OCR processing..." : "Idle"));
     }
 }
 
