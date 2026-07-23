@@ -140,11 +140,13 @@ TestCase {
         compare(fileMenu.itemAt(0).text, "Add Watched Folder...", "First File item should be Add Watched Folder");
         compare(fileMenu.itemAt(2).text, "Quit", "Second File item should be Quit"); // index 2 because separator is at index 1
 
-        // Verify Help menu About and Preferences
+        // Verify Help menu About, User Guide, Shortcuts, and Preferences
         let helpMenu = menus[4];
-        verify(helpMenu.count >= 2, "Help menu should have items");
-        compare(helpMenu.itemAt(0).text, "About NinjaLibrary", "First Help item should be About");
-        compare(helpMenu.itemAt(1).text, "Preferences...", "Second Help item should be Preferences");
+        verify(helpMenu.count >= 4, "Help menu should have items");
+        compare(helpMenu.itemAt(0).text, "User Guide", "First Help item should be User Guide");
+        compare(helpMenu.itemAt(1).text, "Keyboard Shortcuts", "Second Help item should be Keyboard Shortcuts");
+        compare(helpMenu.itemAt(3).text, "About NinjaLibrary", "Fourth Help item should be About NinjaLibrary");
+        compare(helpMenu.itemAt(4).text, "Preferences...", "Fifth Help item should be Preferences");
 
         // Test Sidebar Toggle via Menu Trigger
         let sidebar = findChildByType(win, "Sidebar");

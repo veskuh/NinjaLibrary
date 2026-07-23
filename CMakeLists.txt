@@ -160,6 +160,7 @@ qt_add_qml_module(NinjaLibrary
         src/components/LocalTableRowDelegate.qml
         src/components/DocumentPreview.qml
         src/components/ImagePreview.qml
+        src/components/DocumentationDialog.qml
         src/views/GridCanvas.qml
         src/views/TableCanvas.qml
         src/panels/Sidebar.qml
@@ -170,6 +171,8 @@ qt_add_qml_module(NinjaLibrary
         src/panels/QuickLookDialog.qml
         src/panels/QuickSearchDialog.qml
         src/panels/TrashConfirmDialog.qml
+        src/panels/UserGuideDialog.qml
+        src/panels/ShortcutsDialog.qml
 )
 
 # Add platform specific source files
