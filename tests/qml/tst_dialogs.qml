@@ -64,6 +64,30 @@ TestCase {
         dialog.destroy();
     }
 
+    function test_user_guide_dialog() {
+        let dialog = createTemporaryQmlObject("import NinjaLibrary; UserGuideDialog {}", this);
+        verify(dialog !== null, "UserGuideDialog should be created");
+
+        compare(dialog.docTitle, "User Guide");
+        verify(dialog.docText.indexOf("Adding Watched Folders") >= 0, "UserGuideDialog text should contain section headers");
+        verify(dialog.docText.indexOf("Browsing & View Toggle") >= 0, "UserGuideDialog text should contain browsing section");
+        verify(dialog.docText.indexOf("Searching & Quick Search") >= 0, "UserGuideDialog text should contain searching section");
+
+        dialog.destroy();
+    }
+
+    function test_shortcuts_dialog() {
+        let dialog = createTemporaryQmlObject("import NinjaLibrary; ShortcutsDialog {}", this);
+        verify(dialog !== null, "ShortcutsDialog should be created");
+
+        compare(dialog.docTitle, "Keyboard Shortcuts");
+        verify(dialog.docText.indexOf("Ctrl+O / Cmd+O") >= 0, "ShortcutsDialog text should contain Add Folder shortcut");
+        verify(dialog.docText.indexOf("Ctrl+Q / Cmd+Q") >= 0, "ShortcutsDialog text should contain Quit shortcut");
+        verify(dialog.docText.indexOf("Ctrl+Shift+F / Cmd+Shift+F") >= 0, "ShortcutsDialog text should contain Quick Search shortcut");
+
+        dialog.destroy();
+    }
+
     function test_preferences_dialog() {
         let dialog = createTemporaryQmlObject("import NinjaLibrary; PreferencesDialog {}", this);
         verify(dialog !== null, "PreferencesDialog should be created");

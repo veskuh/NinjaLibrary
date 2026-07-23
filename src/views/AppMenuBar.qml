@@ -43,6 +43,8 @@ MenuBar {
     property bool includeSubfolderContentsVal: false
     property bool showSubfolderIconsVal: true
     signal minimizeRequested
+    signal openUserGuideRequested
+    signal openShortcutsRequested
     signal openAboutRequested
     signal openPreferencesRequested
 
@@ -216,6 +218,19 @@ MenuBar {
 
     Menu {
         title: "Help"
+        MenuItem {
+            action: Action {
+                text: "User Guide"
+                onTriggered: appMenuBar.openUserGuideRequested()
+            }
+        }
+        MenuItem {
+            action: Action {
+                text: "Keyboard Shortcuts"
+                onTriggered: appMenuBar.openShortcutsRequested()
+            }
+        }
+        MenuSeparator {}
         MenuItem {
             action: Action {
                 text: "About NinjaLibrary"

@@ -213,6 +213,8 @@ KaakaoWindow {
     property alias trashDialog: trashDialog
     property alias quickLookDialog: quickLookDialog
     property alias quickSearchDialog: quickSearchDialog
+    property alias userGuideDialog: userGuideDialog
+    property alias shortcutsDialog: shortcutsDialog
 
     menuBar: AppMenuBar {
         id: mainMenuBar
@@ -225,6 +227,8 @@ KaakaoWindow {
         onSetViewModeRequested: index => viewSegment.currentIndex = index
         onSetFolderViewModeRequested: mode => window.setFolderViewMode(mode)
         onMinimizeRequested: window.showMinimized()
+        onOpenUserGuideRequested: userGuideDialog.open()
+        onOpenShortcutsRequested: shortcutsDialog.open()
         onOpenAboutRequested: aboutDialog.open()
         onOpenPreferencesRequested: prefsDialog.open()
     }
@@ -247,6 +251,14 @@ KaakaoWindow {
     }
 
     // Modal dialog instances
+    UserGuideDialog {
+        id: userGuideDialog
+    }
+
+    ShortcutsDialog {
+        id: shortcutsDialog
+    }
+
     AboutDialog {
         id: aboutDialog
     }
